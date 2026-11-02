@@ -141,33 +141,75 @@ static bool push(s_vm *vm, s_value v) {
 /* Format a scalar value into a string for print/println. Returns false for
  * values that have no textual form (raw arrays/records). For a string value,
  * *data points into the GC object; for scalars it points into buf. */
-static bool fmt_scalar(s_value v, char *buf, s_size bufsz,
-                       const char **data, s_size *len) {
+typedef struct s_buf {
+    char *data;
+    s_size len, cap;
+} s_buf;
+
+static bool buf_reserve(s_buf *b, s_size extra) {
+    if (b->len + extra + 1 <= b->cap) return true;
+    s_size ncap = b->cap ? b->cap * 2 : 64;
+    while (ncap < b->len + extra + 1) ncap *= 2;
+    char *n = realloc(b->data, ncap);
+    if (!n) return false;
+    b->data = n;
+    b->cap = ncap;
+    return true;
+}
+
+static bool buf_app(s_buf *b, const char *s, s_size len) {
+    if (!buf_reserve(b, len)) return false;
+    memcpy(b->data + b->len, s, len);
+    b->len += len;
+    b->data[b->len] = '\0';
+    return true;
+}
+
+/* Recursively render any value into a string. depth guards against cyclic
+ * array/record graphs. */
+static bool fmt_into(s_vm *vm, s_value v, s_buf *b, int depth) {
+    (void)vm;
+    if (depth > 32) return buf_app(b, "...", 3);
     switch (v.tag) {
-    case S_VAL_INT:
-        *len = s_rt_format_i64(buf, bufsz, v.u.i);
-        *data = buf;
-        return true;
-    case S_VAL_FLOAT:
-        *len = s_rt_format_f64(buf, bufsz, v.u.f);
-        if (*len >= bufsz) *len = bufsz - 1;
-        *data = buf;
-        return true;
+    case S_VAL_INT: {
+        char t[40];
+        s_size n = s_rt_format_i64(t, sizeof t, v.u.i);
+        return buf_app(b, t, n);
+    }
+    case S_VAL_FLOAT: {
+        char t[64];
+        s_size n = s_rt_format_f64(t, sizeof t, v.u.f);
+        if (n >= sizeof t) n = sizeof t - 1;
+        return buf_app(b, t, n);
+    }
     case S_VAL_BOOL:
-        *data = v.u.b ? "true" : "false";
-        *len = v.u.b ? 4 : 5;
-        return true;
+        return buf_app(b, v.u.b ? "true" : "false", v.u.b ? 4 : 5);
     case S_VAL_NONE:
-        *data = "unit";
-        *len = 4;
-        return true;
-    case S_VAL_OBJ:
-        if (v.u.o->kind == S_OBJ_STR) {
-            *data = s_obj_str_data(v.u.o);
-            *len = s_obj_str_len(v.u.o);
-            return true;
+        return buf_app(b, "unit", 4);
+    case S_VAL_OBJ: {
+        s_gcobj *o = v.u.o;
+        if (o->kind == S_OBJ_STR)
+            return buf_app(b, s_obj_str_data(o), s_obj_str_len(o));
+        if (o->kind == S_OBJ_CLOSURE)
+            return buf_app(b, "<closure>", 9);
+        if (o->kind == S_OBJ_ARRAY) {
+            if (!buf_app(b, "[", 1)) return false;
+            s_value *el = s_obj_array_data(o);
+            for (s_u32 i = 0; i < o->count; ++i) {
+                if (i && !buf_app(b, ", ", 2)) return false;
+                if (!fmt_into(vm, el[i], b, depth + 1)) return false;
+            }
+            return buf_app(b, "]", 1);
         }
-        return false;
+        /* record */
+        if (!buf_app(b, "{", 1)) return false;
+        s_value *f = s_obj_record_fields(o);
+        for (s_u32 i = 0; i < o->count; ++i) {
+            if (i && !buf_app(b, ", ", 2)) return false;
+            if (!fmt_into(vm, f[i], b, depth + 1)) return false;
+        }
+        return buf_app(b, "}", 1);
+    }
     }
     return false;
 }
@@ -181,15 +223,16 @@ static bool push_str_from_buf(s_vm *vm, const char *buf, s_size len) {
 
 static bool builtin_print(s_vm *vm, bool newline) {
     s_value s = pop(vm);
-    char buf[64];
-    const char *data;
-    s_size len;
-    if (!fmt_scalar(s, buf, sizeof buf, &data, &len)) {
-        vm_trap(vm, "print cannot format this value");
+    s_buf b;
+    memset(&b, 0, sizeof(b));
+    if (!fmt_into(vm, s, &b, 0)) {
+        free(b.data);
+        vm_trap(vm, "print: out of memory");
         return false;
     }
-    if (newline) s_rt_write_line(data, len);
-    else s_rt_write(data, len);
+    if (newline) s_rt_write_line(b.data, b.len);
+    else s_rt_write(b.data, b.len);
+    free(b.data);
     return push(vm, s_val_none());
 }
 
