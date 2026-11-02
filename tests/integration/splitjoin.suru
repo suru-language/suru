@@ -1,0 +1,7 @@
+func main() {
+    let parts = str_split("a,b,c", ",");
+    println(to_str(array_len(parts)));
+    println(parts[0]);
+    println(parts[2]);
+    println(str_join(parts, "-"));
+}

@@ -41,6 +41,8 @@ typedef enum s_builtin_id {
     S_BUILTIN_STR_TRIM,
     S_BUILTIN_ARGS_LEN,
     S_BUILTIN_ARGS,
+    S_BUILTIN_STR_SPLIT,
+    S_BUILTIN_STR_JOIN,
     S_BUILTIN_COUNT
 } s_builtin_id;
 
@@ -52,6 +54,7 @@ typedef enum s_sig_type {
     S_SIG_STR,
     S_SIG_ARRAY_INT,
     S_SIG_ARRAY,          /* any array, regardless of element type */
+    S_SIG_ARRAY_STR,      /* array of strings */
     S_SIG_ANY,            /* any value */
 } s_sig_type;
 

@@ -163,6 +163,10 @@ static s_type *sig_to_type(s_sema *S, s_sig_type st) {
         t->kind = S_TYPE_ARRAY;
         t->elem = NULL; /* wildcard: matches any element type */
         break;
+    case S_SIG_ARRAY_STR:
+        t->kind = S_TYPE_ARRAY;
+        t->elem = sig_to_type(S, S_SIG_STR);
+        break;
     case S_SIG_ANY:
         t->kind = S_TYPE_ANY;
         break;

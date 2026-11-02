@@ -548,6 +548,86 @@ static bool builtin_args(s_vm *vm) {
     return push(vm, s_val_obj(o));
 }
 
+static bool builtin_str_split(s_vm *vm) {
+    s_value sep = pop(vm);
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR ||
+        sep.tag != S_VAL_OBJ || sep.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "str_split expects (str, str)");
+        return false;
+    }
+    const char *data = s_obj_str_data(s.u.o);
+    s_size sl = s_obj_str_len(s.u.o);
+    const char *sp = s_obj_str_data(sep.u.o);
+    s_size pl = s_obj_str_len(sep.u.o);
+    if (pl == 0) { vm_trap(vm, "str_split separator must be non-empty"); return false; }
+    s_size n = 1;
+    for (s_size i = 0; i + pl <= sl; ) {
+        if (memcmp(data + i, sp, pl) == 0) { n++; i += pl; }
+        else i++;
+    }
+    s_gcobj *arr = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)n, 0);
+    if (!arr) return false;
+    s_value *dst = s_obj_array_data(arr);
+    s_size start = 0, k = 0;
+    for (s_size i = 0; i + pl <= sl; ) {
+        if (memcmp(data + i, sp, pl) == 0) {
+            s_size ln = i - start;
+            s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)ln, ln);
+            if (!o) return false;
+            if (ln) memcpy(s_obj_str_data(o), data + start, ln);
+            dst[k++] = s_val_obj(o);
+            i += pl;
+            start = i;
+        } else {
+            i++;
+        }
+    }
+    {
+        s_size ln = sl - start;
+        s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)ln, ln);
+        if (!o) return false;
+        if (ln) memcpy(s_obj_str_data(o), data + start, ln);
+        dst[k++] = s_val_obj(o);
+    }
+    return push(vm, s_val_obj(arr));
+}
+
+static bool builtin_str_join(s_vm *vm) {
+    s_value sep = pop(vm);
+    s_value arr = pop(vm);
+    if (arr.tag != S_VAL_OBJ || arr.u.o->kind != S_OBJ_ARRAY ||
+        sep.tag != S_VAL_OBJ || sep.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "str_join expects ([str], str)");
+        return false;
+    }
+    s_size n = arr.u.o->count;
+    const char *sp = s_obj_str_data(sep.u.o);
+    s_size pl = s_obj_str_len(sep.u.o);
+    s_size total = 0;
+    for (s_size i = 0; i < n; ++i) {
+        s_value e = s_obj_array_data(arr.u.o)[i];
+        if (e.tag != S_VAL_OBJ || e.u.o->kind != S_OBJ_STR) {
+            vm_trap(vm, "str_join array must contain strings");
+            return false;
+        }
+        total += s_obj_str_len(e.u.o);
+        if (i + 1 < n) total += pl;
+    }
+    if (total > (1u << 24)) { vm_trap(vm, "str_join too large"); return false; }
+    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
+    if (!o) return false;
+    char *d = s_obj_str_data(o);
+    s_size off = 0;
+    for (s_size i = 0; i < n; ++i) {
+        s_value e = s_obj_array_data(arr.u.o)[i];
+        s_size ln = s_obj_str_len(e.u.o);
+        if (ln) { memcpy(d + off, s_obj_str_data(e.u.o), ln); off += ln; }
+        if (i + 1 < n) { memcpy(d + off, sp, pl); off += pl; }
+    }
+    return push(vm, s_val_obj(o));
+}
+
 static bool builtin_str_to_f64(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
@@ -593,6 +673,8 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_STR_TRIM: return builtin_str_trim(vm);
     case S_BUILTIN_ARGS_LEN: return builtin_args_len(vm);
     case S_BUILTIN_ARGS: return builtin_args(vm);
+    case S_BUILTIN_STR_SPLIT: return builtin_str_split(vm);
+    case S_BUILTIN_STR_JOIN: return builtin_str_join(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;
