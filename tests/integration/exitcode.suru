@@ -1,0 +1,4 @@
+func main() {
+    exit(7);
+    println("unreached");
+}

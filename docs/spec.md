@@ -255,11 +255,15 @@ The standard library provides a small set of builtin functions (see
 - `read_line() -> str` — read a line from stdin ("" on EOF).
 - `make_array(n: int) -> [int]` — a zero-filled array of `n` elements.
 - `range(lo: int, hi: int) -> [int]` — the integers `lo .. hi-1`.
+- `range_step(lo: int, hi: int, step: int) -> [int]` — like `range`,
+  with a (nonzero) step; a negative step counts down.
 - `substr(s: str, start: int, len: int) -> str` — substring, bounds-clamped.
 - `str_contains(haystack: str, needle: str) -> bool`.
 - `abs(i: int) -> int`, `min(a: int, b: int) -> int`,
   `max(a: int, b: int) -> int`.
 - `str_to_f64(s: str) -> float` — parse a float from a string.
+- `assert(cond: bool, msg: str)` — trap with `msg` if `cond` is false.
+- `exit(code: int)` — terminate the program immediately with `code`.
 - `f64_to_i64`, `i64_to_f64` conversions.
 
 The set is intentionally minimal; it will grow through the release roadmap.

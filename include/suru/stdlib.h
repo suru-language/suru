@@ -31,6 +31,9 @@ typedef enum s_builtin_id {
     S_BUILTIN_MIN,
     S_BUILTIN_MAX,
     S_BUILTIN_STR_TO_F64,
+    S_BUILTIN_RANGE_STEP,
+    S_BUILTIN_ASSERT,
+    S_BUILTIN_EXIT,
     S_BUILTIN_COUNT
 } s_builtin_id;
 

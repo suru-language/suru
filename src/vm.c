@@ -25,6 +25,7 @@ struct s_vm {
     s_size sp;
     s_size fp;
     s_u32 cur_fid;
+    bool exit_halt;
     s_cont *calls;
     s_size ncalls, capcalls;
     s_u32 alloc_counter;
@@ -379,6 +380,53 @@ static bool builtin_minmax(s_vm *vm, bool is_max) {
     return push(vm, s_val_int(pick_b ? b.u.i : a.u.i));
 }
 
+static bool builtin_range_step(s_vm *vm) {
+    s_value step = pop(vm);
+    s_value hi = pop(vm);
+    s_value lo = pop(vm);
+    if (lo.tag != S_VAL_INT || hi.tag != S_VAL_INT || step.tag != S_VAL_INT) {
+        vm_trap(vm, "range_step expects int arguments");
+        return false;
+    }
+    s_i64 s = step.u.i;
+    if (s == 0) { vm_trap(vm, "range_step step must be nonzero"); return false; }
+    s_i64 dist = hi.u.i - lo.u.i;
+    s_i64 n;
+    if (s > 0) n = dist > 0 ? (dist + s - 1) / s : 0;
+    else n = dist < 0 ? (dist + s + 1) / s : 0;
+    if (n < 0) n = 0;
+    if (n > (1 << 20)) { vm_trap(vm, "range_step too large"); return false; }
+    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)n, 0);
+    if (!o) return false;
+    s_value *data = s_obj_array_data(o);
+    for (s_i64 i = 0; i < n; ++i) data[i] = s_val_int(lo.u.i + i * s);
+    return push(vm, s_val_obj(o));
+}
+
+static bool builtin_assert(s_vm *vm) {
+    s_value msg = pop(vm);
+    s_value cond = pop(vm);
+    if (cond.tag != S_VAL_INT || msg.tag != S_VAL_OBJ ||
+        msg.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "assert expects (bool, str)");
+        return false;
+    }
+    if (cond.u.i == 0) {
+        s_size len = s_obj_str_len(msg.u.o);
+        vm_trap(vm, "assertion failed: %.*s", (int)len, s_obj_str_data(msg.u.o));
+        return false;
+    }
+    return push(vm, s_val_none());
+}
+
+static bool builtin_exit(s_vm *vm) {
+    s_value code = pop(vm);
+    if (code.tag != S_VAL_INT) { vm_trap(vm, "exit expects an int"); return false; }
+    vm->exit_code = (int)code.u.i;
+    vm->exit_halt = true;
+    return push(vm, s_val_none());
+}
+
 static bool builtin_str_to_f64(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
@@ -414,6 +462,9 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_MIN: return builtin_minmax(vm, false);
     case S_BUILTIN_MAX: return builtin_minmax(vm, true);
     case S_BUILTIN_STR_TO_F64: return builtin_str_to_f64(vm);
+    case S_BUILTIN_RANGE_STEP: return builtin_range_step(vm);
+    case S_BUILTIN_ASSERT: return builtin_assert(vm);
+    case S_BUILTIN_EXIT: return builtin_exit(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;
@@ -868,6 +919,10 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
         }
         case BC_BUILTIN:
             if (!dispatch_builtin(vm, in->a)) return 1;
+            if (vm->exit_halt) {
+                done = true;
+                break;
+            }
             pc++; break;
         case BC_TRAP:
             vm_trap(vm, "executed trap instruction");

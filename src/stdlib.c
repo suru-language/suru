@@ -39,6 +39,12 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "max", 2, { S_SIG_INT, S_SIG_INT }, S_SIG_INT },
     [S_BUILTIN_STR_TO_F64] = {
         "str_to_f64", 1, { S_SIG_STR }, S_SIG_FLOAT },
+    [S_BUILTIN_RANGE_STEP] = {
+        "range_step", 3, { S_SIG_INT, S_SIG_INT, S_SIG_INT }, S_SIG_ARRAY_INT },
+    [S_BUILTIN_ASSERT] = {
+        "assert", 2, { S_SIG_BOOL, S_SIG_STR }, S_SIG_UNIT },
+    [S_BUILTIN_EXIT] = {
+        "exit", 1, { S_SIG_INT }, S_SIG_UNIT },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {
