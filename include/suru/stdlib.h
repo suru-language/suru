@@ -43,6 +43,7 @@ typedef enum s_builtin_id {
     S_BUILTIN_ARGS,
     S_BUILTIN_STR_SPLIT,
     S_BUILTIN_STR_JOIN,
+    S_BUILTIN_ARRAY_SLICE,
     S_BUILTIN_COUNT
 } s_builtin_id;
 

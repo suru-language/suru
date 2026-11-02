@@ -628,6 +628,31 @@ static bool builtin_str_join(s_vm *vm) {
     return push(vm, s_val_obj(o));
 }
 
+static bool builtin_array_slice(s_vm *vm) {
+    s_value len = pop(vm);
+    s_value start = pop(vm);
+    s_value arr = pop(vm);
+    if (arr.tag != S_VAL_OBJ || arr.u.o->kind != S_OBJ_ARRAY ||
+        start.tag != S_VAL_INT || len.tag != S_VAL_INT) {
+        vm_trap(vm, "slice expects ([T], int, int)");
+        return false;
+    }
+    s_i64 n = (s_i64)arr.u.o->count;
+    s_i64 b = start.u.i;
+    if (b < 0) b = 0;
+    if (b > n) b = n;
+    s_i64 l = len.u.i;
+    if (l < 0) l = 0;
+    s_i64 end = b + l;
+    if (end > n) end = n;
+    s_size m = (s_size)(end - b);
+    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)m, 0);
+    if (!o) return false;
+    if (m) memcpy(s_obj_array_data(o), s_obj_array_data(arr.u.o) + b,
+                  sizeof(s_value) * m);
+    return push(vm, s_val_obj(o));
+}
+
 static bool builtin_str_to_f64(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
@@ -675,6 +700,7 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_ARGS: return builtin_args(vm);
     case S_BUILTIN_STR_SPLIT: return builtin_str_split(vm);
     case S_BUILTIN_STR_JOIN: return builtin_str_join(vm);
+    case S_BUILTIN_ARRAY_SLICE: return builtin_array_slice(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

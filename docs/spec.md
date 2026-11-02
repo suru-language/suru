@@ -329,6 +329,8 @@ The standard library provides a small set of builtin functions (see
 - `str_trim(s: str) -> str` — `s` with leading/trailing ASCII whitespace removed.
 - `str_split(s: str, sep: str) -> [str]` — split `s` on `sep` (non-empty).
 - `str_join(arr: [str], sep: str) -> str` — join `arr` with `sep`.
+- `slice(a: [T], start: int, len: int) -> [T]` — bounds-clamped copy of a
+  subarray.
 - `args_len() -> int` — number of command-line arguments passed to the program.
 - `args(i: int) -> str` — the `i`-th command-line argument (0-based; traps if
   out of range). Arguments are passed after the source file on the CLI, e.g.
