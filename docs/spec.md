@@ -246,10 +246,10 @@ allocation so the collector never reads past an object.
 The standard library provides a small set of builtin functions (see
 `src/stdlib.c` and `docs/architecture.md`):
 
-- `print(s: str)` — write to stdout.
-- `println(s: str)` — write line to stdout.
+- `print(v: any)` — write a scalar value to stdout (int, float, str).
+- `println(v: any)` — same, with a trailing newline.
 - `str_len(s: str) -> int` — length in bytes.
-- `array_len(a: [T]) -> int` — element count.
+- `array_len(a: [T]) -> int` — element count (any element type).
 - `to_str(i: int) -> str`.
 - `f64_to_str(f: float) -> str`.
 - `read_line() -> str` — read a line from stdin ("" on EOF).
@@ -257,6 +257,9 @@ The standard library provides a small set of builtin functions (see
 - `range(lo: int, hi: int) -> [int]` — the integers `lo .. hi-1`.
 - `substr(s: str, start: int, len: int) -> str` — substring, bounds-clamped.
 - `str_contains(haystack: str, needle: str) -> bool`.
+- `abs(i: int) -> int`, `min(a: int, b: int) -> int`,
+  `max(a: int, b: int) -> int`.
+- `str_to_f64(s: str) -> float` — parse a float from a string.
 - `f64_to_i64`, `i64_to_f64` conversions.
 
 The set is intentionally minimal; it will grow through the release roadmap.

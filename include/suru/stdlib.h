@@ -27,6 +27,10 @@ typedef enum s_builtin_id {
     S_BUILTIN_SUBSTR,
     S_BUILTIN_STR_CONTAINS,
     S_BUILTIN_INT_FROM_STR,
+    S_BUILTIN_ABS,
+    S_BUILTIN_MIN,
+    S_BUILTIN_MAX,
+    S_BUILTIN_STR_TO_F64,
     S_BUILTIN_COUNT
 } s_builtin_id;
 
@@ -38,6 +42,7 @@ typedef enum s_sig_type {
     S_SIG_STR,
     S_SIG_ARRAY_INT,
     S_SIG_ARRAY,          /* any array, regardless of element type */
+    S_SIG_ANY,            /* any value */
 } s_sig_type;
 
 typedef struct s_builtin_sig {

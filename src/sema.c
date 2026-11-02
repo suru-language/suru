@@ -67,6 +67,7 @@ static const char *type_name(s_type *t) {
     case S_TYPE_BOOL: return "bool";
     case S_TYPE_STR: return "str";
     case S_TYPE_UNIT: return "unit";
+    case S_TYPE_ANY: return "any";
     case S_TYPE_ARRAY: return "[array]";
     case S_TYPE_FN: return "fn";
     case S_TYPE_RECORD: return t->record_name ? t->record_name : "record";
@@ -77,6 +78,7 @@ static const char *type_name(s_type *t) {
 
 static bool type_eq(s_type *a, s_type *b) {
     if (!a || !b) return false;
+    if (a->kind == S_TYPE_ANY || b->kind == S_TYPE_ANY) return true;
     if (a->kind != b->kind) return false;
     switch (a->kind) {
     case S_TYPE_ARRAY:
@@ -142,6 +144,9 @@ static s_type *sig_to_type(s_sema *S, s_sig_type st) {
     case S_SIG_ARRAY:
         t->kind = S_TYPE_ARRAY;
         t->elem = NULL; /* wildcard: matches any element type */
+        break;
+    case S_SIG_ANY:
+        t->kind = S_TYPE_ANY;
         break;
     default: t->kind = S_TYPE_UNIT; break;
     }

@@ -18,6 +18,7 @@ typedef enum s_type_kind {
     S_TYPE_BOOL,
     S_TYPE_STR,
     S_TYPE_UNIT,
+    S_TYPE_ANY,           /* wildcard: matches any type (builtin args only) */
     S_TYPE_ARRAY,
     S_TYPE_FN,
     S_TYPE_RECORD,        /* named record reference (name resolved by sema) */

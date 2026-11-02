@@ -5,6 +5,7 @@
 
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 #define VM_INIT_STACK 4096u
 #define VM_MAX_STACK (1u << 22)
@@ -127,14 +128,49 @@ static bool push(s_vm *vm, s_value v) {
 /* Builtins                                                            */
 /* ------------------------------------------------------------------ */
 
-static bool builtin_print(s_vm *vm, bool newline) {
-    s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
-        vm_trap(vm, "print expects a string");
+/* Format a scalar value into a string for print/println. Returns false for
+ * values that have no textual form (raw arrays/records). For a string value,
+ * *data points into the GC object; for scalars it points into buf. */
+static bool fmt_scalar(s_value v, char *buf, s_size bufsz,
+                       const char **data, s_size *len) {
+    switch (v.tag) {
+    case S_VAL_INT:
+        *len = s_rt_format_i64(buf, bufsz, v.u.i);
+        *data = buf;
+        return true;
+    case S_VAL_FLOAT:
+        *len = s_rt_format_f64(buf, bufsz, v.u.f);
+        if (*len >= bufsz) *len = bufsz - 1;
+        *data = buf;
+        return true;
+    case S_VAL_BOOL:
+        *data = v.u.b ? "true" : "false";
+        *len = v.u.b ? 4 : 5;
+        return true;
+    case S_VAL_NONE:
+        *data = "unit";
+        *len = 4;
+        return true;
+    case S_VAL_OBJ:
+        if (v.u.o->kind == S_OBJ_STR) {
+            *data = s_obj_str_data(v.u.o);
+            *len = s_obj_str_len(v.u.o);
+            return true;
+        }
         return false;
     }
-    s_size len = s_obj_str_len(s.u.o);
-    const char *data = s_obj_str_data(s.u.o);
+    return false;
+}
+
+static bool builtin_print(s_vm *vm, bool newline) {
+    s_value s = pop(vm);
+    char buf[64];
+    const char *data;
+    s_size len;
+    if (!fmt_scalar(s, buf, sizeof buf, &data, &len)) {
+        vm_trap(vm, "print cannot format this value");
+        return false;
+    }
     if (newline) s_rt_write_line(data, len);
     else s_rt_write(data, len);
     return push(vm, s_val_none());
@@ -324,6 +360,40 @@ static bool builtin_str_contains(s_vm *vm) {
     return push(vm, s_val_int(found ? 1 : 0));
 }
 
+static bool builtin_abs(s_vm *vm) {
+    s_value v = pop(vm);
+    if (v.tag != S_VAL_INT) { vm_trap(vm, "abs expects an int"); return false; }
+    if (v.u.i == INT64_MIN) { vm_trap(vm, "abs overflow"); return false; }
+    s_i64 r = v.u.i < 0 ? -v.u.i : v.u.i;
+    return push(vm, s_val_int(r));
+}
+
+static bool builtin_minmax(s_vm *vm, bool is_max) {
+    s_value b = pop(vm);
+    s_value a = pop(vm);
+    if (a.tag != S_VAL_INT || b.tag != S_VAL_INT) {
+        vm_trap(vm, "min/max expect int arguments");
+        return false;
+    }
+    bool pick_b = is_max ? (b.u.i > a.u.i) : (b.u.i < a.u.i);
+    return push(vm, s_val_int(pick_b ? b.u.i : a.u.i));
+}
+
+static bool builtin_str_to_f64(s_vm *vm) {
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "str_to_f64 expects a string");
+        return false;
+    }
+    s_size n = s_obj_str_len(s.u.o);
+    char buf[128];
+    if (n >= sizeof buf) n = sizeof buf - 1;
+    memcpy(buf, s_obj_str_data(s.u.o), n);
+    buf[n] = '\0';
+    double v = strtod(buf, NULL);
+    return push(vm, s_val_float(v));
+}
+
 static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     switch (id) {
     case S_BUILTIN_PRINT: return builtin_print(vm, false);
@@ -340,6 +410,10 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_SUBSTR: return builtin_substr(vm);
     case S_BUILTIN_STR_CONTAINS: return builtin_str_contains(vm);
     case S_BUILTIN_INT_FROM_STR: return builtin_int_from_str(vm);
+    case S_BUILTIN_ABS: return builtin_abs(vm);
+    case S_BUILTIN_MIN: return builtin_minmax(vm, false);
+    case S_BUILTIN_MAX: return builtin_minmax(vm, true);
+    case S_BUILTIN_STR_TO_F64: return builtin_str_to_f64(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

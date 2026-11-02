@@ -4,9 +4,9 @@
 
 const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
     [S_BUILTIN_PRINT] = {
-        "print", 1, { S_SIG_STR }, S_SIG_UNIT },
+        "print", 1, { S_SIG_ANY }, S_SIG_UNIT },
     [S_BUILTIN_PRINTLN] = {
-        "println", 1, { S_SIG_STR }, S_SIG_UNIT },
+        "println", 1, { S_SIG_ANY }, S_SIG_UNIT },
     [S_BUILTIN_STR_LEN] = {
         "str_len", 1, { S_SIG_STR }, S_SIG_INT },
     [S_BUILTIN_ARRAY_LEN] = {
@@ -31,6 +31,14 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "str_contains", 2, { S_SIG_STR, S_SIG_STR }, S_SIG_BOOL },
     [S_BUILTIN_INT_FROM_STR] = {
         "int_from_str", 1, { S_SIG_STR }, S_SIG_INT },
+    [S_BUILTIN_ABS] = {
+        "abs", 1, { S_SIG_INT }, S_SIG_INT },
+    [S_BUILTIN_MIN] = {
+        "min", 2, { S_SIG_INT, S_SIG_INT }, S_SIG_INT },
+    [S_BUILTIN_MAX] = {
+        "max", 2, { S_SIG_INT, S_SIG_INT }, S_SIG_INT },
+    [S_BUILTIN_STR_TO_F64] = {
+        "str_to_f64", 1, { S_SIG_STR }, S_SIG_FLOAT },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {
