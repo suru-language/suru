@@ -105,3 +105,6 @@ analyze:
 .PHONY: clean
 clean:
 	rm -rf $(BUILD)
+
+# Header dependency files, included last so they do not change the default goal.
+-include $(wildcard $(OBJDIR)/*.d)
