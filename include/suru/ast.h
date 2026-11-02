@@ -140,6 +140,7 @@ typedef enum s_stmt_kind {
     S_STMT_IF,
     S_STMT_WHILE,
     S_STMT_FOR,
+    S_STMT_DO,
     S_STMT_BREAK,
     S_STMT_CONTINUE,
     S_STMT_BLOCK,
@@ -165,6 +166,7 @@ struct s_stmt {
             s_type *result_type;
         } ifstmt;
         struct { s_expr *cond; s_stmt *body; } whilestmt;
+        struct { s_stmt *body; s_expr *cond; } dostmt;
         struct {
             const char *name;
             int var_index;

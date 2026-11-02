@@ -777,6 +777,23 @@ static s_stmt *parse_statement(s_parser *p) {
         return s;
     }
 
+    if (at(p, S_TOK_KW_DO)) {
+        advance(p);
+        s_stmt *s = stmt_alloc(p, S_STMT_DO, loc);
+        if (!s) return NULL;
+        if (!enter_depth(p, 318)) return NULL;
+        s->u.dostmt.body = parse_block(p);
+        if (!s->u.dostmt.body) { leave_depth(p); return NULL; }
+        if (!expect(p, S_TOK_KW_WHILE, 319)) return NULL;
+        if (!expect(p, S_TOK_LPAREN, 320)) return NULL;
+        s->u.dostmt.cond = parse_assignment(p);
+        if (!s->u.dostmt.cond) { leave_depth(p); return NULL; }
+        if (!expect(p, S_TOK_RPAREN, 321)) return NULL;
+        if (!expect(p, S_TOK_SEMI, 322)) return NULL;
+        leave_depth(p);
+        return s;
+    }
+
     if (at(p, S_TOK_KW_FOR)) {
         advance(p);
         if (!at(p, S_TOK_IDENT)) {

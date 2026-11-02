@@ -44,6 +44,7 @@ const char *s_tok_kind_name(s_tok_kind k) {
     case S_TOK_KW_AS: return "'as'";
     case S_TOK_KW_CONST: return "'const'";
     case S_TOK_KW_ENUM: return "'enum'";
+    case S_TOK_KW_DO: return "'do'";
     case S_TOK_LPAREN: return "'('";
     case S_TOK_RPAREN: return "')'";
     case S_TOK_LBRACE: return "'{'";
@@ -177,6 +178,7 @@ static s_tok_kind keyword_kind(const char *s, s_size len) {
     KW("as", S_TOK_KW_AS)
     KW("const", S_TOK_KW_CONST)
     KW("enum", S_TOK_KW_ENUM)
+    KW("do", S_TOK_KW_DO)
     KW("and", S_TOK_AND)
     KW("or", S_TOK_OR)
     KW("not", S_TOK_NOT)
