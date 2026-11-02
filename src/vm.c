@@ -1158,6 +1158,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             }
             s_i64 i = idx.u.i;
             if (arr.u.o->kind == S_OBJ_STR) {
+                if (i < 0) i += (s_i64)arr.u.o->count;
                 if (i < 0 || i >= (s_i64)arr.u.o->count) {
                     vm_trap(vm, "string index out of bounds (%lld of %u)",
                             (long long)i, arr.u.o->count);
@@ -1169,6 +1170,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 if (!push(vm, s_val_obj(o))) return 1;
                 pc++; break;
             }
+            if (i < 0) i += (s_i64)arr.u.o->count;
             if (i < 0 || i >= (s_i64)arr.u.o->count) {
                 vm_trap(vm, "index out of bounds (%lld of %u)", (long long)i, arr.u.o->count);
                 return 1;
@@ -1186,6 +1188,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 return 1;
             }
             s_i64 i = idx.u.i;
+            if (i < 0) i += (s_i64)arr.u.o->count;
             if (i < 0 || i >= (s_i64)arr.u.o->count) {
                 vm_trap(vm, "index out of bounds (%lld of %u)", (long long)i, arr.u.o->count);
                 return 1;

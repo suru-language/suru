@@ -1,0 +1,10 @@
+func main() {
+    let a = [10, 20, 30];
+    println(to_str(a[-1]));
+    println(to_str(a[-3]));
+    let s = "hello";
+    println(s[-1]);
+    mut m = [1, 2, 3];
+    m[-1] = 99;
+    println(to_str(m[2]));
+}

@@ -232,7 +232,8 @@ Precedence, highest to lowest:
   Shifts treat the operand as a 64-bit unsigned bit pattern (logical shifts,
   and a shift count of 64 or more yields 0). Precedence (loosest to tightest)
   follows C: `|`, `^`, `&`, `<<`/`>>`, then additive.
-- Index: `a[i]` yields the element type, bounds-checked. Strings are indexable
+- Index: `a[i]` yields the element type, bounds-checked. A negative index
+  counts from the end (`a[-1]` is the last element). Strings are indexable
   too: `s[i]` yields a one-character string.
 - Field: `r.f`.
 - Assignment: `=` stores into a mutable binding, array element, or record
