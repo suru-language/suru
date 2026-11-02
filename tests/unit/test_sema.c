@@ -335,6 +335,57 @@ static void test_duplicate_record(void) {
     s_arena_dispose(&arena);
 }
 
+static void test_lambda_valid(void) {
+    const char *src =
+        "func make(n: int) -> fn(int) -> int {\n"
+        "    return fn(x: int) -> int { return x + n; };\n"
+        "}\n"
+        "func main() -> int {\n"
+        "    let f = make(10);\n"
+        "    return f(5);\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(ok);
+    CHECK_EQ_INT(s_diag_has_errors(&d), 0);
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_lambda_dynamic_call(void) {
+    const char *src =
+        "func main() -> int {\n"
+        "    let fns = [fn(x: int) -> int { return x + 1; }];\n"
+        "    return fns[0](5);\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(ok);
+    CHECK_EQ_INT(s_diag_has_errors(&d), 0);
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_lambda_not_function(void) {
+    const char *src =
+        "func main() -> int {\n"
+        "    let x = 5;\n"
+        "    return x(3);\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
 TEST_MAIN_BEGIN()
     test_valid_program();
     test_type_mismatch();
@@ -356,4 +407,7 @@ TEST_MAIN_BEGIN()
     test_record_init_type_mismatch();
     test_duplicate_function();
     test_duplicate_record();
+    test_lambda_valid();
+    test_lambda_dynamic_call();
+    test_lambda_not_function();
 TEST_MAIN_END()

@@ -92,7 +92,8 @@ postfix    = primary { ("(" arg_list ")" | "[" expression "]" | "." identifier
             | record_literal) }
 primary     = int_literal | float_literal | string_literal | bool_literal
             | "none" | identifier | "(" expression ")"
-            | array_literal
+            | array_literal | lambda_literal
+lambda_literal = "fn" param_list [ "->" type ] block
 record_literal = identifier "{" [ record_field { "," record_field } ] "}"
 record_field = identifier "=" expression
 array_literal = "[" [ expression { "," expression } ] "]"

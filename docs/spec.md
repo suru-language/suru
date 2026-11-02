@@ -128,7 +128,28 @@ accept any array, regardless of element type.
 
 `fn(T1, T2) -> R` is the type of a function taking `T1, T2` and returning
 `R`. A function type with no arrow returns `unit`. Function types are
-first-class values; closures capture their environment by reference.
+first-class values.
+
+A lambda literal `fn(T1, T2) -> R { body }` creates a closure value of
+function type. A closure may reference variables from its enclosing function
+scopes; such variables are **captured by value** at the point the closure is
+created (each captured variable is copied into the closure's environment).
+The closure can then be stored, passed, and called anywhere, including after
+the enclosing function has returned. Assigning to a captured variable updates
+the closure's local copy only.
+
+```
+func make_adder(n: int) -> fn(int) -> int {
+    return fn(x: int) -> int { return x + n; };   // captures n by value
+}
+func main() {
+    let f = make_adder(10);
+    println(to_str(f(5)));   // 15
+}
+```
+
+Calls through function-typed values (variable, array element, record field, or
+expression) are dispatched dynamically at runtime.
 
 ### 3.4 Records
 
