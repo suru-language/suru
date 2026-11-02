@@ -141,6 +141,21 @@ static s_type *sig_to_type(s_sema *S, s_sig_type st) {
     return t;
 }
 
+static s_type *func_type(s_sema *S, const s_func_decl *f) {
+    s_type *t = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+    if (!t) return NULL;
+    t->kind = S_TYPE_FN;
+    t->nparams = f->nparams;
+    t->ret = f->ret_type;
+    t->params = s_arena_calloc(S->arena, f->nparams ? f->nparams : 1,
+                               sizeof(s_type *), _Alignof(s_type *));
+    if (!t->params) return NULL;
+    for (s_size i = 0; i < f->nparams; ++i) {
+        t->params[i] = f->params[i].type;
+    }
+    return t;
+}
+
 /* ------------------------------------------------------------------ */
 /* Name resolution in scopes                                           */
 /* ------------------------------------------------------------------ */
@@ -410,6 +425,13 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
     case S_EXPR_VAR: {
         s_sym *sym = scope_lookup(S->scope, e->u.var.name);
         if (!sym) {
+            s_func_decl *f = resolve_function(S, e->u.var.name);
+            if (f) {
+                e->kind = S_EXPR_FUNC_REF;
+                e->u.var.var_index = (int)(f - S->mod->funcs);
+                t = func_type(S, f);
+                break;
+            }
             s_diag_error(S->diag, e->loc, 431,
                          "unknown variable '%s'", e->u.var.name);
             t = type_unit(S);
@@ -419,6 +441,15 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
         e->u.var.is_mut = sym->is_mut;
         t = sym->type;
         e->is_lvalue = true; /* a variable is assignable if mutable; checked separately */
+        break;
+    }
+    case S_EXPR_FUNC_REF: {
+        int f = e->u.var.var_index;
+        if (f >= 0 && f < (int)S->mod->nfuncs) {
+            t = func_type(S, &S->mod->funcs[f]);
+        } else {
+            t = type_unit(S);
+        }
         break;
     }
     case S_EXPR_CALL: t = check_call(S, e); break;
