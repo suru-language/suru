@@ -475,6 +475,50 @@ static bool builtin_f64_to_str_prec(s_vm *vm) {
     return push_str_from_buf(vm, buf, len);
 }
 
+static bool builtin_str_repeat(s_vm *vm) {
+    s_value n = pop(vm);
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR ||
+        n.tag != S_VAL_INT) {
+        vm_trap(vm, "str_repeat expects (str, int)");
+        return false;
+    }
+    s_i64 rep = n.u.i;
+    if (rep < 0) { vm_trap(vm, "str_repeat count must be non-negative"); return false; }
+    s_size slen = s_obj_str_len(s.u.o);
+    s_size total;
+    if (!s_size_mul_ovf(slen, (s_size)rep, &total) || total > (1u << 24)) {
+        vm_trap(vm, "str_repeat too large");
+        return false;
+    }
+    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
+    if (!o) return false;
+    char *d = s_obj_str_data(o);
+    for (s_i64 i = 0; i < rep; ++i)
+        memcpy(d + i * slen, s_obj_str_data(s.u.o), slen);
+    return push(vm, s_val_obj(o));
+}
+
+static bool builtin_str_trim(s_vm *vm) {
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "str_trim expects a string");
+        return false;
+    }
+    const char *data = s_obj_str_data(s.u.o);
+    s_size len = s_obj_str_len(s.u.o);
+    s_size b = 0, e = len;
+    while (b < e && (data[b] == ' ' || data[b] == '\t' ||
+                     data[b] == '\n' || data[b] == '\r')) b++;
+    while (e > b && (data[e - 1] == ' ' || data[e - 1] == '\t' ||
+                     data[e - 1] == '\n' || data[e - 1] == '\r')) e--;
+    s_size n = e - b;
+    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
+    if (!o) return false;
+    if (n) memcpy(s_obj_str_data(o), data + b, n);
+    return push(vm, s_val_obj(o));
+}
+
 static bool builtin_str_to_f64(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
@@ -516,6 +560,8 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_TO_HEX: return builtin_to_hex(vm);
     case S_BUILTIN_TO_BIN: return builtin_to_bin(vm);
     case S_BUILTIN_F64_TO_STR_PREC: return builtin_f64_to_str_prec(vm);
+    case S_BUILTIN_STR_REPEAT: return builtin_str_repeat(vm);
+    case S_BUILTIN_STR_TRIM: return builtin_str_trim(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

@@ -37,6 +37,8 @@ typedef enum s_builtin_id {
     S_BUILTIN_TO_HEX,
     S_BUILTIN_TO_BIN,
     S_BUILTIN_F64_TO_STR_PREC,
+    S_BUILTIN_STR_REPEAT,
+    S_BUILTIN_STR_TRIM,
     S_BUILTIN_COUNT
 } s_builtin_id;
 

@@ -51,6 +51,10 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "to_bin", 1, { S_SIG_INT }, S_SIG_STR },
     [S_BUILTIN_F64_TO_STR_PREC] = {
         "f64_to_str_prec", 2, { S_SIG_FLOAT, S_SIG_INT }, S_SIG_STR },
+    [S_BUILTIN_STR_REPEAT] = {
+        "str_repeat", 2, { S_SIG_STR, S_SIG_INT }, S_SIG_STR },
+    [S_BUILTIN_STR_TRIM] = {
+        "str_trim", 1, { S_SIG_STR }, S_SIG_STR },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {
