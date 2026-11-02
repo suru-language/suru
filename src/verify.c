@@ -11,6 +11,7 @@ static int ins_pops(const s_bc_module *m, s_u32 fid, const s_bc_ins *in) {
     switch ((int)in->op) {
     case BC_NEW_ARRAY: return (int)in->a;
     case BC_NEW_RECORD: return (int)in->b;
+    case BC_MKCLOSURE_V: return (int)in->b;
     case BC_CALL:
         if (in->a >= m->nfuncs) return -1;
         return (int)m->funcs[in->a].nparams;
@@ -30,6 +31,7 @@ static int ins_pushes(const s_bc_module *m, s_u32 fid, const s_bc_ins *in) {
     switch ((int)in->op) {
     case BC_NEW_ARRAY:
     case BC_NEW_RECORD:
+    case BC_MKCLOSURE_V:
     case BC_CALL:
     case BC_CALLV:
         return 1;
@@ -90,6 +92,10 @@ static int check_operands(const s_bc_module *m, s_u32 fid, s_u32 i) {
         break;
     case BC_NEW_ARRAY:
         if (in->a > S_BC_MAX_DEPTH) return VERIFY_ERR;
+        break;
+    case BC_MKCLOSURE_V:
+        if (in->a >= m->nfuncs) return VERIFY_ERR;
+        if (in->b > S_BC_MAX_DEPTH) return VERIFY_ERR;
         break;
     case BC_JMP:
     case BC_JZ:

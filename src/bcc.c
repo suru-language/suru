@@ -311,6 +311,24 @@ static bool gen_assign(s_gen *g, const s_expr *e, bool compound) {
     }
     switch (lhs->kind) {
     case S_EXPR_VAR: {
+        if (lhs->u.var.is_capture) {
+            int cap = lhs->u.var.capture_index;
+            if (compound) {
+                EM3(BC_LD_LOCAL, 0, 0, 0);
+                if (!em_const_int(g, cap)) return false;
+                EM(BC_DUP);
+                EM(BC_IDX_LD);
+                if (!gen_expr(g, rhs)) return false;
+                if (!push_bin_op(g, e)) return false;
+                EM(BC_IDX_ST);
+            } else {
+                EM3(BC_LD_LOCAL, 0, 0, 0);
+                if (!em_const_int(g, cap)) return false;
+                if (!gen_expr(g, rhs)) return false;
+                EM(BC_IDX_ST);
+            }
+            return true;
+        }
         s_u32 slot = (s_u32)lhs->u.var.var_index;
         if (compound) {
             EM3(BC_LD_LOCAL, slot, 0, 0);
@@ -426,13 +444,27 @@ static bool gen_expr(s_gen *g, const s_expr *e) {
         return true;
     }
     case S_EXPR_VAR:
-        EM3(BC_LD_LOCAL, (s_u32)e->u.var.var_index, 0, 0);
+        if (e->u.var.is_capture) {
+            EM3(BC_LD_LOCAL, 0, 0, 0);
+            if (!em_const_int(g, e->u.var.capture_index)) return false;
+            EM(BC_IDX_LD);
+        } else {
+            EM3(BC_LD_LOCAL, (s_u32)e->u.var.var_index, 0, 0);
+        }
         return true;
     case S_EXPR_FUNC_REF:
         EM3(BC_MKCLOSURE, (s_u32)e->u.var.var_index, 0, 0);
         return true;
     case S_EXPR_CALL:
         return gen_call(g, e);
+    case S_EXPR_LAMBDA: {
+        for (int i = 0; i < e->u.lambda.ncaptures; ++i) {
+            EM3(BC_LD_LOCAL, (s_u32)e->u.lambda.cap_src[i], 0, 0);
+        }
+        EM3(BC_MKCLOSURE_V, (s_u32)e->u.lambda.func_index,
+            (s_u32)e->u.lambda.ncaptures, 0);
+        return true;
+    }
     case S_EXPR_RECORD_INIT: {
         s_u32 rec = (s_u32)e->u.rec.record_index;
         for (s_size i = 0; i < e->u.rec.nfields; ++i) {
