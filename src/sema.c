@@ -788,6 +788,35 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
 
     bool ok = true;
 
+    /* detect duplicate top-level declarations (surfaces across `use` merges) */
+    for (s_size i = 0; i < mod->nfuncs; ++i) {
+        for (s_size j = i + 1; j < mod->nfuncs; ++j) {
+            if (strcmp(mod->funcs[i].name, mod->funcs[j].name) == 0) {
+                s_diag_error(diag, mod->funcs[j].loc, 477,
+                             "duplicate function '%s'", mod->funcs[j].name);
+                ok = false;
+            }
+        }
+    }
+    for (s_size i = 0; i < mod->nrecords; ++i) {
+        for (s_size j = i + 1; j < mod->nrecords; ++j) {
+            if (strcmp(mod->records[i].name, mod->records[j].name) == 0) {
+                s_diag_error(diag, mod->records[j].loc, 478,
+                             "duplicate type '%s'", mod->records[j].name);
+                ok = false;
+            }
+        }
+    }
+    for (s_size i = 0; i < mod->nconsts; ++i) {
+        for (s_size j = i + 1; j < mod->nconsts; ++j) {
+            if (strcmp(mod->consts[i].name, mod->consts[j].name) == 0) {
+                s_diag_error(diag, mod->consts[j].loc, 479,
+                             "duplicate constant '%s'", mod->consts[j].name);
+                ok = false;
+            }
+        }
+    }
+
     /* resolve constants: infer or validate their types */
     for (s_size ci = 0; ci < mod->nconsts; ++ci) {
         s_const_decl *c = &mod->consts[ci];

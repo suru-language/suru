@@ -495,7 +495,7 @@ static bool builtin_str_repeat(s_vm *vm) {
     if (!o) return false;
     char *d = s_obj_str_data(o);
     for (s_i64 i = 0; i < rep; ++i)
-        memcpy(d + i * slen, s_obj_str_data(s.u.o), slen);
+        memcpy(d + (s_size)i * slen, s_obj_str_data(s.u.o), slen);
     return push(vm, s_val_obj(o));
 }
 

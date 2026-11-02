@@ -1,0 +1,5 @@
+func main() {
+    println(str_repeat("ab", 3));
+    println(str_trim("  hi  "));
+    println("[" + str_trim("  x  ") + "]");
+}
