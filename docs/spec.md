@@ -260,6 +260,7 @@ A program is a sequence of top-level items:
 - functions (`func`)
 - record types (`type`)
 - constants (`const`)
+- enumerations (`enum`)
 - `use` includes (source-level module inclusion)
 - a single `main` function (required)
 
@@ -280,6 +281,14 @@ const LABEL = "suru" + "-lang";
 ```
 
 Forward references to not-yet-declared constants are an error.
+
+An enumeration `enum Name { A, B, C };` declares its enumerators as integer
+constants `0, 1, 2, ...`, usable anywhere a constant is:
+
+```
+enum Color { Red, Green, Blue };
+let c = Green;      // 1
+```
 
 There is no global mutable state in the language; all state lives in
 function-local bindings and heap objects.

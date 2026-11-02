@@ -1,0 +1,6 @@
+enum Color { Red, Green, Blue };
+func main() {
+    println(to_str(Red));
+    println(to_str(Green));
+    println(to_str(Blue));
+}
