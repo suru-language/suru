@@ -204,6 +204,10 @@ Precedence, highest to lowest:
 - String concatenation: `+` on two `str` values concatenates them.
 - Comparison: `== != < <= > >=` yield `bool`.
 - Logical: `and or not` short-circuit.
+- Bitwise: `& | ^` and shifts `<< >>` on `int`; `~` is unary bitwise NOT.
+  Shifts treat the operand as a 64-bit unsigned bit pattern (logical shifts,
+  and a shift count of 64 or more yields 0). Precedence (loosest to tightest)
+  follows C: `|`, `^`, `&`, `<<`/`>>`, then additive.
 - Index: `a[i]` yields the element type, bounds-checked.
 - Field: `r.f`.
 - Assignment: `=` stores into a mutable binding, array element, or record

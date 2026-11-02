@@ -84,10 +84,14 @@ assignment = logical_or [ assign_op logical_or ]
 assign_op  = "=" | "+=" | "-=" | "*=" | "/="
 logical_or = logical_and { "or" logical_and }
 logical_and = comparison { "and" comparison }
-comparison = additive [ ("==" | "!=" | "<" | "<=" | ">" | ">=") additive ]
+comparison = bitor [ ("==" | "!=" | "<" | "<=" | ">" | ">=") bitor ]
+bitor      = bitxor { "|" bitxor }
+bitxor     = bitand { "^" bitand }
+bitand     = shift { "&" shift }
+shift      = additive { ("<<" | ">>") additive }
 additive   = multiplicative { ("+" | "-") multiplicative }
 multiplicative = unary { ("*" | "/" | "%") unary }
-unary      = ("-" | "not") unary | postfix
+unary      = ("-" | "not" | "~") unary | postfix
 postfix    = primary { ("(" arg_list ")" | "[" expression "]" | "." identifier
             | record_literal) }
 primary     = int_literal | float_literal | string_literal | bool_literal
