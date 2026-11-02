@@ -315,6 +315,10 @@ let c = Green;      // 1
 There is no global mutable state in the language; all state lives in
 function-local bindings and heap objects.
 
+The tracing garbage collector's initial trigger threshold is configurable via
+the `SURU_GC_THRESHOLD` environment variable (bytes) for tuning and stress
+testing.
+
 ## 8. Memory Model
 
 See `docs/memory.md` for the full model. Summary:

@@ -46,6 +46,12 @@ s_vm *s_vm_create(const s_bc_module *m) {
     if (!vm->st) { free(vm); return NULL; }
     vm->st_cap = VM_INIT_STACK;
     vm->gc_threshold = VM_GC_INIT_THRESHOLD;
+    const char *gs = getenv("SURU_GC_THRESHOLD");
+    if (gs && *gs) {
+        char *end;
+        unsigned long v = strtoul(gs, &end, 10);
+        if (end != gs && v > 0) vm->gc_threshold = (s_u64)v;
+    }
     return vm;
 }
 

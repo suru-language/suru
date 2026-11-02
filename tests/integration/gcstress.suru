@@ -1,0 +1,12 @@
+func main() {
+    mut total = 0;
+    mut i = 0;
+    while i < 200 {
+        let a = [i, i + 1, i + 2];
+        let b = [a, a, a];
+        let s = "data-" + to_str(i);
+        total = total + array_len(b[0]) + str_len(s);
+        i = i + 1;
+    }
+    println(to_str(total));
+}
