@@ -856,8 +856,13 @@ static bool parse_use(s_parser *p) {
 
     const char *fname = s_arena_strdup(p->arena, full);
     if (!fname) { free(src); --p->file_depth; return false; }
-    VEC_PUSH(p->arena, p->included, p->nincluded, p->included_cap,
-             sizeof(char *), (char *)fname);
+    if (!vec_reserve(p->arena, (void **)&p->included, &p->included_cap,
+                     p->nincluded + 1, sizeof(char *))) {
+        free(src);
+        --p->file_depth;
+        return false;
+    }
+    p->included[p->nincluded++] = (char *)fname;
 
     s_lexer saved_lx = p->lx;
     s_token saved_cur = p->cur;
