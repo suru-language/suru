@@ -267,11 +267,24 @@ static bool push_bin_op(s_gen *g, const s_expr *e) {
 
 static bool gen_call(s_gen *g, const s_expr *e) {
     const s_expr *callee = e->u.call.callee;
-    if (callee->kind != S_EXPR_VAR) return false;
-    const char *name = callee->u.var.name;
     s_call_kind kind;
     int target;
-    classify_call(g->ast, name, &kind, &target);
+
+    if (callee->kind == S_EXPR_FUNC_REF) {
+        kind = S_CALL_FUNC;
+        target = callee->u.var.var_index;
+    } else if (callee->kind == S_EXPR_VAR) {
+        classify_call(g->ast, callee->u.var.name, &kind, &target);
+    } else {
+        /* dynamic call through a function-typed value */
+        if (!gen_expr(g, callee)) return false;
+        for (s_size i = 0; i < e->u.call.nargs; ++i) {
+            if (!gen_expr(g, e->u.call.args[i])) return false;
+        }
+        EM3(BC_CALLV, (s_u32)e->u.call.nargs, 0, 0);
+        return true;
+    }
+
     for (s_size i = 0; i < e->u.call.nargs; ++i) {
         if (!gen_expr(g, e->u.call.args[i])) return false;
     }

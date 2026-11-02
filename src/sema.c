@@ -327,6 +327,28 @@ static s_type *check_call(s_sema *S, s_expr *e) {
         }
     }
 
+    /* Dynamic call through a function-typed value. */
+    {
+        s_type *ct = check_expr(S, callee);
+        if (ct && ct->kind == S_TYPE_FN) {
+            if (e->u.call.nargs != ct->nparams) {
+                s_diag_error(S->diag, e->loc, 418,
+                             "this function expects %zu argument(s), got %zu",
+                             ct->nparams, e->u.call.nargs);
+                return type_unit(S);
+            }
+            for (s_size i = 0; i < ct->nparams; ++i) {
+                s_type *at = check_expr(S, e->u.call.args[i]);
+                if (at && !type_eq(at, ct->params[i])) {
+                    s_diag_error(S->diag, e->u.call.args[i]->loc, 419,
+                                 "argument %zu has type %s, expected %s",
+                                 i + 1, type_name(at), type_name(ct->params[i]));
+                }
+            }
+            return ct->ret;
+        }
+    }
+
     s_diag_error(S->diag, e->loc, 411, "unknown function '%s'", fname);
     return type_unit(S);
 }
