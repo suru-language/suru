@@ -1,0 +1,9 @@
+const BASE = 10;
+const DOUBLE = BASE * 2;
+const NAME = "suru" + "-lang";
+const THIRD = 9 / 3;
+func main() {
+    println(to_str(DOUBLE));
+    println(NAME);
+    println(to_str(THIRD));
+}
