@@ -29,8 +29,6 @@ OBJDIR  := $(BUILD)/obj
 BINDIR  := $(BUILD)/bin
 UNITDIR := $(BUILD)/unit
 
--include $(wildcard $(OBJDIR)/*.d)
-
 LIBSRC = \
 	src/arena.c \
 	src/diag.c \
