@@ -616,6 +616,17 @@ static bool gen_stmt(s_gen *g, const s_stmt *s, const s_loopctx *loop) {
         place_label(&g->e, &g->labels, lend);
         return true;
     }
+    case S_STMT_DO: {
+        s_u32 lloop = new_label(&g->labels);
+        s_u32 lend = new_label(&g->labels);
+        s_loopctx inner = { lend, lloop };
+        place_label(&g->e, &g->labels, lloop);
+        if (!gen_stmt(g, s->u.dostmt.body, &inner)) return false;
+        if (!gen_expr(g, s->u.dostmt.cond)) return false;
+        if (!em_jump(&g->e, &g->labels, BC_JNZ, lloop)) return false;
+        place_label(&g->e, &g->labels, lend);
+        return true;
+    }
     case S_STMT_FOR: {
         s_u32 idx_slot = g->frame_max++;
         s_u32 arr_slot = g->frame_max++;
@@ -854,6 +865,10 @@ static s_u32 max_user_slot(const s_stmt *s, s_u32 cur) {
     case S_STMT_WHILE:
         if (s->u.whilestmt.body)
             cur = max_user_slot(s->u.whilestmt.body, cur);
+        break;
+    case S_STMT_DO:
+        if (s->u.dostmt.body)
+            cur = max_user_slot(s->u.dostmt.body, cur);
         break;
     case S_STMT_BLOCK:
         for (s_size i = 0; i < s->u.block.count; ++i)

@@ -956,6 +956,15 @@ static bool check_stmt(s_sema *S, s_stmt *s) {
         }
         return check_block(S, s->u.whilestmt.body);
     }
+    case S_STMT_DO: {
+        bool ok = check_block(S, s->u.dostmt.body);
+        s_type *ct = check_expr(S, s->u.dostmt.cond);
+        if (ct && ct->kind != S_TYPE_BOOL) {
+            s_diag_error(S->diag, s->u.dostmt.cond->loc, 455,
+                         "do-while condition must be bool, got %s", type_name(ct));
+        }
+        return ok;
+    }
     case S_STMT_FOR: {
         s_type *it = check_expr(S, s->u.forstmt.iter);
         if (!it) return false;
