@@ -501,6 +501,15 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
     case S_EXPR_VAR: {
         s_sym *sym = scope_lookup(S->scope, e->u.var.name);
         if (!sym) {
+            for (s_size ci = 0; ci < S->mod->nconsts; ++ci) {
+                if (strcmp(S->mod->consts[ci].name, e->u.var.name) == 0) {
+                    e->kind = S_EXPR_CONST_REF;
+                    e->u.cref.const_index = (int)ci;
+                    t = S->mod->consts[ci].type;
+                    break;
+                }
+            }
+            if (e->kind == S_EXPR_CONST_REF) break;
             s_func_decl *f = resolve_function(S, e->u.var.name);
             if (f) {
                 e->kind = S_EXPR_FUNC_REF;
@@ -517,6 +526,15 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
         e->u.var.is_mut = sym->is_mut;
         t = sym->type;
         e->is_lvalue = true; /* a variable is assignable if mutable; checked separately */
+        break;
+    }
+    case S_EXPR_CONST_REF: {
+        int ci = e->u.cref.const_index;
+        if (ci >= 0 && ci < (int)S->mod->nconsts) {
+            t = S->mod->consts[ci].type;
+        } else {
+            t = type_unit(S);
+        }
         break;
     }
     case S_EXPR_FUNC_REF: {
@@ -709,6 +727,8 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
         }
     }
 
+    bool ok = true;
+
     /* resolve constants: infer or validate their types */
     for (s_size ci = 0; ci < mod->nconsts; ++ci) {
         s_const_decl *c = &mod->consts[ci];
@@ -732,8 +752,6 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
             ok = false;
         }
     }
-
-    bool ok = true;
 
     for (s_size f = 0; f < mod->nfuncs; ++f) {
         s_func_decl *fn = &mod->funcs[f];

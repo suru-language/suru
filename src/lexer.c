@@ -42,6 +42,7 @@ const char *s_tok_kind_name(s_tok_kind k) {
     case S_TOK_KW_WHILE: return "'while'";
     case S_TOK_KW_NEW: return "'new'";
     case S_TOK_KW_AS: return "'as'";
+    case S_TOK_KW_CONST: return "'const'";
     case S_TOK_LPAREN: return "'('";
     case S_TOK_RPAREN: return "')'";
     case S_TOK_LBRACE: return "'{'";

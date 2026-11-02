@@ -1,0 +1,10 @@
+const PI = 3.14;
+const GREETING = "hi";
+const MAX = 1000;
+const NEG = -5;
+func main() {
+    println(f64_to_str_prec(PI, 2));
+    println(GREETING);
+    println(MAX);
+    println(NEG);
+}

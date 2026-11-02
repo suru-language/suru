@@ -188,6 +188,56 @@ static void test_array_any_elem(void) {
     s_arena_dispose(&arena);
 }
 
+static void test_const_valid(void) {
+    const char *src =
+        "const X = 42;\n"
+        "const NAME = \"suru\";\n"
+        "func main() -> int {\n"
+        "    return X;\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(ok);
+    CHECK_EQ_INT(s_diag_has_errors(&d), 0);
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_const_type_mismatch(void) {
+    const char *src =
+        "const X: int = 1.5;\n"
+        "func main() -> int {\n"
+        "    return 0;\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_const_assign_rejected(void) {
+    const char *src =
+        "const X = 5;\n"
+        "func main() -> int {\n"
+        "    X = 9;\n"
+        "    return 0;\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
 TEST_MAIN_BEGIN()
     test_valid_program();
     test_type_mismatch();
@@ -200,4 +250,7 @@ TEST_MAIN_BEGIN()
     test_array_literal_empty();
     test_array_literal_empty_ascribed();
     test_array_any_elem();
+    test_const_valid();
+    test_const_type_mismatch();
+    test_const_assign_rejected();
 TEST_MAIN_END()

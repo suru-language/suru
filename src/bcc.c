@@ -390,6 +390,31 @@ static bool gen_expr(s_gen *g, const s_expr *e) {
         EM3(BC_CONST_INT, ci, 0, 0);
         return true;
     }
+    case S_EXPR_CONST_REF: {
+        const s_const_decl *c = &g->ast->consts[e->u.cref.const_index];
+        switch (c->lit_kind) {
+        case S_EXPR_INT_LIT:
+            if (!em_const_int(g, c->v.i)) return false;
+            return true;
+        case S_EXPR_FLOAT_LIT: {
+            s_u32 cf;
+            if (!pool_add_float(&g->pool, c->v.f, &cf)) return false;
+            EM3(BC_CONST_FLOAT, cf, 0, 0);
+            return true;
+        }
+        case S_EXPR_STR_LIT: {
+            s_u32 cs;
+            if (!pool_add_str(&g->pool, c->v.str.text, (s_u32)c->v.str.len, &cs))
+                return false;
+            EM3(BC_CONST_STR, cs, 0, 0);
+            return true;
+        }
+        case S_EXPR_BOOL_LIT:
+            if (!em_const_int(g, c->v.b ? 1 : 0)) return false;
+            return true;
+        }
+        return false;
+    }
     case S_EXPR_NONE_LIT:
         EM(BC_CONST_NONE);
         return true;

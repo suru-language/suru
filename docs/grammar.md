@@ -27,8 +27,8 @@ string_literal = '"' { ?any char except '"' or newline or unescaped backslash?
                       | escape } '"'
 escape        = "\\" ("n" | "t" | "r" | "0" | "\\" | '"' | "'" | "u" hex_digit{4})
 
-keyword       = "break" | "continue" | "else" | "false" | "for" | "func"
-              | "if" | "in" | "let" | "mut" | "none" | "return"
+keyword       = "break" | "continue" | "const" | "else" | "false" | "for"
+              | "func" | "if" | "in" | "let" | "mut" | "none" | "return"
               | "true" | "type" | "use" | "while" | "new" | "as"
 ```
 
@@ -36,10 +36,13 @@ keyword       = "break" | "continue" | "else" | "false" | "for" | "func"
 
 ```
 program       = { item }
-item          = func_decl | type_decl
+item          = func_decl | type_decl | const_decl
 func_decl     = "func" identifier [ param_list ] [ "->" type ] block
 type_decl     = "type" identifier "{" { field_decl } "}"
 field_decl    = "let" identifier ":" type ";"
+const_decl    = "const" identifier [ ":" type ] "=" literal ";"
+literal       = [ "-" ] ( int_literal | float_literal )
+              | string_literal | bool_literal
 param_list     = "(" [ param { "," param } ] ")"
 param         = identifier ":" type
 block         = "{" { statement } "}"
