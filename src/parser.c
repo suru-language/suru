@@ -1062,9 +1062,10 @@ static bool resolve_include(const char *basefile, const char *inc,
     const char *slash = basefile ? strrchr(basefile, '/') : NULL;
     if (slash) {
         size_t d = (size_t)(slash - basefile + 1);
-        if (d < sizeof cand) {
+        size_t il = strlen(inc);
+        if (d + il + 1 <= sizeof cand) {
             memcpy(cand, basefile, d);
-            snprintf(cand + d, sizeof cand - d, "%s", inc);
+            memcpy(cand + d, inc, il + 1);
             FILE *f = fopen(cand, "rb");
             if (f) { fclose(f); snprintf(full, fullsz, "%s", cand); return true; }
         }
@@ -1083,8 +1084,9 @@ static bool resolve_include(const char *basefile, const char *inc,
         if (tlen > 0 && tlen + strlen(inc) + 2 < sizeof cand) {
             memcpy(cand, q, tlen);
             cand[tlen] = '\0';
-            size_t cl = strlen(cand);
-            snprintf(cand + cl, sizeof cand - cl, "/%s", inc);
+            size_t cl = tlen;
+            cand[cl] = '/';
+            memcpy(cand + cl + 1, inc, strlen(inc) + 1);
             FILE *f = fopen(cand, "rb");
             if (f) { fclose(f); snprintf(full, fullsz, "%s", cand); return true; }
         }
