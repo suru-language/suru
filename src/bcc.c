@@ -433,6 +433,14 @@ static bool gen_expr(s_gen *g, const s_expr *e) {
         return true;
     case S_EXPR_CALL:
         return gen_call(g, e);
+    case S_EXPR_RECORD_INIT: {
+        s_u32 rec = (s_u32)e->u.rec.record_index;
+        for (s_size i = 0; i < e->u.rec.nfields; ++i) {
+            if (!gen_expr(g, e->u.rec.by_field[i])) return false;
+        }
+        EM3(BC_NEW_RECORD, rec, (s_u32)e->u.rec.nfields, 0);
+        return true;
+    }
     case S_EXPR_INDEX:
         if (!gen_expr(g, e->u.index.obj)) return false;
         if (!gen_expr(g, e->u.index.index)) return false;

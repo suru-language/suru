@@ -419,6 +419,64 @@ static s_type *check_field(s_sema *S, s_expr *e) {
     return type_unit(S);
 }
 
+static s_type *check_record_init(s_sema *S, s_expr *e) {
+    int ridx = resolve_record_name(S, e->u.rec.name);
+    if (ridx < 0) {
+        s_diag_error(S->diag, e->loc, 471, "unknown record type '%s'",
+                     e->u.rec.name);
+        return type_unit(S);
+    }
+    s_record_decl *rec = &S->mod->records[ridx];
+    e->u.rec.record_index = ridx;
+    s_size nf = rec->nfields;
+    s_expr **by = s_arena_calloc(S->arena, nf ? nf : 1, sizeof(s_expr *),
+                                  _Alignof(s_expr *));
+    if (!by) { e->u.rec.by_field = NULL; e->u.rec.nfields = nf; return type_unit(S); }
+    bool ok = true;
+    for (s_size i = 0; i < e->u.rec.nprovided; ++i) {
+        const char *nm = e->u.rec.fnames[i];
+        int j = -1;
+        for (s_size k = 0; k < nf; ++k) {
+            if (strcmp(rec->fields[k].name, nm) == 0) { j = (int)k; break; }
+        }
+        if (j < 0) {
+            s_diag_error(S->diag, e->loc, 472, "record '%s' has no field '%s'",
+                         rec->name, nm);
+            ok = false;
+            continue;
+        }
+        if (by[j]) {
+            s_diag_error(S->diag, e->loc, 473, "duplicate field '%s'", nm);
+            ok = false;
+            continue;
+        }
+        s_type *vt = check_expr(S, e->u.rec.fvals[i]);
+        if (vt && !type_eq(vt, rec->fields[j].type)) {
+            s_diag_error(S->diag, e->loc, 475, "field '%s' has type %s, expected %s",
+                         nm, type_name(vt), type_name(rec->fields[j].type));
+            ok = false;
+        }
+        by[j] = e->u.rec.fvals[i];
+    }
+    for (s_size j = 0; j < nf; ++j) {
+        if (!by[j]) {
+            s_diag_error(S->diag, e->loc, 474, "missing field '%s'",
+                         rec->fields[j].name);
+            ok = false;
+        }
+    }
+    e->u.rec.by_field = by;
+    e->u.rec.nfields = nf;
+    if (!ok) return type_unit(S);
+    s_type *t = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+    if (t) {
+        t->kind = S_TYPE_RECORD;
+        t->record_index = ridx;
+        t->record_name = rec->name;
+    }
+    return t;
+}
+
 static s_type *check_assign(s_sema *S, s_expr *e) {
     s_expr *lhs = e->kind == S_EXPR_COMPOUND_ASSIGN ? e->u.compound.lhs
                                                     : e->u.assign.lhs;
@@ -547,6 +605,7 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
         break;
     }
     case S_EXPR_CALL: t = check_call(S, e); break;
+    case S_EXPR_RECORD_INIT: t = check_record_init(S, e); break;
     case S_EXPR_INDEX: t = check_index(S, e); break;
     case S_EXPR_FIELD: t = check_field(S, e); break;
     case S_EXPR_UNARY: t = check_unary(S, e); break;

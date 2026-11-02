@@ -54,6 +54,7 @@ typedef enum s_expr_kind {
     S_EXPR_CONST_REF,         /* a named constant used as a value */
     S_EXPR_FUNC_REF,          /* a named function used as a value */
     S_EXPR_CALL,
+    S_EXPR_RECORD_INIT,
     S_EXPR_INDEX,
     S_EXPR_FIELD,
     S_EXPR_UNARY,             /* -x, not x */
@@ -86,6 +87,15 @@ struct s_expr {
         struct { const char *name; int var_index; bool is_mut; } var;
         struct { int const_index; } cref;
         struct { s_expr *callee; s_expr **args; s_size nargs; } call;
+        struct {
+            const char *name;      /* record type name */
+            int record_index;      /* resolved by sema */
+            const char **fnames;   /* provided field names */
+            s_expr **fvals;        /* provided field value expressions */
+            s_size nprovided;
+            s_expr **by_field;     /* resolved values indexed by field index */
+            s_size nfields;
+        } rec;
         struct { s_expr *obj; s_expr *index; } index;
         struct { s_expr *obj; const char *field; int field_index; } field;
         struct { s_un_op op; s_expr *operand; } unary;

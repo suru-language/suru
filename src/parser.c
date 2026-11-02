@@ -229,6 +229,38 @@ static s_expr *parse_postfix(s_parser *p) {
             f->u.field.field_index = -1;
             advance(p);
             e = f;
+        } else if (accept(p, S_TOK_LBRACE)) {
+            if (e->kind != S_EXPR_VAR) {
+                s_diag_error(p->diag, p->cur.loc, 373,
+                             "record literal must follow a type name");
+                return NULL;
+            }
+            s_expr *r = expr_alloc(p, S_EXPR_RECORD_INIT, e->loc);
+            if (!r) return NULL;
+            r->u.rec.name = e->u.var.name;
+            const char **fnames = NULL;
+            s_expr **fvals = NULL;
+            s_size n = 0, capn = 0, capv = 0;
+            while (!at(p, S_TOK_RBRACE)) {
+                if (!at(p, S_TOK_IDENT)) {
+                    s_diag_error(p->diag, p->cur.loc, 370,
+                                 "expected field name in record literal");
+                    return NULL;
+                }
+                VEC_PUSH(p->arena, fnames, n, capn, sizeof(char *),
+                         ident_text(p));
+                advance(p);
+                if (!expect(p, S_TOK_ASSIGN, 371)) return NULL;
+                s_expr *val = parse_assignment(p);
+                if (!val) return NULL;
+                VEC_PUSH(p->arena, fvals, n, capv, sizeof(s_expr *), val);
+                if (!accept(p, S_TOK_COMMA)) break;
+            }
+            if (!expect(p, S_TOK_RBRACE, 372)) return NULL;
+            r->u.rec.fnames = fnames;
+            r->u.rec.fvals = fvals;
+            r->u.rec.nprovided = n;
+            e = r;
         } else {
             break;
         }
