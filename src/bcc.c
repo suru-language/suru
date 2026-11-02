@@ -622,6 +622,8 @@ static bool gen_stmt(s_gen *g, const s_stmt *s, const s_loopctx *loop) {
         s_u32 lloop = new_label(&g->labels);
         s_u32 lend = new_label(&g->labels);
         s_loopctx inner = { lend, lloop };
+        bool iter_is_str = s->u.forstmt.iter->type &&
+                           s->u.forstmt.iter->type->kind == S_TYPE_STR;
         if (!gen_expr(g, s->u.forstmt.iter)) return false;
         EM3(BC_ST_LOCAL, arr_slot, 0, 0);
         if (!em_const_int(g, 0)) return false;
@@ -629,7 +631,8 @@ static bool gen_stmt(s_gen *g, const s_stmt *s, const s_loopctx *loop) {
         place_label(&g->e, &g->labels, lloop);
         EM3(BC_LD_LOCAL, idx_slot, 0, 0);
         EM3(BC_LD_LOCAL, arr_slot, 0, 0);
-        EM(BC_ARR_LEN);
+        if (iter_is_str) EM3(BC_BUILTIN, S_BUILTIN_STR_LEN, 0, 0);
+        else EM(BC_ARR_LEN);
         EM(BC_LT_I);
         if (!em_jump(&g->e, &g->labels, BC_JZ, lend)) return false;
         EM3(BC_LD_LOCAL, arr_slot, 0, 0);

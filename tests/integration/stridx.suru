@@ -1,0 +1,8 @@
+func main() {
+    let s = "hello";
+    println(s[0]);
+    println(s[4]);
+    mut t = "";
+    for ch in s { t = t + ch; }
+    println(t);
+}

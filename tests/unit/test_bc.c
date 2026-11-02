@@ -92,6 +92,32 @@ static void test_verify_bad_local(void) {
     s_bc_module_dispose(&m);
 }
 
+static void test_le_endian(void) {
+    /* The serialized format is fixed little-endian regardless of host. Write a
+     * module whose only data is one int64 and require the byte pattern to be
+     * little-endian. */
+    s_bc_module m;
+    s_bc_module_init(&m);
+    m.version = S_BC_VERSION;
+    m.entry = 0;
+    m.nints = 1;
+    m.ints = malloc(sizeof(s_i64));
+    m.ints[0] = 0x0102030405060708LL;
+    s_u8 *buf = NULL;
+    s_size len = 0;
+    CHECK_EQ_INT(s_bc_write(&m, &buf, &len), 0);
+    CHECK(buf && len >= 8);
+    static const s_u8 le[8] = {0x08, 0x07, 0x06, 0x05,
+                                0x04, 0x03, 0x02, 0x01};
+    bool found = false;
+    for (s_size i = 0; i + 8 <= len; ++i) {
+        if (memcmp(buf + i, le, 8) == 0) { found = true; break; }
+    }
+    CHECK(found);
+    free(buf);
+    s_bc_module_dispose(&m);
+}
+
 static void test_read_garbage(void) {
     s_u8 garbage[64];
     for (int i = 0; i < 64; i++) garbage[i] = (s_u8)(i * 7);
@@ -108,4 +134,5 @@ TEST_MAIN_BEGIN()
     test_verify_underflow();
     test_verify_bad_local();
     test_read_garbage();
+    test_le_endian();
 TEST_MAIN_END()

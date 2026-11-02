@@ -501,6 +501,11 @@ static s_type *check_index(s_sema *S, s_expr *e) {
                      "array index must be int, got %s", type_name(it));
     }
     if (!ot) return type_unit(S);
+    if (ot->kind == S_TYPE_STR) {
+        /* string indexing yields a one-character string */
+        e->is_lvalue = false;
+        return ot;
+    }
     if (ot->kind != S_TYPE_ARRAY) {
         s_diag_error(S->diag, e->loc, 415,
                      "cannot index a value of type %s", type_name(ot));
@@ -954,14 +959,19 @@ static bool check_stmt(s_sema *S, s_stmt *s) {
     case S_STMT_FOR: {
         s_type *it = check_expr(S, s->u.forstmt.iter);
         if (!it) return false;
-        if (it->kind != S_TYPE_ARRAY) {
+        s_type *elem = NULL;
+        if (it->kind == S_TYPE_ARRAY) {
+            elem = it->elem;
+        } else if (it->kind == S_TYPE_STR) {
+            elem = it;
+        } else {
             s_diag_error(S->diag, s->u.forstmt.iter->loc, 456,
-                         "for-in requires an array, got %s", type_name(it));
+                         "for-in requires an array or string, got %s", type_name(it));
             return false;
         }
         s_sym sym;
         sym.name = s->u.forstmt.name;
-        sym.type = it->elem;
+        sym.type = elem;
         sym.index = S->next_slot++;
         sym.is_mut = true;
         if (!scope_push_sym(S->scope, sym)) return false;

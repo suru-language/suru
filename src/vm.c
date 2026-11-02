@@ -1085,12 +1085,24 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
         case BC_IDX_LD: {
             s_value idx = pop(vm);
             s_value arr = pop(vm);
-            if (arr.tag != S_VAL_OBJ || arr.u.o->kind != S_OBJ_ARRAY ||
-                idx.tag != S_VAL_INT) {
+            if (arr.tag != S_VAL_OBJ || idx.tag != S_VAL_INT ||
+                (arr.u.o->kind != S_OBJ_ARRAY && arr.u.o->kind != S_OBJ_STR)) {
                 vm_trap(vm, "index type error");
                 return 1;
             }
             s_i64 i = idx.u.i;
+            if (arr.u.o->kind == S_OBJ_STR) {
+                if (i < 0 || i >= (s_i64)arr.u.o->count) {
+                    vm_trap(vm, "string index out of bounds (%lld of %u)",
+                            (long long)i, arr.u.o->count);
+                    return 1;
+                }
+                s_gcobj *o = vm_alloc(vm, S_OBJ_STR, 1, 1);
+                if (!o) return 1;
+                s_obj_str_data(o)[0] = s_obj_str_data(arr.u.o)[i];
+                if (!push(vm, s_val_obj(o))) return 1;
+                pc++; break;
+            }
             if (i < 0 || i >= (s_i64)arr.u.o->count) {
                 vm_trap(vm, "index out of bounds (%lld of %u)", (long long)i, arr.u.o->count);
                 return 1;
