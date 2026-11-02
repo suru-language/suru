@@ -1,6 +1,7 @@
 #include "suru/parser.h"
 
 #include <string.h>
+#include <stdio.h>
 
 #define SU_PARSE_MAX_DEPTH 512
 #define SU_PARSE_MAX_ITEMS 1u << 20
