@@ -1,0 +1,9 @@
+type P { let x: int; let y: int; }
+func main() {
+    let a = [1, 2, 3];
+    println(a);
+    let n = [[1, 2], [3, 4]];
+    println(n);
+    let p = P { x = 1, y = 2 };
+    println(p);
+}

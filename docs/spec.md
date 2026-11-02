@@ -303,7 +303,8 @@ allocation so the collector never reads past an object.
 The standard library provides a small set of builtin functions (see
 `src/stdlib.c` and `docs/architecture.md`):
 
-- `print(v: any)` — write a scalar value to stdout (int, float, str).
+- `print(v: any)` — write a value to stdout (int, float, str, bool, and
+  recursively rendered arrays and records; cyclic structures are truncated).
 - `println(v: any)` — same, with a trailing newline.
 - `str_len(s: str) -> int` — length in bytes.
 - `array_len(a: [T]) -> int` — element count (any element type).
