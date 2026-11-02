@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define SU_PARSE_MAX_DEPTH 512
 #define SU_PARSE_MAX_ITEMS 1u << 20
@@ -1051,6 +1052,48 @@ static bool read_file(const char *path, char **out, s_size *outlen) {
 
 static bool parse_items(s_parser *p);
 
+/* Resolve an include path: absolute, relative to the containing file, then
+ * each colon-separated directory in SURU_MOD_PATH. On success fills `full`
+ * with an openable path and returns true. */
+static bool resolve_include(const char *basefile, const char *inc,
+                            char *full, size_t fullsz) {
+    char cand[1024];
+    if (inc[0] == '/') { snprintf(full, fullsz, "%s", inc); return true; }
+    const char *slash = basefile ? strrchr(basefile, '/') : NULL;
+    if (slash) {
+        size_t d = (size_t)(slash - basefile + 1);
+        if (d < sizeof cand) {
+            memcpy(cand, basefile, d);
+            snprintf(cand + d, sizeof cand - d, "%s", inc);
+            FILE *f = fopen(cand, "rb");
+            if (f) { fclose(f); snprintf(full, fullsz, "%s", cand); return true; }
+        }
+    } else {
+        FILE *f = fopen(inc, "rb");
+        if (f) { fclose(f); snprintf(full, fullsz, "%s", inc); return true; }
+    }
+    const char *path = getenv("SURU_MOD_PATH");
+    if (!path || !*path) return false;
+    char buf[4096];
+    snprintf(buf, sizeof buf, "%s", path);
+    char *q = buf;
+    while (*q) {
+        char *sep = strchr(q, ':');
+        size_t tlen = sep ? (size_t)(sep - q) : strlen(q);
+        if (tlen > 0 && tlen + strlen(inc) + 2 < sizeof cand) {
+            memcpy(cand, q, tlen);
+            cand[tlen] = '\0';
+            size_t cl = strlen(cand);
+            snprintf(cand + cl, sizeof cand - cl, "/%s", inc);
+            FILE *f = fopen(cand, "rb");
+            if (f) { fclose(f); snprintf(full, fullsz, "%s", cand); return true; }
+        }
+        if (!sep) break;
+        q = sep + 1;
+    }
+    return false;
+}
+
 static bool parse_use(s_parser *p) {
     s_source_loc loc = p->cur.loc;
     advance(p); /* 'use' */
@@ -1071,22 +1114,9 @@ static bool parse_use(s_parser *p) {
     if (!expect(p, S_TOK_SEMI, 361)) return false;
 
     char full[1024];
-    if (inc[0] == '/') {
-        snprintf(full, sizeof full, "%s", inc);
-    } else {
-        const char *base = p->lx.file ? p->lx.file : "";
-        const char *slash = strrchr(base, '/');
-        if (slash) {
-            size_t d = (size_t)(slash - base + 1);
-            if (d >= sizeof full) {
-                s_diag_error(p->diag, loc, 363, "include path too long");
-                return false;
-            }
-            memcpy(full, base, d);
-            snprintf(full + d, sizeof full - d, "%s", inc);
-        } else {
-            snprintf(full, sizeof full, "%s", inc);
-        }
+    if (!resolve_include(p->lx.file, inc, full, sizeof full)) {
+        s_diag_error(p->diag, loc, 362, "cannot locate included file '%s'", inc);
+        return false;
     }
 
     for (s_size i = 0; i < p->nincluded; ++i) {

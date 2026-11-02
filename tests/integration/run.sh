@@ -12,6 +12,7 @@ for src in "$DIR"/*.suru; do
     [ -e "$src" ] || continue
     name="$(basename "$src" .suru)"
     [ "$name" = "argtest" ] && continue   # handled specially with args
+    [ "$name" = "pkgmain" ] && continue   # handled specially with SURU_MOD_PATH
     tests=$((tests + 1))
     outfile="$DIR/$name.out"
     exitfile="$DIR/$name.exit"
@@ -64,6 +65,21 @@ if [ "$code" -eq 0 ] && [ "$actual" = "$(cat "$DIR/argtest.out")" ]; then
     echo "ok: argtest"
 else
     echo "FAIL: argtest (exit $code)"
+    echo "  got: $actual"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+
+# Module search path: SURU_MOD_PATH is used to resolve `use`.
+tests=$((tests + 1))
+mkdir -p "$tmp/mod"
+printf 'func greet() -> str { return "gm"; }\n' > "$tmp/mod/gm.suru"
+actual="$(SURU_MOD_PATH="$tmp/mod" "$SURU" run "$DIR/pkgmain.suru" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "gm" ]; then
+    echo "ok: pkgsearch"
+else
+    echo "FAIL: pkgsearch (exit $code)"
     echo "  got: $actual"
     sed 's/^/    stderr: /' "$tmp/stderr"
     fail=$((fail + 1))

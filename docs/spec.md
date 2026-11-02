@@ -286,10 +286,11 @@ A program is a sequence of top-level items:
 - a single `main` function (required)
 
 A `use "path.suru"` directive parses another source file and merges its
-top-level items into the current module. Paths are resolved relative to the
-containing file's directory, includes are idempotent, and recursive includes
-are bounded to prevent cycles. This provides simple user-module composition
-until the full package system ships.
+top-level items into the current module. Paths are resolved (in order) as an
+absolute path, relative to the containing file's directory, then against each
+directory in the `SURU_MOD_PATH` environment variable (colon-separated).
+Includes are idempotent, and recursive includes are bounded to prevent cycles.
+This provides simple user-module composition.
 
 `const` bindings are compile-time constants. Their initializers are constant
 expressions: literals, references to previously declared constants, and
