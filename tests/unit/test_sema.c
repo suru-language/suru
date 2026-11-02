@@ -335,6 +335,38 @@ static void test_duplicate_record(void) {
     s_arena_dispose(&arena);
 }
 
+static void test_const_expression(void) {
+    const char *src =
+        "const BASE = 10;\n"
+        "const DOUBLE = BASE * 2;\n"
+        "func main() -> int {\n"
+        "    return DOUBLE;\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(ok);
+    CHECK_EQ_INT(s_diag_has_errors(&d), 0);
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_const_forward_ref(void) {
+    const char *src =
+        "const A = B;\n"
+        "const B = 1;\n"
+        "func main() -> int { return 0; }\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
 static void test_lambda_valid(void) {
     const char *src =
         "func make(n: int) -> fn(int) -> int {\n"
@@ -401,6 +433,8 @@ TEST_MAIN_BEGIN()
     test_const_valid();
     test_const_type_mismatch();
     test_const_assign_rejected();
+    test_const_expression();
+    test_const_forward_ref();
     test_record_init_valid();
     test_record_init_missing_field();
     test_record_init_unknown_field();

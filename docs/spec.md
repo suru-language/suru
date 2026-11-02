@@ -265,6 +265,18 @@ containing file's directory, includes are idempotent, and recursive includes
 are bounded to prevent cycles. This provides simple user-module composition
 until the full package system ships.
 
+`const` bindings are compile-time constants. Their initializers are constant
+expressions: literals, references to previously declared constants, and
+arithmetic/string/logical/bitwise operators over those. For example:
+
+```
+const BASE = 10;
+const DOUBLE = BASE * 2;     // 20
+const LABEL = "suru" + "-lang";
+```
+
+Forward references to not-yet-declared constants are an error.
+
 There is no global mutable state in the language; all state lives in
 function-local bindings and heap objects.
 
