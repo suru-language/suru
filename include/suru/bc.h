@@ -30,6 +30,7 @@ typedef enum s_bc_op {
 
     BC_NEG_I,
     BC_NEG_F,
+    BC_CONV_I_F,         /* pop int; push float */
 
     BC_ADD_I, BC_SUB_I, BC_MUL_I, BC_DIV_I, BC_MOD_I,
     BC_ADD_F, BC_SUB_F, BC_MUL_F, BC_DIV_F,

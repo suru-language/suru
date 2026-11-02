@@ -247,6 +247,10 @@ static s_type *check_binary(s_sema *S, s_expr *e) {
         if (lt->kind == S_TYPE_FLOAT && rt->kind == S_TYPE_FLOAT) return lt;
         if (e->u.binary.op == S_BIN_ADD &&
             lt->kind == S_TYPE_STR && rt->kind == S_TYPE_STR) return lt;
+        if ((lt->kind == S_TYPE_INT && rt->kind == S_TYPE_FLOAT) ||
+            (lt->kind == S_TYPE_FLOAT && rt->kind == S_TYPE_INT)) {
+            return lt->kind == S_TYPE_FLOAT ? lt : rt; /* int promotes to float */
+        }
         s_diag_error(S->diag, e->loc, 403,
                      "arithmetic operands must both be int or both float, got %s and %s",
                      type_name(lt), type_name(rt));
@@ -265,6 +269,10 @@ static s_type *check_binary(s_sema *S, s_expr *e) {
         }
         break; /* comparison result is bool */
     case S_BIN_LT: case S_BIN_LE: case S_BIN_GT: case S_BIN_GE:
+        if ((lt->kind == S_TYPE_INT && rt->kind == S_TYPE_FLOAT) ||
+            (lt->kind == S_TYPE_FLOAT && rt->kind == S_TYPE_INT)) {
+            break; /* int promotes to float; comparison result is bool */
+        }
         if (!(lt->kind == S_TYPE_INT || lt->kind == S_TYPE_FLOAT ||
               lt->kind == S_TYPE_STR) || !type_eq(lt, rt)) {
             s_diag_error(S->diag, e->loc, 406,

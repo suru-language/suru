@@ -806,6 +806,12 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             if (!push(vm, s_val_float(-v.u.f))) return 1;
             pc++; break;
         }
+        case BC_CONV_I_F: {
+            s_value v = pop(vm);
+            if (v.tag != S_VAL_INT) { vm_trap(vm, "conv_i_f type error"); return 1; }
+            if (!push(vm, s_val_float((double)v.u.i))) return 1;
+            pc++; break;
+        }
         case BC_ADD_I: case BC_SUB_I: case BC_MUL_I:
         case BC_DIV_I: case BC_MOD_I:
             if (!arith_i(vm, in->op)) return 1;
