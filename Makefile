@@ -14,7 +14,8 @@ CC      ?= cc
 BUILD   ?= build
 
 WARN     = -Wall -Wextra -Wpedantic -Wconversion -Wshadow
-BASE     = -std=c17 -Iinclude
+# -MMD -MP generates header dependency files for reliable incremental rebuilds.
+BASE     = -std=c17 -Iinclude -MMD -MP
 CFLAGS  ?= $(BASE) -g -O0 $(WARN) -Werror
 LDFLAGS ?=
 
@@ -23,6 +24,8 @@ ASAN_CFLAGS   = $(BASE) -g -O1 -fsanitize=address,undefined -fno-omit-frame-poin
 ASAN_LDFLAGS  = -fsanitize=address,undefined
 UBSAN_CFLAGS  = $(BASE) -g -O1 -fsanitize=undefined -fno-omit-frame-pointer $(WARN) -Werror
 UBSAN_LDFLAGS = -fsanitize=undefined
+
+-include $(wildcard $(OBJDIR)/*.d)
 
 OBJDIR  := $(BUILD)/obj
 BINDIR  := $(BUILD)/bin
