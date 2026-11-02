@@ -419,6 +419,24 @@ static s_expr *parse_primary(s_parser *p) {
         advance(p);
         return e;
     }
+    if (accept(p, S_TOK_LBRACKET)) {
+        s_expr *e = expr_alloc(p, S_EXPR_ARRAY_LIT, loc);
+        if (!e) return NULL;
+        s_expr **elems = NULL;
+        s_size n = 0, cap = 0;
+        if (!at(p, S_TOK_RBRACKET)) {
+            for (;;) {
+                s_expr *el = parse_assignment(p);
+                if (!el) return NULL;
+                VEC_PUSH(p->arena, elems, n, cap, sizeof(s_expr *), el);
+                if (!accept(p, S_TOK_COMMA)) break;
+            }
+        }
+        if (!expect(p, S_TOK_RBRACKET, 309)) return NULL;
+        e->u.array.elems = elems;
+        e->u.array.count = n;
+        return e;
+    }
     if (at(p, S_TOK_IDENT)) {
         s_expr *e = expr_alloc(p, S_EXPR_VAR, loc);
         if (!e) return NULL;

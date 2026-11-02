@@ -393,6 +393,13 @@ static bool gen_expr(s_gen *g, const s_expr *e) {
     case S_EXPR_NONE_LIT:
         EM(BC_CONST_NONE);
         return true;
+    case S_EXPR_ARRAY_LIT: {
+        for (s_size i = 0; i < e->u.array.count; ++i) {
+            if (!gen_expr(g, e->u.array.elems[i])) return false;
+        }
+        EM3(BC_NEW_ARRAY, (s_u32)e->u.array.count, 0, 0);
+        return true;
+    }
     case S_EXPR_VAR:
         EM3(BC_LD_LOCAL, (s_u32)e->u.var.var_index, 0, 0);
         return true;

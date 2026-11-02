@@ -108,6 +108,54 @@ static void test_arithmetic_type(void) {
     s_arena_dispose(&arena);
 }
 
+static void test_array_literal_valid(void) {
+    const char *src =
+        "func main() -> int {\n"
+        "    let a = [1, 2, 3];\n"
+        "    return a[1];\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(ok);
+    CHECK_EQ_INT(s_diag_has_errors(&d), 0);
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_array_literal_hetero(void) {
+    const char *src =
+        "func main() -> int {\n"
+        "    let a = [1, true];\n"
+        "    return a[0];\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_array_literal_empty(void) {
+    const char *src =
+        "func main() -> int {\n"
+        "    let a = [];\n"
+        "    return 0;\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
 TEST_MAIN_BEGIN()
     test_valid_program();
     test_type_mismatch();
@@ -115,4 +163,7 @@ TEST_MAIN_BEGIN()
     test_missing_main();
     test_immutable_assign();
     test_arithmetic_type();
+    test_array_literal_valid();
+    test_array_literal_hetero();
+    test_array_literal_empty();
 TEST_MAIN_END()

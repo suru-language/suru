@@ -87,6 +87,8 @@ unary      = ("-" | "not") unary | postfix
 postfix    = primary { ("(" arg_list ")" | "[" expression "]" | "." identifier) }
 primary     = int_literal | float_literal | string_literal | bool_literal
             | "none" | identifier | "(" expression ")"
+            | array_literal
+array_literal = "[" [ expression { "," expression } ] "]"
 bool_literal = "true" | "false"
 arg_list    = [ expression { "," expression } ]
 ```

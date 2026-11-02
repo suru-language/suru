@@ -444,6 +444,32 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
         if (t) t->kind = S_TYPE_UNIT;
         break;
     }
+    case S_EXPR_ARRAY_LIT: {
+        if (e->u.array.count == 0) {
+            s_diag_error(S->diag, e->loc, 432,
+                         "empty array literal requires an explicit element type");
+            t = type_unit(S);
+            break;
+        }
+        s_type *et = check_expr(S, e->u.array.elems[0]);
+        bool ok = et != NULL;
+        if (ok) {
+            for (s_size i = 1; i < e->u.array.count; ++i) {
+                s_type *it = check_expr(S, e->u.array.elems[i]);
+                if (!it || !type_eq(et, it)) {
+                    s_diag_error(S->diag, e->loc, 433,
+                                 "array elements must all have one type, got %s and %s",
+                                 type_name(et), it ? type_name(it) : "?");
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if (!ok) { t = type_unit(S); break; }
+        t = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+        if (t) { t->kind = S_TYPE_ARRAY; t->elem = et; }
+        break;
+    }
     case S_EXPR_VAR: {
         s_sym *sym = scope_lookup(S->scope, e->u.var.name);
         if (!sym) {

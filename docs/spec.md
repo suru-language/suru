@@ -109,6 +109,15 @@ record = identifier            ; named record type
 not part of the static type. Array indexing is zero-based and bounds-checked
 at runtime; an out-of-range access traps.
 
+An array literal `[...]` builds an array from its elements, whose types must
+all match; the element type is inferred from the first element, so an empty
+array literal is a compile-time error:
+
+```
+let primes = [2, 3, 5, 7];   // [int]
+println(to_str(primes[0]));   // 2
+```
+
 ### 3.3 Function types
 
 `fn(T1, T2) -> R` is the type of a function taking `T1, T2` and returning

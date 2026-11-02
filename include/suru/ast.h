@@ -48,6 +48,7 @@ typedef enum s_expr_kind {
     S_EXPR_STR_LIT,
     S_EXPR_BOOL_LIT,
     S_EXPR_NONE_LIT,
+    S_EXPR_ARRAY_LIT,
     S_EXPR_VAR,               /* identifier reference */
     S_EXPR_FUNC_REF,          /* a named function used as a value */
     S_EXPR_CALL,
@@ -86,6 +87,7 @@ struct s_expr {
         struct { s_expr *obj; const char *field; int field_index; } field;
         struct { s_un_op op; s_expr *operand; } unary;
         struct { s_bin_op op; s_expr *lhs; s_expr *rhs; } binary;
+        struct { s_expr **elems; s_size count; } array;
         struct { s_expr *lhs; s_expr *rhs; } assign;
         struct { s_bin_op op; s_expr *lhs; s_expr *rhs; } compound;
     } u;
