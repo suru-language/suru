@@ -704,6 +704,58 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             pc = 0;
             break;
         }
+        case BC_MKCLOSURE: {
+            s_gcobj *o = vm_alloc(vm, S_OBJ_CLOSURE, 1, 0);
+            if (!o) return 1;
+            s_obj_array_data(o)[0] = s_val_int((s_i64)in->a);
+            if (!push(vm, s_val_obj(o))) return 1;
+            pc++; break;
+        }
+        case BC_CALLV: {
+            s_u32 nargs = in->a;
+            if (vm->sp < nargs + 1) {
+                vm_trap(vm, "call_v underflow");
+                return 1;
+            }
+            s_size closure_slot = vm->sp - nargs - 1;
+            s_value cl = vm->st[closure_slot];
+            if (cl.tag != S_VAL_OBJ || cl.u.o->kind != S_OBJ_CLOSURE) {
+                vm_trap(vm, "call_v expects a closure");
+                return 1;
+            }
+            s_value fnv = s_obj_array_data(cl.u.o)[0];
+            if (fnv.tag != S_VAL_INT || fnv.u.i < 0 ||
+                (s_u64)fnv.u.i >= m->nfuncs) {
+                vm_trap(vm, "call_v invalid function reference");
+                return 1;
+            }
+            s_u32 callee = (s_u32)fnv.u.i;
+            const s_bc_func *cf = &m->funcs[callee];
+            if (cf->nparams != nargs) {
+                vm_trap(vm, "call_v arity mismatch");
+                return 1;
+            }
+            s_size fp_new = closure_slot + 1;
+            s_size need = fp_new + cf->frame_size + cf->max_operand_depth + 4;
+            if (!grow_stack(vm, need)) {
+                vm_trap(vm, "stack overflow in call");
+                return 1;
+            }
+            for (s_size i = fp_new + nargs; i < fp_new + cf->frame_size; ++i)
+                vm->st[i] = s_val_int(0);
+            if (!grow_calls(vm)) {
+                vm_trap(vm, "call stack overflow");
+                return 1;
+            }
+            vm->calls[vm->ncalls++] =
+                (s_cont){ pc + 1, vm->fp, vm->cur_fid };
+            vm->cur_fid = callee;
+            vm->fp = fp_new;
+            vm->sp = fp_new + cf->frame_size;
+            f = cf;
+            pc = 0;
+            break;
+        }
         case BC_RET:
         case BC_RET_UNIT: {
             s_value result = s_val_none();

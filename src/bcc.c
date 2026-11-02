@@ -396,6 +396,9 @@ static bool gen_expr(s_gen *g, const s_expr *e) {
     case S_EXPR_VAR:
         EM3(BC_LD_LOCAL, (s_u32)e->u.var.var_index, 0, 0);
         return true;
+    case S_EXPR_FUNC_REF:
+        EM3(BC_MKCLOSURE, (s_u32)e->u.var.var_index, 0, 0);
+        return true;
     case S_EXPR_CALL:
         return gen_call(g, e);
     case S_EXPR_INDEX:
