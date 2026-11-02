@@ -25,11 +25,11 @@ ASAN_LDFLAGS  = -fsanitize=address,undefined
 UBSAN_CFLAGS  = $(BASE) -g -O1 -fsanitize=undefined -fno-omit-frame-pointer $(WARN) -Werror
 UBSAN_LDFLAGS = -fsanitize=undefined
 
--include $(wildcard $(OBJDIR)/*.d)
-
 OBJDIR  := $(BUILD)/obj
 BINDIR  := $(BUILD)/bin
 UNITDIR := $(BUILD)/unit
+
+-include $(wildcard $(OBJDIR)/*.d)
 
 LIBSRC = \
 	src/arena.c \
