@@ -12,6 +12,7 @@ int s_driver_compile(const char *file, const char *src, s_size len,
     s_arena_init(&arena);
     s_diag_ctx diag;
     s_diag_init(&diag);
+    s_diag_set_source(&diag, src, len);
 
     s_parser p;
     if (!s_parse(&p, file, src, len, &arena, &diag)) {

@@ -219,6 +219,69 @@ static bool builtin_make_array(s_vm *vm) {
     return push(vm, s_val_obj(o));
 }
 
+static bool builtin_range(s_vm *vm) {
+    s_value hi = pop(vm);
+    s_value lo = pop(vm);
+    if (lo.tag != S_VAL_INT || hi.tag != S_VAL_INT) {
+        vm_trap(vm, "range expects int arguments");
+        return false;
+    }
+    s_i64 n = hi.u.i - lo.u.i;
+    if (n < 0) n = 0;
+    if (n > (1 << 20)) { vm_trap(vm, "range too large"); return false; }
+    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)n, 0);
+    if (!o) return false;
+    s_value *data = s_obj_array_data(o);
+    for (s_i64 i = 0; i < n; ++i) data[i] = s_val_int(lo.u.i + i);
+    return push(vm, s_val_obj(o));
+}
+
+static bool builtin_substr(s_vm *vm) {
+    s_value len = pop(vm);
+    s_value start = pop(vm);
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR ||
+        start.tag != S_VAL_INT || len.tag != S_VAL_INT) {
+        vm_trap(vm, "substr expects str, int, int");
+        return false;
+    }
+    s_i64 slen = (s_i64)s_obj_str_len(s.u.o);
+    s_i64 b = start.u.i;
+    if (b < 0) b = 0;
+    if (b > slen) b = slen;
+    s_i64 l = len.u.i;
+    if (l < 0) l = 0;
+    s_i64 end = b + l;
+    if (end > slen) end = slen;
+    s_size n = (s_size)(end - b);
+    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
+    if (!o) return false;
+    if (n) memcpy(s_obj_str_data(o), s_obj_str_data(s.u.o) + b, n);
+    return push(vm, s_val_obj(o));
+}
+
+static bool builtin_str_contains(s_vm *vm) {
+    s_value needle = pop(vm);
+    s_value hay = pop(vm);
+    if (hay.tag != S_VAL_OBJ || hay.u.o->kind != S_OBJ_STR ||
+        needle.tag != S_VAL_OBJ || needle.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "str_contains expects two strings");
+        return false;
+    }
+    s_size hn = s_obj_str_len(hay.u.o), nn = s_obj_str_len(needle.u.o);
+    bool found = false;
+    if (nn == 0) {
+        found = true;
+    } else if (nn <= hn) {
+        const char *h = s_obj_str_data(hay.u.o);
+        const char *nd = s_obj_str_data(needle.u.o);
+        for (s_size i = 0; i + nn <= hn; ++i) {
+            if (memcmp(h + i, nd, nn) == 0) { found = true; break; }
+        }
+    }
+    return push(vm, s_val_int(found ? 1 : 0));
+}
+
 static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     switch (id) {
     case S_BUILTIN_PRINT: return builtin_print(vm, false);
@@ -231,6 +294,9 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_I64_TO_F64: return builtin_itof(vm);
     case S_BUILTIN_F64_TO_I64: return builtin_ftoi(vm);
     case S_BUILTIN_MAKE_ARRAY: return builtin_make_array(vm);
+    case S_BUILTIN_RANGE: return builtin_range(vm);
+    case S_BUILTIN_SUBSTR: return builtin_substr(vm);
+    case S_BUILTIN_STR_CONTAINS: return builtin_str_contains(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

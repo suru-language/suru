@@ -23,6 +23,9 @@ typedef enum s_builtin_id {
     S_BUILTIN_I64_TO_F64,
     S_BUILTIN_F64_TO_I64,
     S_BUILTIN_MAKE_ARRAY,
+    S_BUILTIN_RANGE,
+    S_BUILTIN_SUBSTR,
+    S_BUILTIN_STR_CONTAINS,
     S_BUILTIN_COUNT
 } s_builtin_id;
 

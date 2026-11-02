@@ -23,6 +23,12 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "f64_to_i64", 1, { S_SIG_FLOAT }, S_SIG_INT },
     [S_BUILTIN_MAKE_ARRAY] = {
         "make_array", 1, { S_SIG_INT }, S_SIG_ARRAY_INT },
+    [S_BUILTIN_RANGE] = {
+        "range", 2, { S_SIG_INT, S_SIG_INT }, S_SIG_ARRAY_INT },
+    [S_BUILTIN_SUBSTR] = {
+        "substr", 3, { S_SIG_STR, S_SIG_INT, S_SIG_INT }, S_SIG_STR },
+    [S_BUILTIN_STR_CONTAINS] = {
+        "str_contains", 2, { S_SIG_STR, S_SIG_STR }, S_SIG_BOOL },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {

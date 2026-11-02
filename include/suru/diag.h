@@ -36,10 +36,16 @@ typedef struct s_diag_ctx {
     s_size count;
     s_size cap;
     int error_count;
+    const char *src;        /* optional source text for snippets (not owned) */
+    s_size srclen;
 } s_diag_ctx;
 
 void s_diag_init(s_diag_ctx *ctx);
 void s_diag_dispose(s_diag_ctx *ctx);
+
+/* Optionally attach the source text so printed diagnostics include a snippet
+ * with a caret. `src` is not owned and must outlive the context. */
+void s_diag_set_source(s_diag_ctx *ctx, const char *src, s_size len);
 
 void s_diag_report(s_diag_ctx *ctx, s_diag_sev sev,
                    s_source_loc loc, int code,

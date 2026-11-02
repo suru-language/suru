@@ -1,0 +1,8 @@
+func main() {
+    mut s = 0;
+    for x in range(0, 10) { s = s + x; }
+    println(to_str(s));
+    println(substr("hello world", 6, 5));
+    if str_contains("suru", "ur") { println("yes"); } else { println("no"); }
+    if str_contains("suru", "zz") { println("unexpected"); } else { println("no"); }
+}

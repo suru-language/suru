@@ -8,6 +8,13 @@ void s_diag_init(s_diag_ctx *ctx) {
     ctx->count = 0;
     ctx->cap = 0;
     ctx->error_count = 0;
+    ctx->src = NULL;
+    ctx->srclen = 0;
+}
+
+void s_diag_set_source(s_diag_ctx *ctx, const char *src, s_size len) {
+    ctx->src = src;
+    ctx->srclen = len;
 }
 
 void s_diag_dispose(s_diag_ctx *ctx) {
@@ -86,6 +93,34 @@ bool s_diag_has_errors(const s_diag_ctx *ctx) {
     return ctx->error_count > 0;
 }
 
+static void print_snippet(const s_diag_ctx *ctx, const s_diag *d) {
+    if (!ctx->src || d->loc.line == 0) return;
+    const char *s = ctx->src;
+    s_size n = ctx->srclen;
+    s_size pos = 0;
+    s_u32 cur = 1;
+    while (pos < n && cur < d->loc.line) {
+        if (s[pos] == '\n') cur++;
+        pos++;
+    }
+    if (cur != d->loc.line) return;
+    char buf[256];
+    s_size cap = 0;
+    while (pos < n && s[pos] != '\n' && cap + 1 < sizeof(buf)) {
+        buf[cap++] = s[pos++];
+    }
+    while (cap > 0 && buf[cap - 1] == '\r') cap--;
+    buf[cap] = '\0';
+    fprintf(stderr, "      | %s\n", buf);
+    s_u32 col = d->loc.col;
+    if (col < 1) col = 1;
+    fprintf(stderr, "      | ");
+    s_u32 i;
+    for (i = 1; i < col && i <= cap; ++i) fputc(' ', stderr);
+    fputc('^', stderr);
+    fputc('\n', stderr);
+}
+
 void s_diag_print(const s_diag_ctx *ctx) {
     for (s_size i = 0; i < ctx->count; ++i) {
         const s_diag *d = &ctx->items[i];
@@ -97,5 +132,6 @@ void s_diag_print(const s_diag_ctx *ctx) {
         fprintf(stderr, "%s[%d]: %s\n",
                 d->sev == S_DIAG_ERROR ? "error" : "warning",
                 d->code, d->msg);
+        print_snippet(ctx, d);
     }
 }

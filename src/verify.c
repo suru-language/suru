@@ -41,14 +41,30 @@ static int ins_pushes(const s_bc_module *m, s_u32 fid, const s_bc_ins *in) {
 static int check_operands(const s_bc_module *m, s_u32 fid, s_u32 i) {
     const s_bc_func *f = &m->funcs[fid];
     const s_bc_ins *in = &f->ins[i];
-    if (in->op >= BC_OP_COUNT) return VERIFY_ERR;
+    if (in->op >= BC_OP_COUNT) {
+        if (getenv("SURU_VERIFY_DEBUG"))
+            fprintf(stderr, "[verify] bad opcode %u at %u\n", in->op, i);
+        return VERIFY_ERR;
+    }
     switch ((int)in->op) {
-    case BC_CONST_INT: if (in->a >= m->nints) return VERIFY_ERR; break;
+    case BC_CONST_INT:
+        if (in->a >= m->nints) {
+            if (getenv("SURU_VERIFY_DEBUG"))
+                fprintf(stderr, "[verify] const_int OOB at %u (a=%u nints=%u)\n",
+                        i, in->a, m->nints);
+            return VERIFY_ERR;
+        }
+        break;
     case BC_CONST_FLOAT: if (in->a >= m->nfloats) return VERIFY_ERR; break;
     case BC_CONST_STR: if (in->a >= m->nstrings) return VERIFY_ERR; break;
     case BC_LD_LOCAL:
     case BC_ST_LOCAL:
-        if (in->a >= f->frame_size) return VERIFY_ERR;
+        if (in->a >= f->frame_size) {
+            if (getenv("SURU_VERIFY_DEBUG"))
+                fprintf(stderr, "[verify] local OOB at %u (a=%u frame=%u)\n",
+                        i, in->a, f->frame_size);
+            return VERIFY_ERR;
+        }
         break;
     case BC_FIELD_LD:
     case BC_FIELD_ST:
@@ -63,7 +79,11 @@ static int check_operands(const s_bc_module *m, s_u32 fid, s_u32 i) {
         if (in->a >= m->nfuncs) return VERIFY_ERR;
         break;
     case BC_BUILTIN:
-        if (in->a >= S_BUILTIN_COUNT) return VERIFY_ERR;
+        if (in->a >= S_BUILTIN_COUNT) {
+            if (getenv("SURU_VERIFY_DEBUG"))
+                fprintf(stderr, "[verify] builtin OOB at %u (id=%u)\n", i, in->a);
+            return VERIFY_ERR;
+        }
         break;
     case BC_NEW_ARRAY:
         if (in->a > S_BC_MAX_DEPTH) return VERIFY_ERR;
