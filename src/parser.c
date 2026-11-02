@@ -160,6 +160,17 @@ static s_type *parse_type(s_parser *p) {
         return t;
     }
     if (at(p, S_TOK_IDENT)) {
+        for (int i = 0; i < p->ntp; ++i) {
+            if (p->cur.v.s.len == (s_size)strlen(p->tp_names[i]) &&
+                memcmp(p->cur.v.s.text, p->tp_names[i],
+                       p->cur.v.s.len) == 0) {
+                s_type *tv = type_prim(p, S_TYPE_VAR, loc);
+                if (!tv) return NULL;
+                tv->var_index = i;
+                advance(p);
+                return tv;
+            }
+        }
         s_type *t = type_prim(p, S_TYPE_RECORD, loc);
         if (!t) return NULL;
         t->record_name = ident_text(p);
@@ -843,6 +854,26 @@ static bool parse_func(s_parser *p) {
     fn.loc = loc;
     advance(p);
 
+    const char **tp = NULL;
+    int ntp = 0, tpc = 0;
+    if (accept(p, S_TOK_LT)) {
+        while (!at(p, S_TOK_GT)) {
+            if (!at(p, S_TOK_IDENT)) {
+                s_diag_error(p->diag, p->cur.loc, 335,
+                             "expected type parameter name");
+                return false;
+            }
+            VEC_PUSH(p->arena, tp, ntp, tpc, sizeof(char *), ident_text(p));
+            advance(p);
+            if (!accept(p, S_TOK_COMMA)) break;
+        }
+        if (!expect(p, S_TOK_GT, 336)) return false;
+    }
+    const char **saved_tp = p->tp_names;
+    int saved_ntp = p->ntp;
+    p->tp_names = tp;
+    p->ntp = ntp;
+
     if (!expect(p, S_TOK_LPAREN, 331)) return false;
     s_param_entry *params = NULL;
     s_size n = 0, cap = 0;
@@ -883,6 +914,10 @@ static bool parse_func(s_parser *p) {
     }
     fn.body = parse_block(p);
     if (!fn.body) return false;
+    p->tp_names = saved_tp;
+    p->ntp = saved_ntp;
+    fn.type_params = tp;
+    fn.ntype_params = ntp;
     fn.func_index = (int)p->nfuncs;
 
     VEC_PUSH(p->arena, p->funcs, p->nfuncs, p->funcs_cap,

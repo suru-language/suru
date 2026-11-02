@@ -23,6 +23,7 @@ typedef enum s_type_kind {
     S_TYPE_FN,
     S_TYPE_RECORD,        /* named record reference (name resolved by sema) */
     S_TYPE_VOID,          /* only used internally for missing returns */
+    S_TYPE_VAR,           /* generic type parameter (index in var_index) */
 } s_type_kind;
 
 typedef struct s_type {
@@ -34,6 +35,7 @@ typedef struct s_type {
     struct s_type *ret;         /* fn return type */
     const char *record_name;    /* record reference */
     int record_index;           /* resolved record decl index (sema) */
+    int var_index;              /* type parameter index (S_TYPE_VAR) */
 } s_type;
 
 typedef struct s_expr s_expr;
@@ -199,6 +201,8 @@ typedef struct s_func_decl {
     s_stmt *body;                /* a BLOCK statement */
     int func_index;
     bool is_lambda;              /* synthetic function created from a lambda */
+    const char **type_params;    /* generic type parameter names */
+    int ntype_params;
     s_u32 max_frame_slots;       /* semi for stack size */
     s_u32 max_operand_depth;     /* sema */
     s_source_loc loc;

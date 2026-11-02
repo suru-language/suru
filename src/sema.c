@@ -73,6 +73,7 @@ static const char *type_kind_name(s_type_kind k) {
     case S_TYPE_RECORD: return "record";
     case S_TYPE_VOID: return "void";
     case S_TYPE_ANY: return "any";
+    case S_TYPE_VAR: return "type parameter";
     }
     return "?";
 }
@@ -108,6 +109,7 @@ static bool type_eq(s_type *a, s_type *b) {
             if (!type_eq(a->params[i], b->params[i])) return false;
         return type_eq(a->ret, b->ret);
     case S_TYPE_RECORD: return a->record_index == b->record_index;
+    case S_TYPE_VAR: return a->var_index == b->var_index;
     default: return true;
     }
 }
