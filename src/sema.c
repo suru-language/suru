@@ -190,13 +190,16 @@ static s_type *func_type(s_sema *S, const s_func_decl *f) {
 /* Name resolution in scopes                                           */
 /* ------------------------------------------------------------------ */
 
-static s_sym *scope_lookup(s_scope *sc, const char *name) {
+static s_sym *scope_lookup(s_scope *sc, const char *name, int *out_depth) {
     for (s_scope *s = sc; s; s = s->parent) {
         for (s_size i = s->count; i > 0; --i) {
-            if (strcmp(s->syms[i - 1].name, name) == 0)
+            if (strcmp(s->syms[i - 1].name, name) == 0) {
+                if (out_depth) *out_depth = s->depth;
                 return &s->syms[i - 1];
+            }
         }
     }
+    if (out_depth) *out_depth = -1;
     return NULL;
 }
 
