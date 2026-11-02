@@ -79,7 +79,9 @@ static bool type_eq(s_type *a, s_type *b) {
     if (!a || !b) return false;
     if (a->kind != b->kind) return false;
     switch (a->kind) {
-    case S_TYPE_ARRAY: return type_eq(a->elem, b->elem);
+    case S_TYPE_ARRAY:
+        if (!a->elem || !b->elem) return true; /* wildcard element type */
+        return type_eq(a->elem, b->elem);
     case S_TYPE_FN:
         if (a->nparams != b->nparams) return false;
         for (s_size i = 0; i < a->nparams; ++i)
@@ -136,6 +138,10 @@ static s_type *sig_to_type(s_sema *S, s_sig_type st) {
     case S_SIG_ARRAY_INT:
         t->kind = S_TYPE_ARRAY;
         t->elem = sig_to_type(S, S_SIG_INT);
+        break;
+    case S_SIG_ARRAY:
+        t->kind = S_TYPE_ARRAY;
+        t->elem = NULL; /* wildcard: matches any element type */
         break;
     default: t->kind = S_TYPE_UNIT; break;
     }
@@ -556,7 +562,20 @@ static bool check_block(s_sema *S, s_stmt *blk) {
 static bool check_stmt(s_sema *S, s_stmt *s) {
     switch (s->kind) {
     case S_STMT_LET: {
-        s_type *it = check_expr(S, s->u.let.init);
+        s_type *it = NULL;
+        s_expr *init = s->u.let.init;
+        if (init->kind == S_EXPR_ARRAY_LIT && init->u.array.count == 0) {
+            if (s->u.let.decl_type && s->u.let.decl_type->kind == S_TYPE_ARRAY) {
+                it = s->u.let.decl_type;
+                init->type = it;
+            } else {
+                s_diag_error(S->diag, init->loc, 432,
+                             "empty array literal requires a type ascription, e.g. [int]");
+                return false;
+            }
+        } else {
+            it = check_expr(S, init);
+        }
         if (!it) return false;
         if (s->u.let.decl_type) {
             if (!type_eq(s->u.let.decl_type, it)) {

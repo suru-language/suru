@@ -37,6 +37,7 @@ typedef enum s_sig_type {
     S_SIG_BOOL,
     S_SIG_STR,
     S_SIG_ARRAY_INT,
+    S_SIG_ARRAY,          /* any array, regardless of element type */
 } s_sig_type;
 
 typedef struct s_builtin_sig {
