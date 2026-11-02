@@ -60,6 +60,7 @@ static void scope_pop(s_scope *sc) {
 /* ------------------------------------------------------------------ */
 
 static const char *type_name(s_type *t) {
+    if (!t) return "?";
     switch (t->kind) {
     case S_TYPE_INT: return "int";
     case S_TYPE_FLOAT: return "float";
