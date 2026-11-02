@@ -55,6 +55,10 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "str_repeat", 2, { S_SIG_STR, S_SIG_INT }, S_SIG_STR },
     [S_BUILTIN_STR_TRIM] = {
         "str_trim", 1, { S_SIG_STR }, S_SIG_STR },
+    [S_BUILTIN_ARGS_LEN] = {
+        "args_len", 0, { S_SIG_UNIT }, S_SIG_INT },
+    [S_BUILTIN_ARGS] = {
+        "args", 1, { S_SIG_INT }, S_SIG_STR },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {

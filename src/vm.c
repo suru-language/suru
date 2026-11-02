@@ -27,6 +27,8 @@ struct s_vm {
     s_size fp;
     s_u32 cur_fid;
     bool exit_halt;
+    int argc;
+    char **argv;
     s_cont *calls;
     s_size ncalls, capcalls;
     s_u32 alloc_counter;
@@ -62,6 +64,12 @@ static void vm_trap(s_vm *vm, const char *fmt, ...) {
     vsnprintf(vm->err, sizeof(vm->err), fmt, ap);
     va_end(ap);
     fprintf(stderr, "SURU runtime error: %s\n", vm->err);
+}
+
+void s_vm_set_args(s_vm *vm, int argc, char **argv) {
+    if (!vm) return;
+    vm->argc = argc;
+    vm->argv = argv;
 }
 
 bool s_vm_trapped(const s_vm *vm) { return vm->trapped; }
@@ -520,6 +528,26 @@ static bool builtin_str_trim(s_vm *vm) {
     return push(vm, s_val_obj(o));
 }
 
+static bool builtin_args_len(s_vm *vm) {
+    return push(vm, s_val_int((s_i64)vm->argc));
+}
+
+static bool builtin_args(s_vm *vm) {
+    s_value i = pop(vm);
+    if (i.tag != S_VAL_INT) { vm_trap(vm, "args expects an int"); return false; }
+    s_i64 k = i.u.i;
+    if (k < 0 || k >= (s_i64)vm->argc) {
+        vm_trap(vm, "args index out of range");
+        return false;
+    }
+    const char *s = vm->argv[k];
+    s_size len = strlen(s);
+    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
+    if (!o) return false;
+    if (len) memcpy(s_obj_str_data(o), s, len);
+    return push(vm, s_val_obj(o));
+}
+
 static bool builtin_str_to_f64(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
@@ -563,6 +591,8 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_F64_TO_STR_PREC: return builtin_f64_to_str_prec(vm);
     case S_BUILTIN_STR_REPEAT: return builtin_str_repeat(vm);
     case S_BUILTIN_STR_TRIM: return builtin_str_trim(vm);
+    case S_BUILTIN_ARGS_LEN: return builtin_args_len(vm);
+    case S_BUILTIN_ARGS: return builtin_args(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

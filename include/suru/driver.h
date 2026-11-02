@@ -15,6 +15,7 @@ int s_driver_compile(const char *file, const char *src, s_size len,
                      s_bc_module *out);
 
 int s_driver_run_module(s_bc_module *m);
+int s_driver_run_module_args(s_bc_module *m, int argc, char **argv);
 
 #ifdef __cplusplus
 }

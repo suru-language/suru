@@ -20,7 +20,7 @@ static char *read_file(const char *path, s_size *len) {
     return buf;
 }
 
-static int cmd_run(const char *path) {
+static int cmd_run(const char *path, int argc, char **argv) {
     s_size len;
     char *src = read_file(path, &len);
     if (!src) {
@@ -33,7 +33,7 @@ static int cmd_run(const char *path) {
         return 1;
     }
     free(src);
-    int rc = s_driver_run_module(&m);
+    int rc = s_driver_run_module_args(&m, argc, argv);
     s_bc_module_dispose(&m);
     return rc;
 }
@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
     const char *cmd = argv[1];
     const char *path = argv[2];
     if (strcmp(cmd, "run") == 0) {
-        return cmd_run(path);
+        return cmd_run(path, argc - 3, argv + 3);
     }
     if (strcmp(cmd, "check") == 0) {
         return cmd_check(path);
