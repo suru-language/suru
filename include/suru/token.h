@@ -37,6 +37,7 @@ typedef enum s_tok_kind {
     S_TOK_KW_NEW,
     S_TOK_KW_AS,
     S_TOK_KW_CONST,
+    S_TOK_KW_ENUM,
 
     /* punctuation and operators */
     S_TOK_LPAREN,

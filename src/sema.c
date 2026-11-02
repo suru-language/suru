@@ -1110,7 +1110,7 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
     /* resolve constants: evaluate, then infer or validate their types */
     for (s_size ci = 0; ci < mod->nconsts; ++ci) {
         s_const_decl *c = &mod->consts[ci];
-        if (!eval_const(&S, c)) { ok = false; continue; }
+        if (!c->resolved && !eval_const(&S, c)) { ok = false; continue; }
         s_type_kind k;
         switch (c->lit_kind) {
         case S_EXPR_INT_LIT: k = S_TYPE_INT; break;

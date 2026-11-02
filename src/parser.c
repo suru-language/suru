@@ -920,6 +920,40 @@ static bool parse_const(s_parser *p) {
     return true;
 }
 
+static bool parse_enum(s_parser *p) {
+    s_source_loc loc = p->cur.loc;
+    advance(p); /* 'enum' */
+    if (!at(p, S_TOK_IDENT)) {
+        s_diag_error(p->diag, p->cur.loc, 359, "expected enum name");
+        return false;
+    }
+    advance(p);
+    if (!expect(p, S_TOK_LBRACE, 360)) return false;
+    s_i64 val = 0;
+    while (!at(p, S_TOK_RBRACE) && !at(p, S_TOK_EOF)) {
+        if (!at(p, S_TOK_IDENT)) {
+            s_diag_error(p->diag, p->cur.loc, 361, "expected enumerator name");
+            return false;
+        }
+        s_const_decl c;
+        memset(&c, 0, sizeof(c));
+        c.name = ident_text(p);
+        c.loc = loc;
+        c.index = (int)p->nconsts;
+        c.lit_kind = S_EXPR_INT_LIT;
+        c.v.i = val;
+        c.resolved = true;
+        advance(p);
+        VEC_PUSH(p->arena, p->consts, p->nconsts, p->consts_cap,
+                 sizeof(s_const_decl), c);
+        val++;
+        if (!accept(p, S_TOK_COMMA)) break;
+    }
+    if (!expect(p, S_TOK_RBRACE, 362)) return false;
+    if (!expect(p, S_TOK_SEMI, 363)) return false;
+    return true;
+}
+
 static bool parse_record(s_parser *p) {
     s_source_loc loc = p->cur.loc;
     advance(p); /* 'type' */
@@ -1074,6 +1108,8 @@ static bool parse_items(s_parser *p) {
             if (!parse_record(p)) ok = false;
         } else if (at(p, S_TOK_KW_CONST)) {
             if (!parse_const(p)) ok = false;
+        } else if (at(p, S_TOK_KW_ENUM)) {
+            if (!parse_enum(p)) ok = false;
         } else if (at(p, S_TOK_KW_USE)) {
             if (!parse_use(p)) ok = false;
         } else {
