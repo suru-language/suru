@@ -892,34 +892,8 @@ static bool parse_const(s_parser *p) {
 
     if (!expect(p, S_TOK_ASSIGN, 356)) return false;
 
-    bool neg = false;
-    if (at(p, S_TOK_MINUS)) { neg = true; advance(p); }
-    if (at(p, S_TOK_INT)) {
-        c.lit_kind = S_EXPR_INT_LIT;
-        c.v.i = neg ? -p->cur.v.i : p->cur.v.i;
-        advance(p);
-    } else if (at(p, S_TOK_FLOAT)) {
-        c.lit_kind = S_EXPR_FLOAT_LIT;
-        c.v.f = neg ? -p->cur.v.f : p->cur.v.f;
-        advance(p);
-    } else if (!neg && at(p, S_TOK_STR)) {
-        c.lit_kind = S_EXPR_STR_LIT;
-        c.v.str.text = s_arena_strdup(p->arena, p->cur.v.s.text);
-        c.v.str.len = p->cur.v.s.len;
-        advance(p);
-    } else if (!neg && at(p, S_TOK_TRUE)) {
-        c.lit_kind = S_EXPR_BOOL_LIT;
-        c.v.b = true;
-        advance(p);
-    } else if (!neg && at(p, S_TOK_FALSE)) {
-        c.lit_kind = S_EXPR_BOOL_LIT;
-        c.v.b = false;
-        advance(p);
-    } else {
-        s_diag_error(p->diag, p->cur.loc, 357,
-                     "constant initializer must be a literal");
-        return false;
-    }
+    c.init = parse_assignment(p);
+    if (!c.init) return false;
 
     if (!expect(p, S_TOK_SEMI, 358)) return false;
     VEC_PUSH(p->arena, p->consts, p->nconsts, p->consts_cap,

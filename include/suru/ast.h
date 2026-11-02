@@ -213,6 +213,8 @@ typedef struct s_record_decl {
 typedef struct s_const_decl {
     const char *name;
     s_type *type;                /* resolved type */
+    s_expr *init;                /* parsed initializer expression */
+    bool resolved;                /* value computed by sema */
     int lit_kind;                /* S_EXPR_INT_LIT / FLOAT / STR / BOOL */
     union {
         s_i64 i;

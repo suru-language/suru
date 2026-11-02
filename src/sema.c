@@ -884,6 +884,158 @@ static bool check_stmt(s_sema *S, s_stmt *s) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Compile-time constant evaluation                                    */
+/* ------------------------------------------------------------------ */
+
+static bool eval_expr_const(s_sema *S, s_expr *e, s_const_decl *out) {
+    switch (e->kind) {
+    case S_EXPR_INT_LIT:
+        out->lit_kind = S_EXPR_INT_LIT; out->v.i = e->u.i; return true;
+    case S_EXPR_FLOAT_LIT:
+        out->lit_kind = S_EXPR_FLOAT_LIT; out->v.f = e->u.f; return true;
+    case S_EXPR_STR_LIT:
+        out->lit_kind = S_EXPR_STR_LIT;
+        out->v.str.text = e->u.str.text;
+        out->v.str.len = e->u.str.len;
+        return true;
+    case S_EXPR_BOOL_LIT:
+        out->lit_kind = S_EXPR_BOOL_LIT; out->v.b = e->u.b; return true;
+    case S_EXPR_VAR: {
+        for (s_size i = 0; i < S->mod->nconsts; ++i) {
+            s_const_decl *c = &S->mod->consts[i];
+            if (c->resolved && strcmp(c->name, e->u.var.name) == 0) {
+                out->lit_kind = c->lit_kind;
+                out->v = c->v;
+                return true;
+            }
+        }
+        s_diag_error(S->diag, e->loc, 480,
+                     "unknown or forward-referenced constant '%s'",
+                     e->u.var.name);
+        return false;
+    }
+    case S_EXPR_UNARY: {
+        s_const_decl a;
+        if (!eval_expr_const(S, e->u.unary.operand, &a)) return false;
+        if (e->u.unary.op == S_UN_NEG) {
+            if (a.lit_kind == S_EXPR_INT_LIT) {
+                out->lit_kind = S_EXPR_INT_LIT; out->v.i = -a.v.i; return true;
+            }
+            if (a.lit_kind == S_EXPR_FLOAT_LIT) {
+                out->lit_kind = S_EXPR_FLOAT_LIT; out->v.f = -a.v.f; return true;
+            }
+        } else if (e->u.unary.op == S_UN_NOT) {
+            if (a.lit_kind == S_EXPR_BOOL_LIT) {
+                out->lit_kind = S_EXPR_BOOL_LIT; out->v.b = !a.v.b; return true;
+            }
+        } else if (e->u.unary.op == S_UN_BITNOT) {
+            if (a.lit_kind == S_EXPR_INT_LIT) {
+                out->lit_kind = S_EXPR_INT_LIT; out->v.i = ~a.v.i; return true;
+            }
+        }
+        s_diag_error(S->diag, e->loc, 481,
+                     "operator not supported in a constant expression");
+        return false;
+    }
+    case S_EXPR_BINARY: {
+        s_const_decl a, b;
+        if (!eval_expr_const(S, e->u.binary.lhs, &a)) return false;
+        if (!eval_expr_const(S, e->u.binary.rhs, &b)) return false;
+        s_bin_op op = e->u.binary.op;
+        if (op == S_BIN_ADD && a.lit_kind == S_EXPR_STR_LIT &&
+            b.lit_kind == S_EXPR_STR_LIT) {
+            s_size t = a.v.str.len + b.v.str.len;
+            char *n = s_arena_alloc(S->arena, t + 1, 1);
+            if (!n) return false;
+            memcpy(n, a.v.str.text, a.v.str.len);
+            memcpy(n + a.v.str.len, b.v.str.text, b.v.str.len);
+            out->lit_kind = S_EXPR_STR_LIT;
+            out->v.str.text = n;
+            out->v.str.len = t;
+            return true;
+        }
+        if (a.lit_kind == S_EXPR_INT_LIT && b.lit_kind == S_EXPR_INT_LIT) {
+            s_i64 r;
+            switch (op) {
+            case S_BIN_ADD: r = a.v.i + b.v.i; break;
+            case S_BIN_SUB: r = a.v.i - b.v.i; break;
+            case S_BIN_MUL: r = a.v.i * b.v.i; break;
+            case S_BIN_DIV:
+                if (b.v.i == 0) { s_diag_error(S->diag, e->loc, 482, "division by zero in constant"); return false; }
+                r = a.v.i / b.v.i; break;
+            case S_BIN_MOD:
+                if (b.v.i == 0) { s_diag_error(S->diag, e->loc, 482, "division by zero in constant"); return false; }
+                r = a.v.i % b.v.i; break;
+            case S_BIN_BIT_AND: r = a.v.i & b.v.i; break;
+            case S_BIN_BIT_OR: r = a.v.i | b.v.i; break;
+            case S_BIN_BIT_XOR: r = a.v.i ^ b.v.i; break;
+            case S_BIN_SHL: r = (b.v.i >= 64) ? 0 : (s_i64)((s_u64)a.v.i << b.v.i); break;
+            case S_BIN_SHR: r = (b.v.i >= 64) ? 0 : (s_i64)((s_u64)a.v.i >> b.v.i); break;
+            default:
+                s_diag_error(S->diag, e->loc, 481, "operator not supported in a constant expression");
+                return false;
+            }
+            out->lit_kind = S_EXPR_INT_LIT; out->v.i = r; return true;
+        }
+        if (a.lit_kind == S_EXPR_FLOAT_LIT && b.lit_kind == S_EXPR_FLOAT_LIT) {
+            double r;
+            switch (op) {
+            case S_BIN_ADD: r = a.v.f + b.v.f; break;
+            case S_BIN_SUB: r = a.v.f - b.v.f; break;
+            case S_BIN_MUL: r = a.v.f * b.v.f; break;
+            case S_BIN_DIV: r = a.v.f / b.v.f; break;
+            default:
+                s_diag_error(S->diag, e->loc, 481, "operator not supported in a constant expression");
+                return false;
+            }
+            out->lit_kind = S_EXPR_FLOAT_LIT; out->v.f = r; return true;
+        }
+        if ((a.lit_kind == S_EXPR_INT_LIT && b.lit_kind == S_EXPR_FLOAT_LIT) ||
+            (a.lit_kind == S_EXPR_FLOAT_LIT && b.lit_kind == S_EXPR_INT_LIT)) {
+            double x = (a.lit_kind == S_EXPR_FLOAT_LIT) ? a.v.f : (double)a.v.i;
+            double y = (b.lit_kind == S_EXPR_FLOAT_LIT) ? b.v.f : (double)b.v.i;
+            double r;
+            switch (op) {
+            case S_BIN_ADD: r = x + y; break;
+            case S_BIN_SUB: r = x - y; break;
+            case S_BIN_MUL: r = x * y; break;
+            case S_BIN_DIV: r = x / y; break;
+            default:
+                s_diag_error(S->diag, e->loc, 481, "operator not supported in a constant expression");
+                return false;
+            }
+            out->lit_kind = S_EXPR_FLOAT_LIT; out->v.f = r; return true;
+        }
+        if (op == S_BIN_AND && a.lit_kind == S_EXPR_BOOL_LIT &&
+            b.lit_kind == S_EXPR_BOOL_LIT) {
+            out->lit_kind = S_EXPR_BOOL_LIT; out->v.b = a.v.b && b.v.b; return true;
+        }
+        if (op == S_BIN_OR && a.lit_kind == S_EXPR_BOOL_LIT &&
+            b.lit_kind == S_EXPR_BOOL_LIT) {
+            out->lit_kind = S_EXPR_BOOL_LIT; out->v.b = a.v.b || b.v.b; return true;
+        }
+        s_diag_error(S->diag, e->loc, 481,
+                     "operands are not valid in a constant expression");
+        return false;
+    }
+    default:
+        s_diag_error(S->diag, e->loc, 481,
+                     "expression is not a compile-time constant");
+        return false;
+    }
+}
+
+static bool eval_const(s_sema *S, s_const_decl *c) {
+    s_const_decl tmp;
+    memset(&tmp, 0, sizeof(tmp));
+    if (!eval_expr_const(S, c->init, &tmp)) return false;
+    c->lit_kind = tmp.lit_kind;
+    c->v = tmp.v;
+    c->resolved = true;
+    return true;
+}
+
+/* ------------------------------------------------------------------ */
 /* Entry point                                                         */
 /* ------------------------------------------------------------------ */
 
