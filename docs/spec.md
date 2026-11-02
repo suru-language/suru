@@ -239,6 +239,9 @@ The standard library provides a small set of builtin functions (see
 - `f64_to_str(f: float) -> str`.
 - `read_line() -> str` — read a line from stdin ("" on EOF).
 - `make_array(n: int) -> [int]` — a zero-filled array of `n` elements.
+- `range(lo: int, hi: int) -> [int]` — the integers `lo .. hi-1`.
+- `substr(s: str, start: int, len: int) -> str` — substring, bounds-clamped.
+- `str_contains(haystack: str, needle: str) -> bool`.
 - `f64_to_i64`, `i64_to_f64` conversions.
 
 The set is intentionally minimal; it will grow through the release roadmap.
