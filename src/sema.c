@@ -313,6 +313,82 @@ static s_type *check_binary(s_sema *S, s_expr *e) {
     return b;
 }
 
+static s_type *subst_type(s_sema *S, s_type *t, s_type **binding, int nb) {
+    if (!t) return NULL;
+    if (t->kind == S_TYPE_VAR) {
+        int v = t->var_index;
+        if (v >= 0 && v < nb && binding[v]) return binding[v];
+        return t;
+    }
+    s_type *c = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+    if (!c) return NULL;
+    *c = *t;
+    c->elem = subst_type(S, t->elem, binding, nb);
+    if (c->kind == S_TYPE_FN) {
+        c->ret = subst_type(S, t->ret, binding, nb);
+        for (s_size i = 0; i < c->nparams; ++i)
+            c->params[i] = subst_type(S, t->params[i], binding, nb);
+    }
+    return c;
+}
+
+static bool unify_types(s_sema *S, s_type *conc, s_type *pat,
+                        s_type **binding, int nb, s_expr *e) {
+    (void)S; (void)e;
+    if (!conc || !pat) return false;
+    if (pat->kind == S_TYPE_VAR) {
+        int v = pat->var_index;
+        if (v < 0 || v >= nb) return false;
+        if (binding[v]) return type_eq(binding[v], conc);
+        binding[v] = conc;
+        return true;
+    }
+    if (conc->kind != pat->kind) return false;
+    switch (pat->kind) {
+    case S_TYPE_ARRAY:
+        return unify_types(S, conc->elem, pat->elem, binding, nb, e);
+    case S_TYPE_FN: {
+        if (conc->nparams != pat->nparams) return false;
+        for (s_size i = 0; i < pat->nparams; ++i)
+            if (!unify_types(S, conc->params[i], pat->params[i], binding, nb, e))
+                return false;
+        return unify_types(S, conc->ret, pat->ret, binding, nb, e);
+    }
+    case S_TYPE_RECORD:
+        return conc->record_index == pat->record_index;
+    default:
+        return type_eq(conc, pat);
+    }
+}
+
+static s_type *check_generic_call(s_sema *S, s_expr *e,
+                                  const s_func_decl *f) {
+    if (e->u.call.nargs != f->nparams) {
+        s_diag_error(S->diag, e->loc, 412,
+                     "function '%s' expects %zu argument(s), got %zu",
+                     f->name, f->nparams, e->u.call.nargs);
+        return type_unit(S);
+    }
+    s_type *binding[8];
+    memset(binding, 0, sizeof(binding));
+    int nb = f->ntype_params;
+    for (s_size i = 0; i < f->nparams; ++i) {
+        s_type *at = check_expr(S, e->u.call.args[i]);
+        unify_types(S, at, f->params[i].type, binding, nb, e);
+    }
+    for (s_size i = 0; i < f->nparams; ++i) {
+        s_type *at = e->u.call.args[i]->type;
+        s_type *want = subst_type(S, f->params[i].type, binding, nb);
+        if (at && want && !type_eq(at, want)) {
+            s_diag_error(S->diag, e->u.call.args[i]->loc, 413,
+                         "argument %zu of '%s' has type %s, expected %s",
+                         i + 1, f->name, type_name(at), type_name(want));
+        }
+    }
+    s_type *res = subst_type(S, f->ret_type, binding, nb);
+    return res ? res : type_unit(S);
+}
+
 static s_type *check_call(s_sema *S, s_expr *e) {
     s_expr *callee = e->u.call.callee;
     const char *fname = NULL;
@@ -321,6 +397,7 @@ static s_type *check_call(s_sema *S, s_expr *e) {
     }
     s_func_decl *f = fname ? resolve_function(S, fname) : NULL;
     if (f) {
+        if (f->ntype_params > 0) return check_generic_call(S, e, f);
         if (e->u.call.nargs != f->nparams) {
             s_diag_error(S->diag, e->loc, 412,
                          "function '%s' expects %zu argument(s), got %zu",
