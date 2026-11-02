@@ -925,6 +925,7 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
 
     for (s_size f = 0; f < mod->nfuncs; ++f) {
         s_func_decl *fn = &mod->funcs[f];
+        if (fn->is_lambda) continue; /* analyzed within its enclosing function */
         S.fn = fn;
         S.next_slot = 0;
 
@@ -934,6 +935,7 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
         sc.syms = NULL;
         sc.count = 0;
         sc.cap = 0;
+        sc.depth = 0;
         S.scope = &sc;
 
         for (s_size i = 0; i < fn->nparams; ++i) {
