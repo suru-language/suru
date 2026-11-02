@@ -143,6 +143,16 @@ type Pair {
 
 Record fields are accessed with `.`. Records are heap-allocated GC objects.
 
+A record value is created with a positional constructor call (`Pair(3, 4)`)
+or with a named-field literal, which allows fields in any order and is
+checked for missing/unknown/duplicate fields:
+
+```
+let p = Pair { right = 4, left = 3 };   // same as Pair(3, 4)
+```
+
+All fields must be present exactly once.
+
 ## 4. Type Ascription
 
 The binding operator `:` ascribes a type:
