@@ -246,8 +246,11 @@ static bool gen_stmt(s_gen *g, const s_stmt *s, const s_loopctx *loop);
 
 static bool push_bin_op(s_gen *g, const s_expr *e) {
     const s_type *lt = e->u.binary.lhs->type;
-    bool is_float = lt && lt->kind == S_TYPE_FLOAT;
-    bool is_str = lt && lt->kind == S_TYPE_STR;
+    const s_type *rt = e->u.binary.rhs->type;
+    bool is_float = (lt && lt->kind == S_TYPE_FLOAT) ||
+                    (rt && rt->kind == S_TYPE_FLOAT);
+    bool is_str = lt && rt && lt->kind == S_TYPE_STR &&
+                  rt->kind == S_TYPE_STR;
     switch (e->u.binary.op) {
     case S_BIN_ADD: EM(is_str ? BC_CONCAT_S : is_float ? BC_ADD_F : BC_ADD_I); break;
     case S_BIN_SUB: EM(is_float ? BC_SUB_F : BC_SUB_I); break;
@@ -532,8 +535,18 @@ static bool gen_expr(s_gen *g, const s_expr *e) {
             }
             return true;
         }
-        if (!gen_expr(g, e->u.binary.lhs)) return false;
-        if (!gen_expr(g, e->u.binary.rhs)) return false;
+        {
+            const s_type *lt = e->u.binary.lhs->type;
+            const s_type *rt = e->u.binary.rhs->type;
+            bool ml = lt && rt && lt->kind == S_TYPE_INT &&
+                      rt->kind == S_TYPE_FLOAT;
+            bool mr = lt && rt && lt->kind == S_TYPE_FLOAT &&
+                      rt->kind == S_TYPE_INT;
+            if (!gen_expr(g, e->u.binary.lhs)) return false;
+            if (ml) EM(BC_CONV_I_F);
+            if (!gen_expr(g, e->u.binary.rhs)) return false;
+            if (mr) EM(BC_CONV_I_F);
+        }
         return push_bin_op(g, e);
     }
     case S_EXPR_ASSIGN:

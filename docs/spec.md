@@ -201,6 +201,8 @@ Precedence, highest to lowest:
 ### 5.1 Operators
 
 - Arithmetic: `+ - * / %` on `int` and `float` (no `%` on `float`).
+  In a mixed `int`/`float` expression, the `int` operand is implicitly
+  promoted to `float` (e.g. `1 + 2.5` is `3.5`).
 - String concatenation: `+` on two `str` values concatenates them.
 - Comparison: `== != < <= > >=` yield `bool`.
 - Logical: `and or not` short-circuit.
