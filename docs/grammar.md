@@ -36,8 +36,9 @@ keyword       = "break" | "continue" | "const" | "else" | "false" | "for"
 
 ```
 program       = { item }
-item          = func_decl | type_decl | const_decl
+item          = func_decl | type_decl | const_decl | use_decl
 func_decl     = "func" identifier [ param_list ] [ "->" type ] block
+use_decl      = "use" string_literal ";"
 type_decl     = "type" identifier "{" { field_decl } "}"
 field_decl    = "let" identifier ":" type ";"
 const_decl    = "const" identifier [ ":" type ] "=" literal ";"

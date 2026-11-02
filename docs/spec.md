@@ -218,7 +218,15 @@ A program is a sequence of top-level items:
 
 - functions (`func`)
 - record types (`type`)
+- constants (`const`)
+- `use` includes (source-level module inclusion)
 - a single `main` function (required)
+
+A `use "path.suru"` directive parses another source file and merges its
+top-level items into the current module. Paths are resolved relative to the
+containing file's directory, includes are idempotent, and recursive includes
+are bounded to prevent cycles. This provides simple user-module composition
+until the full package system ships.
 
 There is no global mutable state in the language; all state lives in
 function-local bindings and heap objects.

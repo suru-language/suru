@@ -1,0 +1,10 @@
+type Point { let x: int; let y: int; }
+func helper(x: int) -> int { return x + 1; }
+func main() {
+    let a = Point(3, 4);
+    let b = helper(5);
+    println(to_str(a.y));
+    println(to_str(b));
+    let c = 7;
+    println(to_str(c + a.x));
+}

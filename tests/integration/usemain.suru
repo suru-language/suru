@@ -1,4 +1,4 @@
-use "uselib.suru";
+use "lib/uselib.suru";
 func main() {
     println(to_str(helper(21)));
     println(to_str(LIB_CONST));
