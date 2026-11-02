@@ -306,6 +306,35 @@ static void test_record_init_type_mismatch(void) {
     s_arena_dispose(&arena);
 }
 
+static void test_duplicate_function(void) {
+    const char *src =
+        "func main() -> int { return 0; }\n"
+        "func main() -> int { return 1; }\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_duplicate_record(void) {
+    const char *src =
+        "type P { let x: int; }\n"
+        "type P { let y: int; }\n"
+        "func main() -> int { return 0; }\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
 TEST_MAIN_BEGIN()
     test_valid_program();
     test_type_mismatch();
@@ -325,4 +354,6 @@ TEST_MAIN_BEGIN()
     test_record_init_missing_field();
     test_record_init_unknown_field();
     test_record_init_type_mismatch();
+    test_duplicate_function();
+    test_duplicate_record();
 TEST_MAIN_END()

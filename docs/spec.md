@@ -286,6 +286,8 @@ The standard library provides a small set of builtin functions (see
 - `to_bin(i: int) -> str` — binary.
 - `f64_to_str_prec(f: float, prec: int) -> str` — fixed-point formatting with
   `prec` digits after the decimal point (clamped to 0..20).
+- `str_repeat(s: str, n: int) -> str` — `s` repeated `n` times.
+- `str_trim(s: str) -> str` — `s` with leading/trailing ASCII whitespace removed.
 - `f64_to_i64`, `i64_to_f64` conversions.
 
 The set is intentionally minimal; it will grow through the release roadmap.
