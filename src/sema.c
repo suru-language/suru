@@ -1,0 +1,651 @@
+#include "suru/sema.h"
+#include "suru/stdlib.h"
+
+#include <string.h>
+
+/* ------------------------------------------------------------------ */
+/* Symbols and scopes                                                  */
+/* ------------------------------------------------------------------ */
+
+typedef struct s_sym {
+    const char *name;
+    s_type *type;
+    int index;              /* frame slot */
+    bool is_mut;
+} s_sym;
+
+typedef struct s_scope {
+    struct s_scope *parent;
+    s_sym *syms;
+    s_size count;
+    s_size cap;
+} s_scope;
+
+typedef struct s_sema {
+    s_module *mod;
+    s_arena *arena;
+    s_diag_ctx *diag;
+    s_scope *scope;         /* current scope */
+    s_func_decl *fn;        /* current function (NULL outside) */
+    int next_slot;
+    int depth;
+} s_sema;
+
+/* ------------------------------------------------------------------ */
+/* Scope helpers                                                       */
+/* ------------------------------------------------------------------ */
+
+static bool scope_push_sym(s_scope *sc, s_sym sym) {
+    if (sc->count == sc->cap) {
+        s_size ncap = sc->cap ? sc->cap * 2 : 8;
+        s_sym *n = malloc(ncap * sizeof(s_sym));
+        if (!n) return false;
+        if (sc->syms) {
+            memcpy(n, sc->syms, sc->count * sizeof(s_sym));
+            free(sc->syms);
+        }
+        sc->syms = n;
+        sc->cap = ncap;
+    }
+    sc->syms[sc->count++] = sym;
+    return true;
+}
+
+static void scope_pop(s_scope *sc) {
+    free(sc->syms);
+}
+
+/* ------------------------------------------------------------------ */
+/* Type utilities                                                      */
+/* ------------------------------------------------------------------ */
+
+static const char *type_name(s_type *t) {
+    switch (t->kind) {
+    case S_TYPE_INT: return "int";
+    case S_TYPE_FLOAT: return "float";
+    case S_TYPE_BOOL: return "bool";
+    case S_TYPE_STR: return "str";
+    case S_TYPE_UNIT: return "unit";
+    case S_TYPE_ARRAY: return "[array]";
+    case S_TYPE_FN: return "fn";
+    case S_TYPE_RECORD: return t->record_name ? t->record_name : "record";
+    case S_TYPE_VOID: return "void";
+    }
+    return "?";
+}
+
+static bool type_eq(s_type *a, s_type *b) {
+    if (!a || !b) return false;
+    if (a->kind != b->kind) return false;
+    switch (a->kind) {
+    case S_TYPE_ARRAY: return type_eq(a->elem, b->elem);
+    case S_TYPE_FN:
+        if (a->nparams != b->nparams) return false;
+        for (s_size i = 0; i < a->nparams; ++i)
+            if (!type_eq(a->params[i], b->params[i])) return false;
+        return type_eq(a->ret, b->ret);
+    case S_TYPE_RECORD: return a->record_index == b->record_index;
+    default: return true;
+    }
+}
+
+static s_type *type_unit(s_sema *S) {
+    s_type *t = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+    if (t) t->kind = S_TYPE_UNIT;
+    return t;
+}
+
+/* ------------------------------------------------------------------ */
+/* Record / function resolution                                        */
+/* ------------------------------------------------------------------ */
+
+static int resolve_record(s_sema *S, s_type *t, s_source_loc loc) {
+    for (s_size i = 0; i < S->mod->nrecords; ++i) {
+        if (strcmp(S->mod->records[i].name, t->record_name) == 0) {
+            return (int)i;
+        }
+    }
+    s_diag_error(S->diag, loc, 400, "unknown type '%s'", t->record_name);
+    return -1;
+}
+
+static s_func_decl *resolve_function(s_sema *S, const char *name) {
+    for (s_size i = 0; i < S->mod->nfuncs; ++i) {
+        if (strcmp(S->mod->funcs[i].name, name) == 0)
+            return &S->mod->funcs[i];
+    }
+    return NULL;
+}
+
+static int resolve_record_name(s_sema *S, const char *name) {
+    for (s_size i = 0; i < S->mod->nrecords; ++i) {
+        if (strcmp(S->mod->records[i].name, name) == 0) return (int)i;
+    }
+    return -1;
+}
+
+static s_type *sig_to_type(s_sema *S, s_sig_type st) {
+    s_type *t = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+    if (!t) return NULL;
+    switch (st) {
+    case S_SIG_INT: t->kind = S_TYPE_INT; break;
+    case S_SIG_FLOAT: t->kind = S_TYPE_FLOAT; break;
+    case S_SIG_BOOL: t->kind = S_TYPE_BOOL; break;
+    case S_SIG_STR: t->kind = S_TYPE_STR; break;
+    case S_SIG_ARRAY_INT:
+        t->kind = S_TYPE_ARRAY;
+        t->elem = sig_to_type(S, S_SIG_INT);
+        break;
+    default: t->kind = S_TYPE_UNIT; break;
+    }
+    return t;
+}
+
+/* ------------------------------------------------------------------ */
+/* Name resolution in scopes                                           */
+/* ------------------------------------------------------------------ */
+
+static s_sym *scope_lookup(s_scope *sc, const char *name) {
+    for (s_scope *s = sc; s; s = s->parent) {
+        for (s_size i = s->count; i > 0; --i) {
+            if (strcmp(s->syms[i - 1].name, name) == 0)
+                return &s->syms[i - 1];
+        }
+    }
+    return NULL;
+}
+
+/* ------------------------------------------------------------------ */
+/* Expression checking                                                 */
+/* ------------------------------------------------------------------ */
+
+static s_type *check_expr(s_sema *S, s_expr *e);
+
+static s_type *check_unary(s_sema *S, s_expr *e) {
+    s_type *ot = check_expr(S, e->u.unary.operand);
+    if (!ot) return type_unit(S);
+    if (e->u.unary.op == S_UN_NOT) {
+        if (ot->kind != S_TYPE_BOOL) {
+            s_diag_error(S->diag, e->loc, 401,
+                         "operator 'not' requires bool, got %s", type_name(ot));
+            return type_unit(S);
+        }
+        return ot;
+    }
+    if (ot->kind != S_TYPE_INT && ot->kind != S_TYPE_FLOAT) {
+        s_diag_error(S->diag, e->loc, 402,
+                     "unary '-' requires a numeric operand, got %s", type_name(ot));
+        return type_unit(S);
+    }
+    return ot;
+}
+
+static s_type *check_binary(s_sema *S, s_expr *e) {
+    s_type *lt = check_expr(S, e->u.binary.lhs);
+    s_type *rt = check_expr(S, e->u.binary.rhs);
+    if (!lt || !rt) return type_unit(S);
+
+    switch (e->u.binary.op) {
+    case S_BIN_ADD: case S_BIN_SUB: case S_BIN_MUL: case S_BIN_DIV:
+        if (lt->kind == S_TYPE_INT && rt->kind == S_TYPE_INT) return lt;
+        if (lt->kind == S_TYPE_FLOAT && rt->kind == S_TYPE_FLOAT) return lt;
+        if (e->u.binary.op == S_BIN_ADD &&
+            lt->kind == S_TYPE_STR && rt->kind == S_TYPE_STR) return lt;
+        s_diag_error(S->diag, e->loc, 403,
+                     "arithmetic operands must both be int or both float, got %s and %s",
+                     type_name(lt), type_name(rt));
+        return type_unit(S);
+    case S_BIN_MOD:
+        if (lt->kind == S_TYPE_INT && rt->kind == S_TYPE_INT) return lt;
+        s_diag_error(S->diag, e->loc, 404,
+                     "'%%' requires int operands, got %s and %s",
+                     type_name(lt), type_name(rt));
+        return type_unit(S);
+    case S_BIN_EQ: case S_BIN_NE:
+        if (!type_eq(lt, rt)) {
+            s_diag_error(S->diag, e->loc, 405,
+                         "cannot compare %s with %s", type_name(lt), type_name(rt));
+            return type_unit(S);
+        }
+        break; /* comparison result is bool */
+    case S_BIN_LT: case S_BIN_LE: case S_BIN_GT: case S_BIN_GE:
+        if (!(lt->kind == S_TYPE_INT || lt->kind == S_TYPE_FLOAT ||
+              lt->kind == S_TYPE_STR) || !type_eq(lt, rt)) {
+            s_diag_error(S->diag, e->loc, 406,
+                         "ordering requires comparable operands, got %s and %s",
+                         type_name(lt), type_name(rt));
+            return type_unit(S);
+        }
+        /* fallthrough */
+        break;
+    case S_BIN_AND: case S_BIN_OR:
+        if (lt->kind != S_TYPE_BOOL || rt->kind != S_TYPE_BOOL) {
+            s_diag_error(S->diag, e->loc, 407,
+                         "'and'/'or' require bool operands, got %s and %s",
+                         type_name(lt), type_name(rt));
+            return type_unit(S);
+        }
+        break;
+    }
+
+    /* bool result for comparisons/logic */
+    s_type *b = type_unit(S);
+    if (b) b->kind = S_TYPE_BOOL;
+    return b;
+}
+
+static s_type *check_call(s_sema *S, s_expr *e) {
+    s_expr *callee = e->u.call.callee;
+    const char *fname = NULL;
+    if (callee->kind == S_EXPR_VAR) {
+        fname = callee->u.var.name;
+    }
+    if (!fname) {
+        s_diag_error(S->diag, e->loc, 410, "callee is not a function name");
+        return type_unit(S);
+    }
+    s_func_decl *f = resolve_function(S, fname);
+    if (f) {
+        if (e->u.call.nargs != f->nparams) {
+            s_diag_error(S->diag, e->loc, 412,
+                         "function '%s' expects %zu argument(s), got %zu",
+                         fname, f->nparams, e->u.call.nargs);
+            return type_unit(S);
+        }
+        for (s_size i = 0; i < f->nparams; ++i) {
+            s_type *at = check_expr(S, e->u.call.args[i]);
+            if (at && !type_eq(at, f->params[i].type)) {
+                s_diag_error(S->diag, e->u.call.args[i]->loc, 413,
+                             "argument %zu of '%s' has type %s, expected %s",
+                             i + 1, fname, type_name(at), type_name(f->params[i].type));
+            }
+        }
+        return f->ret_type;
+    }
+
+    const s_builtin_sig *bi = s_builtin_lookup(fname);
+    if (bi) {
+        if (e->u.call.nargs != bi->nparams) {
+            s_diag_error(S->diag, e->loc, 414,
+                         "builtin '%s' expects %u argument(s), got %zu",
+                         fname, bi->nparams, e->u.call.nargs);
+            return type_unit(S);
+        }
+        for (s_size i = 0; i < bi->nparams; ++i) {
+            s_type *at = check_expr(S, e->u.call.args[i]);
+            s_type *want = sig_to_type(S, bi->params[i]);
+            if (at && want && !type_eq(at, want)) {
+                s_diag_error(S->diag, e->u.call.args[i]->loc, 415,
+                             "argument %zu of '%s' has type %s, expected %s",
+                             i + 1, fname, type_name(at), type_name(want));
+            }
+        }
+        return sig_to_type(S, bi->ret);
+    }
+
+    {
+        int ridx = resolve_record_name(S, fname);
+        if (ridx >= 0) {
+            s_record_decl *rec = &S->mod->records[ridx];
+            if (e->u.call.nargs != rec->nfields) {
+                s_diag_error(S->diag, e->loc, 416,
+                             "record '%s' constructor expects %zu field(s), got %zu",
+                             fname, rec->nfields, e->u.call.nargs);
+                return type_unit(S);
+            }
+            for (s_size i = 0; i < rec->nfields; ++i) {
+                s_type *at = check_expr(S, e->u.call.args[i]);
+                if (at && !type_eq(at, rec->fields[i].type)) {
+                    s_diag_error(S->diag, e->u.call.args[i]->loc, 417,
+                                 "field %zu of '%s' has type %s, expected %s",
+                                 i + 1, fname, type_name(at),
+                                 type_name(rec->fields[i].type));
+                }
+            }
+            s_type *rt = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+            if (rt) {
+                rt->kind = S_TYPE_RECORD;
+                rt->record_index = ridx;
+                rt->record_name = rec->name;
+            }
+            return rt;
+        }
+    }
+
+    s_diag_error(S->diag, e->loc, 411, "unknown function '%s'", fname);
+    return type_unit(S);
+}
+
+static s_type *check_index(s_sema *S, s_expr *e) {
+    s_type *ot = check_expr(S, e->u.index.obj);
+    s_type *it = check_expr(S, e->u.index.index);
+    if (it && it->kind != S_TYPE_INT) {
+        s_diag_error(S->diag, e->u.index.index->loc, 414,
+                     "array index must be int, got %s", type_name(it));
+    }
+    if (!ot) return type_unit(S);
+    if (ot->kind != S_TYPE_ARRAY) {
+        s_diag_error(S->diag, e->loc, 415,
+                     "cannot index a value of type %s", type_name(ot));
+        return type_unit(S);
+    }
+    e->is_lvalue = true;
+    return ot->elem;
+}
+
+static s_type *check_field(s_sema *S, s_expr *e) {
+    s_type *ot = check_expr(S, e->u.field.obj);
+    if (!ot) return type_unit(S);
+    if (ot->kind != S_TYPE_RECORD || ot->record_index < 0) {
+        s_diag_error(S->diag, e->loc, 416,
+                     "field access requires a record, got %s", type_name(ot));
+        return type_unit(S);
+    }
+    s_record_decl *rec = &S->mod->records[ot->record_index];
+    for (s_size i = 0; i < rec->nfields; ++i) {
+        if (strcmp(rec->fields[i].name, e->u.field.field) == 0) {
+            e->u.field.field_index = rec->fields[i].index;
+            e->is_lvalue = true;
+            return rec->fields[i].type;
+        }
+    }
+    s_diag_error(S->diag, e->loc, 417,
+                 "record '%s' has no field '%s'", rec->name, e->u.field.field);
+    return type_unit(S);
+}
+
+static s_type *check_assign(s_sema *S, s_expr *e) {
+    s_expr *lhs = e->kind == S_EXPR_COMPOUND_ASSIGN ? e->u.compound.lhs
+                                                    : e->u.assign.lhs;
+    s_expr *rhs = e->kind == S_EXPR_COMPOUND_ASSIGN ? e->u.compound.rhs
+                                                    : e->u.assign.rhs;
+    s_type *lt = check_expr(S, lhs);
+    s_type *rt = check_expr(S, rhs);
+    if (!lt || !rt) return type_unit(S);
+    if (!lhs->is_lvalue) {
+        s_diag_error(S->diag, e->loc, 420, "left side of assignment is not assignable");
+        return type_unit(S);
+    }
+    if (lhs->kind == S_EXPR_VAR && !lhs->u.var.is_mut) {
+        s_diag_error(S->diag, e->loc, 422,
+                     "cannot assign to immutable variable '%s'",
+                     lhs->u.var.name);
+    }
+    if (!type_eq(lt, rt)) {
+        s_diag_error(S->diag, e->loc, 421,
+                     "cannot assign %s to %s", type_name(rt), type_name(lt));
+    }
+    return type_unit(S);
+}
+
+static s_type *check_expr(s_sema *S, s_expr *e) {
+    if (++S->depth > 4096) {
+        s_diag_error(S->diag, e->loc, 430, "expression too deep");
+        --S->depth;
+        return type_unit(S);
+    }
+    s_type *t = NULL;
+    switch (e->kind) {
+    case S_EXPR_INT_LIT:
+        t = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+        if (t) t->kind = S_TYPE_INT;
+        break;
+    case S_EXPR_FLOAT_LIT:
+        t = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+        if (t) t->kind = S_TYPE_FLOAT;
+        break;
+    case S_EXPR_STR_LIT:
+        t = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+        if (t) t->kind = S_TYPE_STR;
+        break;
+    case S_EXPR_BOOL_LIT:
+        t = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+        if (t) t->kind = S_TYPE_BOOL;
+        break;
+    case S_EXPR_NONE_LIT: {
+        t = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+        if (t) t->kind = S_TYPE_UNIT;
+        break;
+    }
+    case S_EXPR_VAR: {
+        s_sym *sym = scope_lookup(S->scope, e->u.var.name);
+        if (!sym) {
+            s_diag_error(S->diag, e->loc, 431,
+                         "unknown variable '%s'", e->u.var.name);
+            t = type_unit(S);
+            break;
+        }
+        e->u.var.var_index = sym->index;
+        e->u.var.is_mut = sym->is_mut;
+        t = sym->type;
+        e->is_lvalue = true; /* a variable is assignable if mutable; checked separately */
+        break;
+    }
+    case S_EXPR_CALL: t = check_call(S, e); break;
+    case S_EXPR_INDEX: t = check_index(S, e); break;
+    case S_EXPR_FIELD: t = check_field(S, e); break;
+    case S_EXPR_UNARY: t = check_unary(S, e); break;
+    case S_EXPR_BINARY: t = check_binary(S, e); break;
+    case S_EXPR_ASSIGN: t = check_assign(S, e); break;
+    case S_EXPR_COMPOUND_ASSIGN: t = check_assign(S, e); break;
+    }
+    e->type = t;
+    --S->depth;
+    return t;
+}
+
+/* ------------------------------------------------------------------ */
+/* Statement checking                                                  */
+/* ------------------------------------------------------------------ */
+
+static bool check_stmt(s_sema *S, s_stmt *s);
+
+static bool push_let(s_sema *S, s_stmt *s, s_type *t, bool is_mut,
+                     int *out_index) {
+    s_sym sym;
+    sym.name = s->u.let.name;
+    sym.type = t;
+    sym.index = S->next_slot++;
+    sym.is_mut = is_mut;
+    if (!scope_push_sym(S->scope, sym)) {
+        s_diag_error(S->diag, s->loc, 440, "out of memory");
+        return false;
+    }
+    s->u.let.var_index = sym.index;
+    if (out_index) *out_index = sym.index;
+    return true;
+}
+
+static bool check_block(s_sema *S, s_stmt *blk) {
+    s_scope sc;
+    sc.parent = S->scope;
+    sc.syms = NULL;
+    sc.count = 0;
+    sc.cap = 0;
+    s_scope *saved = S->scope;
+    S->scope = &sc;
+    bool ok = true;
+    for (s_size i = 0; i < blk->u.block.count; ++i) {
+        if (!check_stmt(S, blk->u.block.items[i])) ok = false;
+    }
+    S->scope = saved;
+    scope_pop(&sc);
+    return ok;
+}
+
+static bool check_stmt(s_sema *S, s_stmt *s) {
+    switch (s->kind) {
+    case S_STMT_LET: {
+        s_type *it = check_expr(S, s->u.let.init);
+        if (!it) return false;
+        if (s->u.let.decl_type) {
+            if (!type_eq(s->u.let.decl_type, it)) {
+                s_diag_error(S->diag, s->loc, 450,
+                             "initializer has type %s, expected %s",
+                             type_name(it), type_name(s->u.let.decl_type));
+            }
+            it = s->u.let.decl_type;
+        }
+        return push_let(S, s, it, s->u.let.is_mut, NULL);
+    }
+    case S_STMT_EXPR:
+        return check_expr(S, s->u.expr.expr) != NULL;
+    case S_STMT_RETURN: {
+        if (!S->fn) {
+            s_diag_error(S->diag, s->loc, 451, "'return' outside function");
+            return false;
+        }
+        s_type *ret = S->fn->ret_type;
+        if (s->u.ret.has_expr) {
+            s_type *it = check_expr(S, s->u.ret.expr);
+            if (it && !type_eq(it, ret)) {
+                s_diag_error(S->diag, s->loc, 452,
+                             "return type is %s, got %s",
+                             type_name(ret), type_name(it));
+            }
+        } else {
+            if (ret->kind != S_TYPE_UNIT) {
+                s_diag_error(S->diag, s->loc, 453,
+                             "function returns %s, missing return value",
+                             type_name(ret));
+            }
+        }
+        return true;
+    }
+    case S_STMT_IF: {
+        s_type *ct = check_expr(S, s->u.ifstmt.cond);
+        if (ct && ct->kind != S_TYPE_BOOL) {
+            s_diag_error(S->diag, s->u.ifstmt.cond->loc, 454,
+                         "if condition must be bool, got %s", type_name(ct));
+        }
+        bool ok = check_block(S, s->u.ifstmt.then_block);
+        if (s->u.ifstmt.else_block) {
+            if (s->u.ifstmt.else_block->kind == S_STMT_IF) {
+                ok = check_stmt(S, s->u.ifstmt.else_block) && ok;
+            } else {
+                ok = check_block(S, s->u.ifstmt.else_block) && ok;
+            }
+        }
+        return ok;
+    }
+    case S_STMT_WHILE: {
+        s_type *ct = check_expr(S, s->u.whilestmt.cond);
+        if (ct && ct->kind != S_TYPE_BOOL) {
+            s_diag_error(S->diag, s->u.whilestmt.cond->loc, 455,
+                         "while condition must be bool, got %s", type_name(ct));
+        }
+        return check_block(S, s->u.whilestmt.body);
+    }
+    case S_STMT_FOR: {
+        s_type *it = check_expr(S, s->u.forstmt.iter);
+        if (!it) return false;
+        if (it->kind != S_TYPE_ARRAY) {
+            s_diag_error(S->diag, s->u.forstmt.iter->loc, 456,
+                         "for-in requires an array, got %s", type_name(it));
+            return false;
+        }
+        s_sym sym;
+        sym.name = s->u.forstmt.name;
+        sym.type = it->elem;
+        sym.index = S->next_slot++;
+        sym.is_mut = true;
+        if (!scope_push_sym(S->scope, sym)) return false;
+        s->u.forstmt.var_index = sym.index;
+        bool ok = check_block(S, s->u.forstmt.body);
+        /* remove the loop variable scope */
+        /* The block pushed its own scope; we push the loop var into the current
+           scope before the block, so pop it after. Implement via parent scope. */
+        return ok;
+    }
+    case S_STMT_BREAK:
+    case S_STMT_CONTINUE:
+        return true;
+    case S_STMT_BLOCK:
+        return check_block(S, s);
+    }
+    return false;
+}
+
+/* ------------------------------------------------------------------ */
+/* Entry point                                                         */
+/* ------------------------------------------------------------------ */
+
+bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
+    s_sema S;
+    memset(&S, 0, sizeof(S));
+    S.mod = mod;
+    S.arena = arena;
+    S.diag = diag;
+
+    /* resolve record types in all type annotations */
+    for (s_size r = 0; r < mod->nrecords; ++r) {
+        s_record_decl *rec = &mod->records[r];
+        for (s_size i = 0; i < rec->nfields; ++i) {
+            s_type *ft = rec->fields[i].type;
+            if (ft->kind == S_TYPE_RECORD) {
+                int idx = resolve_record(&S, ft, rec->fields[i].loc);
+                if (idx >= 0) ft->record_index = idx;
+            }
+        }
+    }
+
+    bool ok = true;
+
+    for (s_size f = 0; f < mod->nfuncs; ++f) {
+        s_func_decl *fn = &mod->funcs[f];
+        S.fn = fn;
+        S.next_slot = 0;
+
+        /* parameter scope */
+        s_scope sc;
+        sc.parent = NULL;
+        sc.syms = NULL;
+        sc.count = 0;
+        sc.cap = 0;
+        S.scope = &sc;
+
+        for (s_size i = 0; i < fn->nparams; ++i) {
+            s_type *pt = fn->params[i].type;
+            if (pt->kind == S_TYPE_RECORD) {
+                int idx = resolve_record(&S, pt, fn->params[i].type->loc);
+                if (idx >= 0) pt->record_index = idx;
+            }
+            s_sym sym;
+            sym.name = fn->params[i].name;
+            sym.type = pt;
+            sym.index = (int)i;
+            sym.is_mut = false;
+            if (!scope_push_sym(&sc, sym)) return false;
+            fn->params[i].index = (int)i;
+            S.next_slot++;
+        }
+        if (fn->ret_type && fn->ret_type->kind == S_TYPE_RECORD) {
+            resolve_record(&S, fn->ret_type, fn->loc);
+        }
+        if (!check_block(&S, fn->body)) ok = false;
+        scope_pop(&sc);
+    }
+
+    S.fn = NULL;
+
+    /* main must exist */
+    mod->main_index = -1;
+    for (s_size f = 0; f < mod->nfuncs; ++f) {
+        if (strcmp(mod->funcs[f].name, "main") == 0) {
+            mod->main_index = (int)f;
+            s_type *rt = mod->funcs[f].ret_type;
+            if (rt->kind != S_TYPE_INT && rt->kind != S_TYPE_UNIT) {
+                s_diag_error(diag, mod->funcs[f].loc, 460,
+                             "main must return int or unit, got %s", type_name(rt));
+                ok = false;
+            }
+            break;
+        }
+    }
+    if (mod->main_index < 0) {
+        s_diag_error(diag, mod->loc, 461, "program has no 'main' function");
+        ok = false;
+    }
+
+    return ok && !s_diag_has_errors(diag);
+}

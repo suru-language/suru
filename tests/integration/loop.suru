@@ -1,0 +1,10 @@
+func main() -> int {
+    mut s = 0;
+    mut i = 0;
+    while i < 10 {
+        s = s + i;
+        i = i + 1;
+    }
+    println(to_str(s));
+    return s;
+}

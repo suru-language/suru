@@ -1,0 +1,7 @@
+func main() -> int {
+    let a = "abc";
+    let b = "abd";
+    if a < b { println("lt"); } else { println("ge"); }
+    if a == a { println("eq"); }
+    return 0;
+}

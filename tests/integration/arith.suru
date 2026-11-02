@@ -1,0 +1,9 @@
+func main() -> int {
+    let x = 6 * 7;
+    if x == 42 {
+        println("forty-two");
+    } else {
+        println("wrong");
+    }
+    return x - 40;
+}

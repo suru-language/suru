@@ -1,0 +1,6 @@
+func main() {
+    let greeting = "hello" + " " + "world";
+    println(greeting);
+    let n = to_str(40 + 2);
+    println(n);
+}

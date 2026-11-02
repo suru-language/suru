@@ -1,0 +1,5 @@
+func main() {
+    let x = i64_to_f64(7);
+    println(f64_to_str(x));
+    println(to_str(f64_to_i64(3.9)));
+}
