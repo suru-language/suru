@@ -11,6 +11,8 @@ typedef struct s_param_entry {
     s_type *type;
 } s_param_entry;
 
+
+
 /* ------------------------------------------------------------------ */
 /* Dynamic arrays over the arena (leaks old buffers; bulk-freed)       */
 /* ------------------------------------------------------------------ */
@@ -238,27 +240,25 @@ static s_expr *parse_postfix(s_parser *p) {
             s_expr *r = expr_alloc(p, S_EXPR_RECORD_INIT, e->loc);
             if (!r) return NULL;
             r->u.rec.name = e->u.var.name;
-            const char **fnames = NULL;
-            s_expr **fvals = NULL;
-            s_size n = 0, capn = 0, capv = 0;
+            s_rec_field_init *fields = NULL;
+            s_size n = 0, cap = 0;
             while (!at(p, S_TOK_RBRACE)) {
                 if (!at(p, S_TOK_IDENT)) {
                     s_diag_error(p->diag, p->cur.loc, 370,
                                  "expected field name in record literal");
                     return NULL;
                 }
-                VEC_PUSH(p->arena, fnames, n, capn, sizeof(char *),
-                         ident_text(p));
+                s_rec_field_init fd;
+                fd.name = ident_text(p);
                 advance(p);
                 if (!expect(p, S_TOK_ASSIGN, 371)) return NULL;
-                s_expr *val = parse_assignment(p);
-                if (!val) return NULL;
-                VEC_PUSH(p->arena, fvals, n, capv, sizeof(s_expr *), val);
+                fd.val = parse_assignment(p);
+                if (!fd.val) return NULL;
+                VEC_PUSH(p->arena, fields, n, cap, sizeof(s_rec_field_init), fd);
                 if (!accept(p, S_TOK_COMMA)) break;
             }
             if (!expect(p, S_TOK_RBRACE, 372)) return NULL;
-            r->u.rec.fnames = fnames;
-            r->u.rec.fvals = fvals;
+            r->u.rec.fields = fields;
             r->u.rec.nprovided = n;
             e = r;
         } else {

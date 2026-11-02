@@ -434,7 +434,7 @@ static s_type *check_record_init(s_sema *S, s_expr *e) {
     if (!by) { e->u.rec.by_field = NULL; e->u.rec.nfields = nf; return type_unit(S); }
     bool ok = true;
     for (s_size i = 0; i < e->u.rec.nprovided; ++i) {
-        const char *nm = e->u.rec.fnames[i];
+        const char *nm = e->u.rec.fields[i].name;
         int j = -1;
         for (s_size k = 0; k < nf; ++k) {
             if (strcmp(rec->fields[k].name, nm) == 0) { j = (int)k; break; }
@@ -450,13 +450,13 @@ static s_type *check_record_init(s_sema *S, s_expr *e) {
             ok = false;
             continue;
         }
-        s_type *vt = check_expr(S, e->u.rec.fvals[i]);
+        s_type *vt = check_expr(S, e->u.rec.fields[i].val);
         if (vt && !type_eq(vt, rec->fields[j].type)) {
             s_diag_error(S->diag, e->loc, 475, "field '%s' has type %s, expected %s",
                          nm, type_name(vt), type_name(rec->fields[j].type));
             ok = false;
         }
-        by[j] = e->u.rec.fvals[i];
+        by[j] = e->u.rec.fields[i].val;
     }
     for (s_size j = 0; j < nf; ++j) {
         if (!by[j]) {

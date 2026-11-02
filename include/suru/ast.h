@@ -39,6 +39,11 @@ typedef struct s_type {
 typedef struct s_expr s_expr;
 typedef struct s_stmt s_stmt;
 
+typedef struct s_rec_field_init {
+    const char *name;
+    s_expr *val;
+} s_rec_field_init;
+
 /* ------------------------------------------------------------------ */
 /* Expressions                                                         */
 /* ------------------------------------------------------------------ */
@@ -90,8 +95,7 @@ struct s_expr {
         struct {
             const char *name;      /* record type name */
             int record_index;      /* resolved by sema */
-            const char **fnames;   /* provided field names */
-            s_expr **fvals;        /* provided field value expressions */
+            s_rec_field_init *fields;
             s_size nprovided;
             s_expr **by_field;     /* resolved values indexed by field index */
             s_size nfields;

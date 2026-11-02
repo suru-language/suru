@@ -1,0 +1,12 @@
+type Point { let x: int; let y: int; }
+type Bag { let name: str; let count: int; }
+func main() {
+    let p = Point { y = 4, x = 3 };
+    println(to_str(p.x));
+    println(to_str(p.y));
+    let b = Bag { count = 2, name = "items" };
+    println(b.name);
+    println(to_str(b.count));
+    let q = Point { x = 10, y = 20 };
+    println(to_str(q.x + q.y));
+}

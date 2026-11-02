@@ -238,6 +238,74 @@ static void test_const_assign_rejected(void) {
     s_arena_dispose(&arena);
 }
 
+static void test_record_init_valid(void) {
+    const char *src =
+        "type Point { let x: int; let y: int; }\n"
+        "func main() -> int {\n"
+        "    let p = Point { y = 4, x = 3 };\n"
+        "    return p.x + p.y;\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(ok);
+    CHECK_EQ_INT(s_diag_has_errors(&d), 0);
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_record_init_missing_field(void) {
+    const char *src =
+        "type Point { let x: int; let y: int; }\n"
+        "func main() -> int {\n"
+        "    let p = Point { x = 1 };\n"
+        "    return p.x;\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_record_init_unknown_field(void) {
+    const char *src =
+        "type Point { let x: int; }\n"
+        "func main() -> int {\n"
+        "    let p = Point { z = 1 };\n"
+        "    return 0;\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_record_init_type_mismatch(void) {
+    const char *src =
+        "type Point { let x: int; }\n"
+        "func main() -> int {\n"
+        "    let p = Point { x = true };\n"
+        "    return 0;\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
 TEST_MAIN_BEGIN()
     test_valid_program();
     test_type_mismatch();
@@ -253,4 +321,8 @@ TEST_MAIN_BEGIN()
     test_const_valid();
     test_const_type_mismatch();
     test_const_assign_rejected();
+    test_record_init_valid();
+    test_record_init_missing_field();
+    test_record_init_unknown_field();
+    test_record_init_type_mismatch();
 TEST_MAIN_END()
