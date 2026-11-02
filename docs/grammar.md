@@ -88,10 +88,13 @@ comparison = additive [ ("==" | "!=" | "<" | "<=" | ">" | ">=") additive ]
 additive   = multiplicative { ("+" | "-") multiplicative }
 multiplicative = unary { ("*" | "/" | "%") unary }
 unary      = ("-" | "not") unary | postfix
-postfix    = primary { ("(" arg_list ")" | "[" expression "]" | "." identifier) }
+postfix    = primary { ("(" arg_list ")" | "[" expression "]" | "." identifier
+            | record_literal) }
 primary     = int_literal | float_literal | string_literal | bool_literal
             | "none" | identifier | "(" expression ")"
             | array_literal
+record_literal = identifier "{" [ record_field { "," record_field } ] "}"
+record_field = identifier "=" expression
 array_literal = "[" [ expression { "," expression } ] "]"
 bool_literal = "true" | "false"
 arg_list    = [ expression { "," expression } ]
