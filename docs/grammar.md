@@ -80,8 +80,9 @@ Precedence increases from lowest to highest.
 
 ```
 expression = assignment
-assignment = logical_or [ assign_op logical_or ]
+assignment = conditional [ assign_op conditional ]
 assign_op  = "=" | "+=" | "-=" | "*=" | "/="
+conditional = logical_or [ "?" assignment ":" conditional ]
 logical_or = logical_and { "or" logical_and }
 logical_and = comparison { "and" comparison }
 comparison = bitor [ ("==" | "!=" | "<" | "<=" | ">" | ">=") bitor ]

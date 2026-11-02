@@ -50,6 +50,7 @@ typedef enum s_tok_kind {
     S_TOK_DOT,
     S_TOK_COLON,
     S_TOK_ARROW,          /* -> */
+    S_TOK_QUESTION,        /* ? */
 
     S_TOK_ASSIGN,         /* = */
     S_TOK_PLUS,           /* + */

@@ -54,6 +54,7 @@ const char *s_tok_kind_name(s_tok_kind k) {
     case S_TOK_DOT: return "'.'";
     case S_TOK_COLON: return "':'";
     case S_TOK_ARROW: return "'->'";
+    case S_TOK_QUESTION: return "'?'";
     case S_TOK_ASSIGN: return "'='";
     case S_TOK_PLUS: return "'+'";
     case S_TOK_MINUS: return "'-'";
@@ -493,6 +494,7 @@ bool s_lexer_next(s_lexer *lx, s_token *out) {
         else if (cur(lx) == '=') { advance(lx); out->kind = S_TOK_GE; }
         else out->kind = S_TOK_GT;
         return true;
+    case '?': advance(lx); out->kind = S_TOK_QUESTION; return true;
     case '&': advance(lx); out->kind = S_TOK_AMP; return true;
     case '|': advance(lx); out->kind = S_TOK_PIPE; return true;
     case '^': advance(lx); out->kind = S_TOK_CARET; return true;

@@ -1,0 +1,5 @@
+func main() {
+    println(to_str(1 < 2 ? 10 : 20));
+    println(to_str(3 < 2 ? 10 : 20));
+    println(1 < 2 ? "yes" : "no");
+}

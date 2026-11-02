@@ -206,6 +206,8 @@ Precedence, highest to lowest:
 - String concatenation: `+` on two `str` values concatenates them.
 - Comparison: `== != < <= > >=` yield `bool`.
 - Logical: `and or not` short-circuit.
+- Conditional: `cond ? a : b` evaluates `a` if `cond` is true, else `b`;
+  both branches must have the same type.
 - Bitwise: `& | ^` and shifts `<< >>` on `int`; `~` is unary bitwise NOT.
   Shifts treat the operand as a 64-bit unsigned bit pattern (logical shifts,
   and a shift count of 64 or more yields 0). Precedence (loosest to tightest)

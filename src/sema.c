@@ -729,6 +729,24 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
     case S_EXPR_FIELD: t = check_field(S, e); break;
     case S_EXPR_UNARY: t = check_unary(S, e); break;
     case S_EXPR_BINARY: t = check_binary(S, e); break;
+    case S_EXPR_COND: {
+        s_type *ct = check_expr(S, e->u.cond.cond);
+        if (ct && ct->kind != S_TYPE_BOOL) {
+            s_diag_error(S->diag, e->loc, 402,
+                         "condition must be bool, got %s", type_name(ct));
+        }
+        s_type *tt = check_expr(S, e->u.cond.when_true);
+        s_type *ft = check_expr(S, e->u.cond.when_false);
+        if (tt && ft && type_eq(tt, ft)) {
+            t = tt;
+        } else {
+            s_diag_error(S->diag, e->loc, 402,
+                         "conditional branches must have the same type, got %s and %s",
+                         tt ? type_name(tt) : "?", ft ? type_name(ft) : "?");
+            t = type_unit(S);
+        }
+        break;
+    }
     case S_EXPR_ASSIGN: t = check_assign(S, e); break;
     case S_EXPR_COMPOUND_ASSIGN: t = check_assign(S, e); break;
     }

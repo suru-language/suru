@@ -65,6 +65,7 @@ typedef enum s_expr_kind {
     S_EXPR_FIELD,
     S_EXPR_UNARY,             /* -x, not x */
     S_EXPR_BINARY,            /* arithmetic / comparison / logic */
+    S_EXPR_COND,              /* cond ? a : b */
     S_EXPR_ASSIGN,            /* = */
     S_EXPR_COMPOUND_ASSIGN,   /* += -= *= /= */
 } s_expr_kind;
@@ -119,6 +120,7 @@ struct s_expr {
         struct { s_expr *obj; const char *field; int field_index; } field;
         struct { s_un_op op; s_expr *operand; } unary;
         struct { s_bin_op op; s_expr *lhs; s_expr *rhs; } binary;
+        struct { s_expr *cond; s_expr *when_true; s_expr *when_false; } cond;
         struct { s_expr **elems; s_size count; } array;
         struct { s_expr *lhs; s_expr *rhs; } assign;
         struct { s_bin_op op; s_expr *lhs; s_expr *rhs; } compound;

@@ -549,6 +549,18 @@ static bool gen_expr(s_gen *g, const s_expr *e) {
         }
         return push_bin_op(g, e);
     }
+    case S_EXPR_COND: {
+        s_u32 lfalse = new_label(&g->labels);
+        s_u32 ldone = new_label(&g->labels);
+        if (!gen_expr(g, e->u.cond.cond)) return false;
+        if (!em_jump(&g->e, &g->labels, BC_JZ, lfalse)) return false;
+        if (!gen_expr(g, e->u.cond.when_true)) return false;
+        if (!em_jump(&g->e, &g->labels, BC_JMP, ldone)) return false;
+        place_label(&g->e, &g->labels, lfalse);
+        if (!gen_expr(g, e->u.cond.when_false)) return false;
+        place_label(&g->e, &g->labels, ldone);
+        return true;
+    }
     case S_EXPR_ASSIGN:
         return gen_assign(g, e, false);
     case S_EXPR_COMPOUND_ASSIGN:

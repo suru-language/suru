@@ -447,8 +447,27 @@ static s_expr *parse_logical_or(s_parser *p) {
     return lhs;
 }
 
+static s_expr *parse_conditional(s_parser *p) {
+    s_expr *e = parse_logical_or(p);
+    if (!e) return NULL;
+    if (accept(p, S_TOK_QUESTION)) {
+        s_expr *when_true = parse_assignment(p);
+        if (!when_true) return NULL;
+        if (!expect(p, S_TOK_COLON, 320)) return NULL;
+        s_expr *when_false = parse_conditional(p);
+        if (!when_false) return NULL;
+        s_expr *c = expr_alloc(p, S_EXPR_COND, e->loc);
+        if (!c) return NULL;
+        c->u.cond.cond = e;
+        c->u.cond.when_true = when_true;
+        c->u.cond.when_false = when_false;
+        return c;
+    }
+    return e;
+}
+
 static s_expr *parse_assignment(s_parser *p) {
-    s_expr *lhs = parse_logical_or(p);
+    s_expr *lhs = parse_conditional(p);
     if (!lhs) return NULL;
     s_tok_kind k = p->cur.kind;
     bool is_compound = false;
