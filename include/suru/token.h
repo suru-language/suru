@@ -57,6 +57,12 @@ typedef enum s_tok_kind {
     S_TOK_STAR,           /* * */
     S_TOK_SLASH,          /* / */
     S_TOK_PERCENT,        /* % */
+    S_TOK_AMP,            /* & */
+    S_TOK_PIPE,           /* | */
+    S_TOK_CARET,          /* ^ */
+    S_TOK_SHL,            /* << */
+    S_TOK_SHR,            /* >> */
+    S_TOK_TILDE,          /* ~ */
     S_TOK_EQ,             /* == */
     S_TOK_NE,             /* != */
     S_TOK_LT,             /* < */

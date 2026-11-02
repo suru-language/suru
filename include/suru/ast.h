@@ -73,10 +73,12 @@ typedef enum s_bin_op {
     S_BIN_ADD, S_BIN_SUB, S_BIN_MUL, S_BIN_DIV, S_BIN_MOD,
     S_BIN_EQ, S_BIN_NE, S_BIN_LT, S_BIN_LE, S_BIN_GT, S_BIN_GE,
     S_BIN_AND, S_BIN_OR,
+    S_BIN_BIT_AND, S_BIN_BIT_OR, S_BIN_BIT_XOR,
+    S_BIN_SHL, S_BIN_SHR,
 } s_bin_op;
 
 typedef enum s_un_op {
-    S_UN_NEG, S_UN_NOT,
+    S_UN_NEG, S_UN_NOT, S_UN_BITNOT,
 } s_un_op;
 
 struct s_expr {

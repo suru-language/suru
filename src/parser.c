@@ -269,9 +269,10 @@ static s_expr *parse_postfix(s_parser *p) {
 }
 
 static s_expr *parse_unary(s_parser *p) {
-    if (at(p, S_TOK_MINUS) || at(p, S_TOK_NOT)) {
+    if (at(p, S_TOK_MINUS) || at(p, S_TOK_NOT) || at(p, S_TOK_TILDE)) {
         s_source_loc loc = p->cur.loc;
-        s_un_op op = at(p, S_TOK_MINUS) ? S_UN_NEG : S_UN_NOT;
+        s_un_op op = at(p, S_TOK_MINUS) ? S_UN_NEG
+                    : at(p, S_TOK_NOT) ? S_UN_NOT : S_UN_BITNOT;
         advance(p);
         s_expr *operand = parse_unary(p);
         if (!operand) return NULL;
@@ -325,8 +326,76 @@ static s_expr *parse_additive(s_parser *p) {
     return lhs;
 }
 
-static s_expr *parse_comparison(s_parser *p) {
+static s_expr *parse_shift(s_parser *p) {
     s_expr *lhs = parse_additive(p);
+    if (!lhs) return NULL;
+    for (;;) {
+        s_bin_op op;
+        if (accept(p, S_TOK_SHL)) op = S_BIN_SHL;
+        else if (accept(p, S_TOK_SHR)) op = S_BIN_SHR;
+        else break;
+        s_expr *rhs = parse_additive(p);
+        if (!rhs) return NULL;
+        s_expr *e = expr_alloc(p, S_EXPR_BINARY, lhs->loc);
+        if (!e) return NULL;
+        e->u.binary.op = op;
+        e->u.binary.lhs = lhs;
+        e->u.binary.rhs = rhs;
+        lhs = e;
+    }
+    return lhs;
+}
+
+static s_expr *parse_bitand(s_parser *p) {
+    s_expr *lhs = parse_shift(p);
+    if (!lhs) return NULL;
+    while (accept(p, S_TOK_AMP)) {
+        s_expr *rhs = parse_shift(p);
+        if (!rhs) return NULL;
+        s_expr *e = expr_alloc(p, S_EXPR_BINARY, lhs->loc);
+        if (!e) return NULL;
+        e->u.binary.op = S_BIN_BIT_AND;
+        e->u.binary.lhs = lhs;
+        e->u.binary.rhs = rhs;
+        lhs = e;
+    }
+    return lhs;
+}
+
+static s_expr *parse_bitxor(s_parser *p) {
+    s_expr *lhs = parse_bitand(p);
+    if (!lhs) return NULL;
+    while (accept(p, S_TOK_CARET)) {
+        s_expr *rhs = parse_bitand(p);
+        if (!rhs) return NULL;
+        s_expr *e = expr_alloc(p, S_EXPR_BINARY, lhs->loc);
+        if (!e) return NULL;
+        e->u.binary.op = S_BIN_BIT_XOR;
+        e->u.binary.lhs = lhs;
+        e->u.binary.rhs = rhs;
+        lhs = e;
+    }
+    return lhs;
+}
+
+static s_expr *parse_bitor(s_parser *p) {
+    s_expr *lhs = parse_bitxor(p);
+    if (!lhs) return NULL;
+    while (accept(p, S_TOK_PIPE)) {
+        s_expr *rhs = parse_bitxor(p);
+        if (!rhs) return NULL;
+        s_expr *e = expr_alloc(p, S_EXPR_BINARY, lhs->loc);
+        if (!e) return NULL;
+        e->u.binary.op = S_BIN_BIT_OR;
+        e->u.binary.lhs = lhs;
+        e->u.binary.rhs = rhs;
+        lhs = e;
+    }
+    return lhs;
+}
+
+static s_expr *parse_comparison(s_parser *p) {
+    s_expr *lhs = parse_bitor(p);
     if (!lhs) return NULL;
     s_bin_op op;
     if (accept(p, S_TOK_EQ)) op = S_BIN_EQ;
@@ -336,7 +405,7 @@ static s_expr *parse_comparison(s_parser *p) {
     else if (accept(p, S_TOK_GT)) op = S_BIN_GT;
     else if (accept(p, S_TOK_GE)) op = S_BIN_GE;
     else return lhs;
-    s_expr *rhs = parse_additive(p);
+    s_expr *rhs = parse_bitor(p);
     if (!rhs) return NULL;
     s_expr *e = expr_alloc(p, S_EXPR_BINARY, lhs->loc);
     if (!e) return NULL;

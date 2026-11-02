@@ -33,6 +33,7 @@ typedef enum s_bc_op {
 
     BC_ADD_I, BC_SUB_I, BC_MUL_I, BC_DIV_I, BC_MOD_I,
     BC_ADD_F, BC_SUB_F, BC_MUL_F, BC_DIV_F,
+    BC_BIT_AND, BC_BIT_OR, BC_BIT_XOR, BC_SHL, BC_SHR, BC_BIT_NOT,
 
     BC_EQ_I, BC_NE_I, BC_LT_I, BC_LE_I, BC_GT_I, BC_GE_I,
     BC_EQ_F, BC_NE_F, BC_LT_F, BC_LE_F, BC_GT_F, BC_GE_F,

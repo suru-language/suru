@@ -60,6 +60,12 @@ const char *s_tok_kind_name(s_tok_kind k) {
     case S_TOK_STAR: return "'*'";
     case S_TOK_SLASH: return "'/'";
     case S_TOK_PERCENT: return "'%'";
+    case S_TOK_AMP: return "'&'";
+    case S_TOK_PIPE: return "'|'";
+    case S_TOK_CARET: return "'^'";
+    case S_TOK_SHL: return "'<<'";
+    case S_TOK_SHR: return "'>>'";
+    case S_TOK_TILDE: return "'~'";
     case S_TOK_EQ: return "'=='";
     case S_TOK_NE: return "'!='";
     case S_TOK_LT: return "'<'";
@@ -477,14 +483,20 @@ bool s_lexer_next(s_lexer *lx, s_token *out) {
         return true;
     case '<':
         advance(lx);
-        if (cur(lx) == '=') { advance(lx); out->kind = S_TOK_LE; }
+        if (cur(lx) == '<') { advance(lx); out->kind = S_TOK_SHL; }
+        else if (cur(lx) == '=') { advance(lx); out->kind = S_TOK_LE; }
         else out->kind = S_TOK_LT;
         return true;
     case '>':
         advance(lx);
-        if (cur(lx) == '=') { advance(lx); out->kind = S_TOK_GE; }
+        if (cur(lx) == '>') { advance(lx); out->kind = S_TOK_SHR; }
+        else if (cur(lx) == '=') { advance(lx); out->kind = S_TOK_GE; }
         else out->kind = S_TOK_GT;
         return true;
+    case '&': advance(lx); out->kind = S_TOK_AMP; return true;
+    case '|': advance(lx); out->kind = S_TOK_PIPE; return true;
+    case '^': advance(lx); out->kind = S_TOK_CARET; return true;
+    case '~': advance(lx); out->kind = S_TOK_TILDE; return true;
     default:
         return lex_error(lx, out->loc, 107, "unexpected character '\\x%02x'", (unsigned char)c);
     }

@@ -226,7 +226,14 @@ static s_type *check_unary(s_sema *S, s_expr *e) {
         return type_unit(S);
     }
     return ot;
-}
+    if (e->u.unary.op == S_UN_BITNOT) {
+        if (ot->kind != S_TYPE_INT) {
+            s_diag_error(S->diag, e->loc, 402,
+                         "'~' requires an int operand, got %s", type_name(ot));
+            return type_unit(S);
+        }
+        return ot;
+    }
 
 static s_type *check_binary(s_sema *S, s_expr *e) {
     s_type *lt = check_expr(S, e->u.binary.lhs);
