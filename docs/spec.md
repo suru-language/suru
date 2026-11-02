@@ -110,13 +110,19 @@ not part of the static type. Array indexing is zero-based and bounds-checked
 at runtime; an out-of-range access traps.
 
 An array literal `[...]` builds an array from its elements, whose types must
-all match; the element type is inferred from the first element, so an empty
-array literal is a compile-time error:
+all match; the element type is inferred from the first element. An empty
+array literal requires a type ascription to fix the element type:
 
 ```
-let primes = [2, 3, 5, 7];   // [int]
-println(to_str(primes[0]));   // 2
+let primes = [2, 3, 5, 7];      // [int]
+let floats = [1.5, 2.5];        // [float]
+let empty: [int] = [];          // empty [int] array
+println(to_str(primes[0]));      // 2
 ```
+
+Array element types are unrestricted, so `[str]`, `[float]`, and nested
+arrays like `[[int]]` are all valid. Array builtins such as `array_len`
+accept any array, regardless of element type.
 
 ### 3.3 Function types
 

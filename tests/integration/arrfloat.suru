@@ -1,0 +1,7 @@
+func main() {
+    let a = [1.5, 2.5, 3.5];
+    println(f64_to_str(a[1]));
+    println(to_str(array_len(a)));
+    let e: [int] = [];
+    println(to_str(array_len(e)));
+}
