@@ -780,6 +780,125 @@ static bool parse_record(s_parser *p) {
     return true;
 }
 
+static bool read_file(const char *path, char **out, s_size *outlen) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return false;
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return false; }
+    long sz = ftell(f);
+    if (sz < 0 || fseek(f, 0, SEEK_SET) != 0) { fclose(f); return false; }
+    char *buf = malloc((s_size)sz + 1);
+    if (!buf) { fclose(f); return false; }
+    size_t rd = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    if (rd != (size_t)sz) { free(buf); return false; }
+    buf[sz] = '\0';
+    *out = buf;
+    *outlen = (s_size)sz;
+    return true;
+}
+
+static bool parse_items(s_parser *p);
+
+static bool parse_use(s_parser *p) {
+    s_source_loc loc = p->cur.loc;
+    advance(p); /* 'use' */
+    if (!at(p, S_TOK_STR)) {
+        s_diag_error(p->diag, loc, 360, "expected a string literal after 'use'");
+        return false;
+    }
+    s_size plen = p->cur.v.s.len;
+    if (plen >= 1024) {
+        s_diag_error(p->diag, loc, 363, "include path too long");
+        advance(p);
+        return false;
+    }
+    char inc[1024];
+    memcpy(inc, p->cur.v.s.text, plen);
+    inc[plen] = '\0';
+    advance(p);
+    if (!expect(p, S_TOK_SEMI, 361)) return false;
+
+    char full[1024];
+    if (inc[0] == '/') {
+        snprintf(full, sizeof full, "%s", inc);
+    } else {
+        const char *base = p->lx.file ? p->lx.file : "";
+        const char *slash = strrchr(base, '/');
+        if (slash) {
+            size_t d = (size_t)(slash - base + 1);
+            if (d >= sizeof full) {
+                s_diag_error(p->diag, loc, 363, "include path too long");
+                return false;
+            }
+            memcpy(full, base, d);
+            snprintf(full + d, sizeof full - d, "%s", inc);
+        } else {
+            snprintf(full, sizeof full, "%s", inc);
+        }
+    }
+
+    for (s_size i = 0; i < p->nincluded; ++i) {
+        if (strcmp(p->included[i], full) == 0) return true; /* idempotent */
+    }
+    if (++p->file_depth > 16) {
+        s_diag_error(p->diag, loc, 362, "too many nested includes");
+        --p->file_depth;
+        return false;
+    }
+
+    char *src = NULL;
+    s_size len = 0;
+    if (!read_file(full, &src, &len)) {
+        s_diag_error(p->diag, loc, 362, "cannot open included file '%s'", full);
+        --p->file_depth;
+        return false;
+    }
+
+    const char *fname = s_arena_strdup(p->arena, full);
+    if (!fname) { free(src); --p->file_depth; return false; }
+    VEC_PUSH(p->arena, p->included, p->nincluded, p->included_cap,
+             sizeof(char *), (char *)fname);
+
+    s_lexer saved_lx = p->lx;
+    s_token saved_cur = p->cur;
+    s_token saved_ahead = p->ahead;
+    bool saved_has = p->has_ahead;
+
+    s_lexer_init(&p->lx, fname, src, len, p->arena, p->diag);
+    advance(p);
+    bool ok = parse_items(p);
+
+    p->lx = saved_lx;
+    p->cur = saved_cur;
+    p->ahead = saved_ahead;
+    p->has_ahead = saved_has;
+    free(src);
+    --p->file_depth;
+    return ok;
+}
+
+static bool parse_items(s_parser *p) {
+    bool ok = true;
+    while (!at(p, S_TOK_EOF)) {
+        if (at(p, S_TOK_KW_FUNC)) {
+            if (!parse_func(p)) ok = false;
+        } else if (at(p, S_TOK_KW_TYPE)) {
+            if (!parse_record(p)) ok = false;
+        } else if (at(p, S_TOK_KW_CONST)) {
+            if (!parse_const(p)) ok = false;
+        } else if (at(p, S_TOK_KW_USE)) {
+            if (!parse_use(p)) ok = false;
+        } else {
+            s_diag_error(p->diag, p->cur.loc, 350,
+                         "unexpected %s at top level",
+                         s_tok_kind_name(p->cur.kind));
+            advance(p);
+            ok = false;
+        }
+    }
+    return ok;
+}
+
 bool s_parse(s_parser *p, const char *file, const char *src, s_size len,
              s_arena *arena, s_diag_ctx *diag) {
     memset(p, 0, sizeof(*p));
@@ -790,22 +909,7 @@ bool s_parse(s_parser *p, const char *file, const char *src, s_size len,
     p->mod.loc = p->cur.loc;
     p->mod.main_index = -1;
 
-    bool ok = true;
-    while (!at(p, S_TOK_EOF)) {
-        if (at(p, S_TOK_KW_FUNC)) {
-            if (!parse_func(p)) { ok = false; }
-        } else if (at(p, S_TOK_KW_TYPE)) {
-            if (!parse_record(p)) { ok = false; }
-        } else if (at(p, S_TOK_KW_CONST)) {
-            if (!parse_const(p)) { ok = false; }
-        } else {
-            s_diag_error(diag, p->cur.loc, 350,
-                         "unexpected %s at top level",
-                         s_tok_kind_name(p->cur.kind));
-            advance(p);
-            ok = false;
-        }
-    }
+    bool ok = parse_items(p);
 
     p->mod.funcs = p->funcs;
     p->mod.nfuncs = p->nfuncs;
