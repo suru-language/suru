@@ -231,7 +231,7 @@ static s_expr *parse_postfix(s_parser *p) {
             f->u.field.field_index = -1;
             advance(p);
             e = f;
-        } else if (accept(p, S_TOK_LBRACE)) {
+        } else if (!p->no_rec_brace && accept(p, S_TOK_LBRACE)) {
             if (e->kind != S_EXPR_VAR) {
                 s_diag_error(p->diag, p->cur.loc, 373,
                              "record literal must follow a type name");
@@ -564,7 +564,12 @@ static s_stmt *parse_statement(s_parser *p) {
         s_stmt *s = stmt_alloc(p, S_STMT_IF, loc);
         if (!s) return NULL;
         if (!enter_depth(p, 316)) return NULL;
-        s->u.ifstmt.cond = parse_assignment(p);
+        {
+            bool saved = p->no_rec_brace;
+            p->no_rec_brace = true;
+            s->u.ifstmt.cond = parse_assignment(p);
+            p->no_rec_brace = saved;
+        }
         if (!s->u.ifstmt.cond) { leave_depth(p); return NULL; }
         s->u.ifstmt.then_block = parse_block(p);
         if (!s->u.ifstmt.then_block) { leave_depth(p); return NULL; }
@@ -585,7 +590,12 @@ static s_stmt *parse_statement(s_parser *p) {
         s_stmt *s = stmt_alloc(p, S_STMT_WHILE, loc);
         if (!s) return NULL;
         if (!enter_depth(p, 317)) return NULL;
-        s->u.whilestmt.cond = parse_assignment(p);
+        {
+            bool saved = p->no_rec_brace;
+            p->no_rec_brace = true;
+            s->u.whilestmt.cond = parse_assignment(p);
+            p->no_rec_brace = saved;
+        }
         if (!s->u.whilestmt.cond) { leave_depth(p); return NULL; }
         s->u.whilestmt.body = parse_block(p);
         if (!s->u.whilestmt.body) { leave_depth(p); return NULL; }
@@ -606,7 +616,12 @@ static s_stmt *parse_statement(s_parser *p) {
         s->u.forstmt.var_index = -1;
         advance(p);
         if (!expect(p, S_TOK_KW_IN, 319)) return NULL;
-        s->u.forstmt.iter = parse_assignment(p);
+        {
+            bool saved = p->no_rec_brace;
+            p->no_rec_brace = true;
+            s->u.forstmt.iter = parse_assignment(p);
+            p->no_rec_brace = saved;
+        }
         if (!s->u.forstmt.iter) return NULL;
         if (!enter_depth(p, 320)) return NULL;
         s->u.forstmt.body = parse_block(p);

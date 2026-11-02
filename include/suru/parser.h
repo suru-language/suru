@@ -33,6 +33,7 @@ typedef struct s_parser {
     s_size nincluded;
     s_size included_cap;
     int file_depth;          /* include recursion guard */
+    bool no_rec_brace;       /* disallow record literals (statement headers) */
 } s_parser;
 
 /* Parse a module from source text. Returns true if the parser completed and
