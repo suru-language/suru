@@ -720,6 +720,61 @@ static bool builtin_str_map(s_vm *vm, int mode) {
     return push(vm, s_val_obj(o));
 }
 
+static bool builtin_len(s_vm *vm) {
+    s_value v = pop(vm);
+    if (v.tag != S_VAL_OBJ) {
+        vm_trap(vm, "len expects an array or string");
+        return false;
+    }
+    if (v.u.o->kind == S_OBJ_ARRAY || v.u.o->kind == S_OBJ_STR)
+        return push(vm, s_val_int((s_i64)v.u.o->count));
+    vm_trap(vm, "len expects an array or string");
+    return false;
+}
+
+static bool builtin_array_reverse(s_vm *vm) {
+    s_value v = pop(vm);
+    if (v.tag != S_VAL_OBJ || v.u.o->kind != S_OBJ_ARRAY) {
+        vm_trap(vm, "array_reverse expects an array");
+        return false;
+    }
+    s_u32 n = v.u.o->count;
+    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, n, 0);
+    if (!o) return false;
+    s_value *src = s_obj_array_data(v.u.o);
+    s_value *dst = s_obj_array_data(o);
+    for (s_u32 i = 0; i < n; ++i) dst[i] = src[n - 1 - i];
+    return push(vm, s_val_obj(o));
+}
+
+static bool builtin_array_reduce(s_vm *vm, int mode) {
+    s_value v = pop(vm);
+    if (v.tag != S_VAL_OBJ || v.u.o->kind != S_OBJ_ARRAY) {
+        vm_trap(vm, "array reduction expects an array");
+        return false;
+    }
+    s_u32 n = v.u.o->count;
+    s_value *el = s_obj_array_data(v.u.o);
+    if (n == 0) {
+        vm_trap(vm, "array reduction on empty array");
+        return false;
+    }
+    for (s_u32 i = 0; i < n; ++i) {
+        if (el[i].tag != S_VAL_INT) {
+            vm_trap(vm, "array reduction expects an int array");
+            return false;
+        }
+    }
+    s_i64 acc = el[0].u.i;
+    for (s_u32 i = 1; i < n; ++i) {
+        s_i64 x = el[i].u.i;
+        if (mode == 0) acc += x;
+        else if (mode == 1 && x < acc) acc = x;
+        else if (mode == 2 && x > acc) acc = x;
+    }
+    return push(vm, s_val_int(acc));
+}
+
 static bool builtin_str_to_f64(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
@@ -771,6 +826,11 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_STR_REVERSE: return builtin_str_map(vm, 0);
     case S_BUILTIN_STR_UPPER: return builtin_str_map(vm, 1);
     case S_BUILTIN_STR_LOWER: return builtin_str_map(vm, 2);
+    case S_BUILTIN_LEN: return builtin_len(vm);
+    case S_BUILTIN_ARRAY_REVERSE: return builtin_array_reverse(vm);
+    case S_BUILTIN_ARRAY_SUM: return builtin_array_reduce(vm, 0);
+    case S_BUILTIN_ARRAY_MIN: return builtin_array_reduce(vm, 1);
+    case S_BUILTIN_ARRAY_MAX: return builtin_array_reduce(vm, 2);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

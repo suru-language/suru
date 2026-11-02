@@ -1,0 +1,7 @@
+func main() {
+    println(to_str(len([1, 2, 3])));
+    println(to_str(len("hello")));
+    let r = array_reverse([1, 2, 3]);
+    println(to_str(r[0]));
+    println(to_str(r[2]));
+}

@@ -368,6 +368,10 @@ The standard library provides a small set of builtin functions (see
   `str_lower(s: str) -> str` — ASCII transforms.
 - `slice(a: [T], start: int, len: int) -> [T]` — bounds-clamped copy of a
   subarray.
+- `len(x)` — element count of an array or byte length of a string.
+- `array_reverse(a: [T]) -> [T]` — a new array with elements reversed.
+- `array_sum(a: [int]) -> int`, `array_min(a: [int]) -> int`,
+  `array_max(a: [int]) -> int` — reductions (traps on an empty array).
 - `args_len() -> int` — number of command-line arguments passed to the program.
 - `args(i: int) -> str` — the `i`-th command-line argument (0-based; traps if
   out of range). Arguments are passed after the source file on the CLI, e.g.
