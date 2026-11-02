@@ -696,6 +696,30 @@ static bool builtin_array_slice(s_vm *vm) {
     return push(vm, s_val_obj(o));
 }
 
+static bool builtin_str_map(s_vm *vm, int mode) {
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "string transform expects a string");
+        return false;
+    }
+    s_size n = s_obj_str_len(s.u.o);
+    const char *src = s_obj_str_data(s.u.o);
+    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
+    if (!o) return false;
+    char *dst = s_obj_str_data(o);
+    if (mode == 0) {
+        for (s_size i = 0; i < n; ++i) dst[i] = src[n - 1 - i];
+    } else {
+        for (s_size i = 0; i < n; ++i) {
+            char ch = src[i];
+            if (mode == 1 && ch >= 'a' && ch <= 'z') ch = (char)(ch - 32);
+            else if (mode == 2 && ch >= 'A' && ch <= 'Z') ch = (char)(ch + 32);
+            dst[i] = ch;
+        }
+    }
+    return push(vm, s_val_obj(o));
+}
+
 static bool builtin_str_to_f64(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
@@ -744,6 +768,9 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_STR_SPLIT: return builtin_str_split(vm);
     case S_BUILTIN_STR_JOIN: return builtin_str_join(vm);
     case S_BUILTIN_ARRAY_SLICE: return builtin_array_slice(vm);
+    case S_BUILTIN_STR_REVERSE: return builtin_str_map(vm, 0);
+    case S_BUILTIN_STR_UPPER: return builtin_str_map(vm, 1);
+    case S_BUILTIN_STR_LOWER: return builtin_str_map(vm, 2);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

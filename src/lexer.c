@@ -411,6 +411,10 @@ static bool lex_string(s_lexer *lx, s_token *tok) {
 }
 
 bool s_lexer_next(s_lexer *lx, s_token *out) {
+    if (lx->pos == 0 && lx->len >= 2 &&
+        lx->src[0] == '#' && lx->src[1] == '!') {
+        while (cur(lx) != '\0' && cur(lx) != '\n') advance(lx);
+    }
     skip_trivia(lx);
     out->loc.file = lx->file;
     out->loc.line = lx->line;

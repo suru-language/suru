@@ -38,6 +38,8 @@ punctuation. Source files are UTF-8.
 ### 2.1 Comments
 
 - Line comment: `//` to end of line.
+- Shebang: a first line beginning with `#!` is ignored, so scripts can be made
+  directly executable (e.g. `#!/usr/bin/env suru`).
 - Block comment: `/* ... */`, may nest.
 
 ### 2.2 Identifiers
@@ -332,6 +334,8 @@ The standard library provides a small set of builtin functions (see
 - `str_trim(s: str) -> str` — `s` with leading/trailing ASCII whitespace removed.
 - `str_split(s: str, sep: str) -> [str]` — split `s` on `sep` (non-empty).
 - `str_join(arr: [str], sep: str) -> str` — join `arr` with `sep`.
+- `str_reverse(s: str) -> str`, `str_upper(s: str) -> str`,
+  `str_lower(s: str) -> str` — ASCII transforms.
 - `slice(a: [T], start: int, len: int) -> [T]` — bounds-clamped copy of a
   subarray.
 - `args_len() -> int` — number of command-line arguments passed to the program.

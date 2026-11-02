@@ -1,0 +1,6 @@
+#!/usr/bin/env suru
+func main() {
+    println(str_reverse("abc"));
+    println(str_upper("Hello"));
+    println(str_lower("World"));
+}

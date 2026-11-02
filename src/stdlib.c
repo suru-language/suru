@@ -65,6 +65,12 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "str_join", 2, { S_SIG_ARRAY_STR, S_SIG_STR }, S_SIG_STR },
     [S_BUILTIN_ARRAY_SLICE] = {
         "slice", 3, { S_SIG_ARRAY, S_SIG_INT, S_SIG_INT }, S_SIG_ARRAY },
+    [S_BUILTIN_STR_REVERSE] = {
+        "str_reverse", 1, { S_SIG_STR }, S_SIG_STR },
+    [S_BUILTIN_STR_UPPER] = {
+        "str_upper", 1, { S_SIG_STR }, S_SIG_STR },
+    [S_BUILTIN_STR_LOWER] = {
+        "str_lower", 1, { S_SIG_STR }, S_SIG_STR },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {
