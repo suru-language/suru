@@ -408,8 +408,80 @@ static s_expr *parse_assignment(s_parser *p) {
     return e;
 }
 
+static s_expr *parse_lambda(s_parser *p) {
+    s_source_loc loc = p->cur.loc;
+    advance(p); /* 'fn' */
+    if (!expect(p, S_TOK_LPAREN, 380)) return NULL;
+
+    s_param_entry *params = NULL;
+    s_size n = 0, cap = 0;
+    if (!at(p, S_TOK_RPAREN)) {
+        for (;;) {
+            if (!at(p, S_TOK_IDENT)) {
+                s_diag_error(p->diag, p->cur.loc, 381, "expected parameter name");
+                return NULL;
+            }
+            const char *pname = ident_text(p);
+            advance(p);
+            if (!expect(p, S_TOK_COLON, 382)) return NULL;
+            s_type *pt = parse_type(p);
+            if (!pt) return NULL;
+            s_param_entry entry = { pname, pt };
+            VEC_PUSH(p->arena, params, n, cap, sizeof(s_param_entry), entry);
+            if (!accept(p, S_TOK_COMMA)) break;
+        }
+    }
+    if (!expect(p, S_TOK_RPAREN, 383)) return NULL;
+
+    s_type *ret = NULL;
+    if (accept(p, S_TOK_ARROW)) {
+        ret = parse_type(p);
+        if (!ret) return NULL;
+    } else {
+        ret = type_prim(p, S_TYPE_UNIT, loc);
+        if (!ret) return NULL;
+    }
+    s_stmt *body = parse_block(p);
+    if (!body) return NULL;
+
+    s_func_decl fn;
+    memset(&fn, 0, sizeof(fn));
+    char namebuf[48];
+    snprintf(namebuf, sizeof namebuf, "$lambda_%d", (int)p->nfuncs);
+    fn.name = s_arena_strdup(p->arena, namebuf);
+    if (!fn.name) return NULL;
+    fn.is_lambda = true;
+    fn.nparams = n + 1; /* +1 for the internal environment parameter */
+    fn.params = s_arena_calloc(p->arena, n + 1, sizeof(s_func_param),
+                               _Alignof(s_func_param));
+    if (!fn.params) return NULL;
+    fn.params[0].name = "$env";
+    fn.params[0].type = type_prim(p, S_TYPE_INT, loc);
+    fn.params[0].index = 0;
+    for (s_size i = 0; i < n; ++i) {
+        fn.params[i + 1].name = params[i].name;
+        fn.params[i + 1].type = params[i].type;
+        fn.params[i + 1].index = (int)(i + 1);
+    }
+    fn.ret_type = ret;
+    fn.body = body;
+    fn.func_index = (int)p->nfuncs;
+    VEC_PUSH(p->arena, p->funcs, p->nfuncs, p->funcs_cap,
+             sizeof(s_func_decl), fn);
+
+    s_expr *e = expr_alloc(p, S_EXPR_LAMBDA, loc);
+    if (!e) return NULL;
+    e->u.lambda.func_index = fn.func_index;
+    e->u.lambda.ncaptures = 0;
+    e->u.lambda.cap_src = NULL;
+    return e;
+}
+
 static s_expr *parse_primary(s_parser *p) {
     s_source_loc loc = p->cur.loc;
+    if (at(p, S_TOK_KW_FUNC)) {
+        return parse_lambda(p);
+    }
     if (at(p, S_TOK_INT)) {
         s_expr *e = expr_alloc(p, S_EXPR_INT_LIT, loc);
         if (!e) return NULL;

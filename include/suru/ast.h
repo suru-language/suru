@@ -60,6 +60,7 @@ typedef enum s_expr_kind {
     S_EXPR_FUNC_REF,          /* a named function used as a value */
     S_EXPR_CALL,
     S_EXPR_RECORD_INIT,
+    S_EXPR_LAMBDA,
     S_EXPR_INDEX,
     S_EXPR_FIELD,
     S_EXPR_UNARY,             /* -x, not x */
@@ -89,8 +90,20 @@ struct s_expr {
         double f;
         struct { const char *text; s_size len; } str;
         bool b;
-        struct { const char *name; int var_index; bool is_mut; } var;
+        struct {
+            const char *name;
+            int var_index;
+            bool is_mut;
+            bool is_capture;    /* set when this var is captured from an outer scope */
+            int capture_index;  /* index into the closure's captured environment */
+        } var;
         struct { int const_index; } cref;
+        struct {
+            int func_index;     /* synthetic module function for the body */
+            int ncaptures;      /* number of captured variables */
+            int *cap_src;       /* source var indices in the enclosing frame */
+            int base_depth;     /* scope depth of the lambda (capture threshold) */
+        } lambda;
         struct { s_expr *callee; s_expr **args; s_size nargs; } call;
         struct {
             const char *name;      /* record type name */
@@ -181,6 +194,7 @@ typedef struct s_func_decl {
     s_type *ret_type;
     s_stmt *body;                /* a BLOCK statement */
     int func_index;
+    bool is_lambda;              /* synthetic function created from a lambda */
     s_u32 max_frame_slots;       /* semi for stack size */
     s_u32 max_operand_depth;     /* sema */
     s_source_loc loc;

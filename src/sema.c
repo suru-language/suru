@@ -19,6 +19,7 @@ typedef struct s_scope {
     s_sym *syms;
     s_size count;
     s_size cap;
+    int depth;              /* lexical nesting depth (root = 0) */
 } s_scope;
 
 typedef struct s_sema {
@@ -29,6 +30,7 @@ typedef struct s_sema {
     s_func_decl *fn;        /* current function (NULL outside) */
     int next_slot;
     int depth;
+    s_expr *lambda_owner;   /* lambda being analyzed (capture collection) */
 } s_sema;
 
 /* ------------------------------------------------------------------ */
