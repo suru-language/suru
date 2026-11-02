@@ -91,6 +91,7 @@ static const char *type_name(s_type *t) {
     case S_TYPE_FN: return "fn";
     case S_TYPE_RECORD: return t->record_name ? t->record_name : "record";
     case S_TYPE_VOID: return "void";
+    case S_TYPE_VAR: return "type parameter";
     }
     return "?";
 }
