@@ -367,6 +367,57 @@ static void test_const_forward_ref(void) {
     s_arena_dispose(&arena);
 }
 
+static void test_generic_valid(void) {
+    const char *src =
+        "func id<T>(x: T) -> T { return x; }\n"
+        "func main() -> int {\n"
+        "    return id(42);\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(ok);
+    CHECK_EQ_INT(s_diag_has_errors(&d), 0);
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_generic_mismatch(void) {
+    const char *src =
+        "func pair<T>(a: T, b: T) -> [T] { return [a, b]; }\n"
+        "func main() -> int {\n"
+        "    let p = pair(1, 2);\n"
+        "    return p[0];\n"
+        "}\n"
+        "func bad() -> int {\n"
+        "    let q = pair(1, \"two\");\n"
+        "    return 0;\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_generic_arith_on_t(void) {
+    const char *src =
+        "func bad<T>(x: T) -> T { return x + 1; }\n"
+        "func main() -> int { return 0; }\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
 static void test_lambda_valid(void) {
     const char *src =
         "func make(n: int) -> fn(int) -> int {\n"
@@ -441,6 +492,9 @@ TEST_MAIN_BEGIN()
     test_record_init_type_mismatch();
     test_duplicate_function();
     test_duplicate_record();
+    test_generic_valid();
+    test_generic_mismatch();
+    test_generic_arith_on_t();
     test_lambda_valid();
     test_lambda_dynamic_call();
     test_lambda_not_function();

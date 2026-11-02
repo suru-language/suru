@@ -1,0 +1,18 @@
+func id<T>(x: T) -> T { return x; }
+func first<T>(a: [T]) -> T { return a[0]; }
+func pair<T>(a: T, b: T) -> [T] { return [a, b]; }
+func make<T>(x: T) -> fn() -> T {
+    return fn() -> T { return x; };
+}
+func main() {
+    println(to_str(id(42)));
+    println(id("hi"));
+    println(f64_to_str(id(1.5)));
+    let arr = [10, 20, 30];
+    println(to_str(first(arr)));
+    let p = pair(1, 2);
+    println(to_str(array_len(p)));
+    println(to_str(p[0]));
+    let g = make(7);
+    println(to_str(g()));
+}

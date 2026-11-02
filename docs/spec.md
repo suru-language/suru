@@ -153,6 +153,24 @@ func main() {
 Calls through function-typed values (variable, array element, record field, or
 expression) are dispatched dynamically at runtime.
 
+## 6.1 Generics
+
+A function may declare type parameters and use them in parameter and return
+types:
+
+```
+func id<T>(x: T) -> T { return x; }
+func first<T>(a: [T]) -> T { return a[0]; }
+```
+
+A call to a generic function infers the type arguments from the argument
+types and checks the call against the instantiated signature. The function
+body is compiled once and is restricted to **type-independent operations**:
+a type parameter may be passed around, stored in arrays/records, and returned,
+but operations that require a concrete type (arithmetic, comparison, field
+access, indexing into `T` itself) are rejected. Generic functions compose and
+may return closures that capture values of a type parameter.
+
 ### 3.4 Records
 
 A record is a named, heterogeneous aggregate declared with `type`:
