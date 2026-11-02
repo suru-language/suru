@@ -15,6 +15,7 @@ typedef struct s_cont {
     s_u32 pc;
     s_size fp;
     s_u32 fid;
+    s_size ret_slot;   /* caller operand slot where the result must be written */
 } s_cont;
 
 struct s_vm {
@@ -919,7 +920,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 vm->st[i] = s_val_int(0);
             if (!grow_calls(vm)) { vm_trap(vm, "call stack overflow"); return 1; }
             vm->calls[vm->ncalls++] =
-                (s_cont){ pc + 1, vm->fp, vm->cur_fid };
+                (s_cont){ pc + 1, vm->fp, vm->cur_fid, fp_new };
             vm->cur_fid = callee;
             vm->fp = fp_new;
             vm->sp = fp_new + cf->frame_size;
@@ -994,7 +995,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 return 1;
             }
             vm->calls[vm->ncalls++] =
-                (s_cont){ pc + 1, vm->fp, vm->cur_fid };
+                (s_cont){ pc + 1, vm->fp, vm->cur_fid, fp_new };
             vm->cur_fid = callee;
             vm->fp = fp_new;
             vm->sp = fp_new + cf->frame_size;
@@ -1018,7 +1019,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             vm->cur_fid = c.fid;
             f = &m->funcs[c.fid];
             vm->fp = c.fp;
-            vm->sp = vm->fp + f->frame_size;
+            vm->sp = c.ret_slot;
             if (!push(vm, result)) return 1;
             pc = c.pc;
             break;

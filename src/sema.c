@@ -288,11 +288,7 @@ static s_type *check_call(s_sema *S, s_expr *e) {
     if (callee->kind == S_EXPR_VAR) {
         fname = callee->u.var.name;
     }
-    if (!fname) {
-        s_diag_error(S->diag, e->loc, 410, "callee is not a function name");
-        return type_unit(S);
-    }
-    s_func_decl *f = resolve_function(S, fname);
+    s_func_decl *f = fname ? resolve_function(S, fname) : NULL;
     if (f) {
         if (e->u.call.nargs != f->nparams) {
             s_diag_error(S->diag, e->loc, 412,
@@ -311,7 +307,7 @@ static s_type *check_call(s_sema *S, s_expr *e) {
         return f->ret_type;
     }
 
-    const s_builtin_sig *bi = s_builtin_lookup(fname);
+    const s_builtin_sig *bi = fname ? s_builtin_lookup(fname) : NULL;
     if (bi) {
         if (e->u.call.nargs != bi->nparams) {
             s_diag_error(S->diag, e->loc, 414,
@@ -332,7 +328,7 @@ static s_type *check_call(s_sema *S, s_expr *e) {
     }
 
     {
-        int ridx = resolve_record_name(S, fname);
+        int ridx = fname ? resolve_record_name(S, fname) : -1;
         if (ridx >= 0) {
             s_record_decl *rec = &S->mod->records[ridx];
             if (e->u.call.nargs != rec->nfields) {
@@ -382,7 +378,9 @@ static s_type *check_call(s_sema *S, s_expr *e) {
         }
     }
 
-    s_diag_error(S->diag, e->loc, 411, "unknown function '%s'", fname);
+    s_diag_error(S->diag, e->loc, 411,
+                 fname ? "unknown function '%s'" : "callee is not a function",
+                 fname ? fname : "");
     return type_unit(S);
 }
 
@@ -646,15 +644,21 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
         }
         if (S->lambda_owner && odepth >= 0 &&
             odepth < S->lambda_owner->u.lambda.base_depth) {
-            /* captured from an enclosing function scope */
+            /* captured from an enclosing function scope; dedup by source slot */
             s_expr *lam = S->lambda_owner;
-            int idx = lam->u.lambda.ncaptures;
-            int *ncap = realloc(lam->u.lambda.cap_src,
-                                sizeof(int) * (s_size)(idx + 1));
-            if (!ncap) return type_unit(S);
-            ncap[idx] = sym->index;
-            lam->u.lambda.cap_src = ncap;
-            lam->u.lambda.ncaptures = idx + 1;
+            int idx = -1;
+            for (int k = 0; k < lam->u.lambda.ncaptures; ++k) {
+                if (lam->u.lambda.cap_src[k] == sym->index) { idx = k; break; }
+            }
+            if (idx < 0) {
+                idx = lam->u.lambda.ncaptures;
+                int *ncap = realloc(lam->u.lambda.cap_src,
+                                    sizeof(int) * (s_size)(idx + 1));
+                if (!ncap) return type_unit(S);
+                ncap[idx] = sym->index;
+                lam->u.lambda.cap_src = ncap;
+                lam->u.lambda.ncaptures = idx + 1;
+            }
             e->u.var.is_capture = true;
             e->u.var.capture_index = idx;
             e->u.var.is_mut = sym->is_mut;
