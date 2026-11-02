@@ -670,6 +670,166 @@ static bool gen_stmt(s_gen *g, const s_stmt *s, const s_loopctx *loop) {
     return false;
 }
 
+/* Remove instructions unreachable from entry (following control flow) and
+ * remap branch targets. Returns false on allocation failure. */
+static bool dce_func(s_bc_ins **pins, s_u32 *pnin) {
+    s_bc_ins *ins = *pins;
+    s_u32 n = *pnin;
+    if (n == 0) return true;
+    unsigned char *reach = calloc(n, 1);
+    s_u32 *stack = malloc(sizeof(s_u32) * n);
+    if (!reach || !stack) { free(reach); free(stack); return false; }
+    s_u32 top = 0;
+    reach[0] = 1;
+    stack[top++] = 0;
+    while (top) {
+        s_u32 u = stack[--top];
+        const s_bc_op_info *info = &s_bc_op_table[ins[u].op];
+        if (info->is_branch) {
+            s_u32 tgt = ins[u].a;
+            if (tgt < n && !reach[tgt]) { reach[tgt] = 1; stack[top++] = tgt; }
+            if (ins[u].op != BC_JMP) {
+                s_u32 nx = u + 1;
+                if (nx < n && !reach[nx]) { reach[nx] = 1; stack[top++] = nx; }
+            }
+        } else if (!info->is_terminal) {
+            s_u32 nx = u + 1;
+            if (nx < n && !reach[nx]) { reach[nx] = 1; stack[top++] = nx; }
+        }
+    }
+    s_u32 m = 0;
+    for (s_u32 i = 0; i < n; ++i) if (reach[i]) m++;
+    if (m == n) { free(reach); free(stack); return true; }
+    s_u32 *map = malloc(sizeof(s_u32) * n);
+    s_bc_ins *ni = malloc(sizeof(s_bc_ins) * m);
+    if (!map || !ni) { free(reach); free(stack); free(map); free(ni); return false; }
+    s_u32 j = 0;
+    for (s_u32 i = 0; i < n; ++i) {
+        if (reach[i]) { map[i] = j; ni[j] = ins[i]; j++; }
+    }
+    for (s_u32 k = 0; k < m; ++k) {
+        if (s_bc_op_table[ni[k].op].is_branch) ni[k].a = map[ni[k].a];
+    }
+    free(ins);
+    free(map);
+    free(reach);
+    free(stack);
+    *pins = ni;
+    *pnin = m;
+    return true;
+}
+
+/* Fold `const X; const Y; pureop` triples into a single constant. Very safe:
+ * contiguous constant pushes are always the op's two operands. We skip any
+ * window that is a branch target. Returns false on allocation failure. */
+static bool fold_lookup(s_pool *pool, s_u8 op, s_i64 x, s_i64 y,
+                        s_u8 *nop, s_u32 *nidx, bool *ok) {
+    *ok = true;
+    s_i64 r;
+    switch (op) {
+    case BC_ADD_I: r = x + y; break;
+    case BC_SUB_I: r = x - y; break;
+    case BC_MUL_I: r = x * y; break;
+    case BC_DIV_I:
+        if (y == 0) { *ok = false; return true; }
+        r = x / y; break;
+    case BC_MOD_I:
+        if (y == 0) { *ok = false; return true; }
+        r = x % y; break;
+    case BC_BIT_AND: r = x & y; break;
+    case BC_BIT_OR: r = x | y; break;
+    case BC_BIT_XOR: r = x ^ y; break;
+    case BC_SHL: r = (y >= 64) ? 0 : (s_i64)((s_u64)x << y); break;
+    case BC_SHR: r = (y >= 64) ? 0 : (s_i64)((s_u64)x >> y); break;
+    case BC_EQ_I: r = x == y; break;
+    case BC_NE_I: r = x != y; break;
+    case BC_LT_I: r = x < y; break;
+    case BC_LE_I: r = x <= y; break;
+    case BC_GT_I: r = x > y; break;
+    case BC_GE_I: r = x >= y; break;
+    default: *ok = false; return true;
+    }
+    if (!pool_add_int(pool, r, nidx)) { *ok = false; return false; }
+    *nop = BC_CONST_INT;
+    return true;
+}
+
+static bool fold_lookup_f(s_pool *pool, s_u8 op, double x, double y,
+                          s_u8 *nop, s_u32 *nidx, bool *ok) {
+    *ok = true;
+    double r;
+    switch (op) {
+    case BC_ADD_F: r = x + y; break;
+    case BC_SUB_F: r = x - y; break;
+    case BC_MUL_F: r = x * y; break;
+    case BC_DIV_F: r = x / y; break;
+    case BC_EQ_F: r = x == y; break;
+    case BC_NE_F: r = x != y; break;
+    case BC_LT_F: r = x < y; break;
+    case BC_LE_F: r = x <= y; break;
+    case BC_GT_F: r = x > y; break;
+    case BC_GE_F: r = x >= y; break;
+    default: *ok = false; return true;
+    }
+    if (!pool_add_float(pool, r, nidx)) { *ok = false; return false; }
+    *nop = BC_CONST_FLOAT;
+    return true;
+}
+
+static bool fold_func(s_bc_ins **pins, s_u32 *pnin, s_pool *pool) {
+    s_bc_ins *ins = *pins;
+    s_u32 n = *pnin;
+    if (n < 3) return true;
+    unsigned char *target = calloc(n, 1);
+    if (!target) return false;
+    for (s_u32 i = 0; i < n; ++i) {
+        if (s_bc_op_table[ins[i].op].is_branch && ins[i].a < n)
+            target[ins[i].a] = 1;
+    }
+    s_u32 *map = malloc(sizeof(s_u32) * n);
+    s_bc_ins *ni = malloc(sizeof(s_bc_ins) * n);
+    if (!map || !ni) { free(target); free(map); free(ni); return false; }
+    s_u32 m = 0;
+    for (s_u32 i = 0; i < n;) {
+        bool folded = false;
+        if (i + 2 < n && !target[i] && !target[i + 1] && !target[i + 2]) {
+            s_u8 a = ins[i].op, b = ins[i + 1].op, c = ins[i + 2].op;
+            if (a == BC_CONST_INT && b == BC_CONST_INT) {
+                s_u8 nop; s_u32 nidx; bool ok;
+                if (!fold_lookup(pool, c, ins[i].a, ins[i + 1].a,
+                                 &nop, &nidx, &ok))
+                    { free(target); free(map); free(ni); return false; }
+                if (ok) {
+                    map[i] = m;
+                    ni[m].op = nop; ni[m].a = nidx; ni[m].b = 0; ni[m].c = 0;
+                    m++; i += 3; folded = true;
+                }
+            } else if (a == BC_CONST_FLOAT && b == BC_CONST_FLOAT) {
+                double x = pool->floats[ins[i].a];
+                double y = pool->floats[ins[i + 1].a];
+                s_u8 nop; s_u32 nidx; bool ok;
+                if (!fold_lookup_f(pool, c, x, y, &nop, &nidx, &ok))
+                    { free(target); free(map); free(ni); return false; }
+                if (ok) {
+                    map[i] = m;
+                    ni[m].op = nop; ni[m].a = nidx; ni[m].b = 0; ni[m].c = 0;
+                    m++; i += 3; folded = true;
+                }
+            }
+        }
+        if (!folded) { map[i] = m; ni[m++] = ins[i]; i++; }
+    }
+    for (s_u32 k = 0; k < m; ++k) {
+        if (s_bc_op_table[ni[k].op].is_branch) ni[k].a = map[ni[k].a];
+    }
+    free(target);
+    free(map);
+    free(ins);
+    *pins = ni;
+    *pnin = m;
+    return true;
+}
+
 static s_u32 max_user_slot(const s_stmt *s, s_u32 cur) {
     switch (s->kind) {
     case S_STMT_LET:
@@ -756,6 +916,12 @@ bool s_bcc_run(const s_module *ast, s_arena *arena, s_diag_ctx *diag,
             }
         }
         finalize_labels(&g.e, &g.labels);
+        if (!dce_func(&g.e.ins, &g.e.nins)) {
+            g.ok = false;
+        }
+        if (!fold_func(&g.e.ins, &g.e.nins, &g.pool)) {
+            g.ok = false;
+        }
         if (getenv("SURU_BCC_DUMP")) {
             fprintf(stderr, "func %zu '%s' n=%u frame=%u:\n",
                     f, fn->name, g.e.nins, g.frame_max);
