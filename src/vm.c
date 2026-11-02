@@ -163,6 +163,13 @@ static bool fmt_scalar(s_value v, char *buf, s_size bufsz,
     return false;
 }
 
+static bool push_str_from_buf(s_vm *vm, const char *buf, s_size len) {
+    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
+    if (!o) return false;
+    if (len) memcpy(s_obj_str_data(o), buf, len);
+    return push(vm, s_val_obj(o));
+}
+
 static bool builtin_print(s_vm *vm, bool newline) {
     s_value s = pop(vm);
     char buf[64];
@@ -427,6 +434,47 @@ static bool builtin_exit(s_vm *vm) {
     return push(vm, s_val_none());
 }
 
+static bool builtin_to_hex(s_vm *vm) {
+    s_value v = pop(vm);
+    if (v.tag != S_VAL_INT) { vm_trap(vm, "to_hex expects an int"); return false; }
+    char buf[80];
+    int n = snprintf(buf, sizeof buf, "%llx", (unsigned long long)v.u.i);
+    s_size len = (n < (int)sizeof buf) ? (s_size)n : sizeof buf - 1;
+    return push_str_from_buf(vm, buf, len);
+}
+
+static bool builtin_to_bin(s_vm *vm) {
+    s_value v = pop(vm);
+    if (v.tag != S_VAL_INT) { vm_trap(vm, "to_bin expects an int"); return false; }
+    unsigned long long x = (unsigned long long)v.u.i;
+    char buf[80];
+    s_size len = 0;
+    int started = 0;
+    for (int b = 63; b >= 0; --b) {
+        int bit = (int)((x >> b) & 1u);
+        if (bit || started) buf[len++] = (char)(bit ? '1' : '0');
+        started |= bit;
+    }
+    if (!started) buf[len++] = '0';
+    return push_str_from_buf(vm, buf, len);
+}
+
+static bool builtin_f64_to_str_prec(s_vm *vm) {
+    s_value p = pop(vm);
+    s_value f = pop(vm);
+    if (f.tag != S_VAL_FLOAT || p.tag != S_VAL_INT) {
+        vm_trap(vm, "f64_to_str_prec expects (float, int)");
+        return false;
+    }
+    int prec = (int)p.u.i;
+    if (prec < 0) prec = 0;
+    if (prec > 20) prec = 20;
+    char buf[64];
+    int n = snprintf(buf, sizeof buf, "%.*f", prec, f.u.f);
+    s_size len = (n < (int)sizeof buf) ? (s_size)n : sizeof buf - 1;
+    return push_str_from_buf(vm, buf, len);
+}
+
 static bool builtin_str_to_f64(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
@@ -465,6 +513,9 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_RANGE_STEP: return builtin_range_step(vm);
     case S_BUILTIN_ASSERT: return builtin_assert(vm);
     case S_BUILTIN_EXIT: return builtin_exit(vm);
+    case S_BUILTIN_TO_HEX: return builtin_to_hex(vm);
+    case S_BUILTIN_TO_BIN: return builtin_to_bin(vm);
+    case S_BUILTIN_F64_TO_STR_PREC: return builtin_f64_to_str_prec(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

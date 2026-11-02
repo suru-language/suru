@@ -45,6 +45,12 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "assert", 2, { S_SIG_BOOL, S_SIG_STR }, S_SIG_UNIT },
     [S_BUILTIN_EXIT] = {
         "exit", 1, { S_SIG_INT }, S_SIG_UNIT },
+    [S_BUILTIN_TO_HEX] = {
+        "to_hex", 1, { S_SIG_INT }, S_SIG_STR },
+    [S_BUILTIN_TO_BIN] = {
+        "to_bin", 1, { S_SIG_INT }, S_SIG_STR },
+    [S_BUILTIN_F64_TO_STR_PREC] = {
+        "f64_to_str_prec", 2, { S_SIG_FLOAT, S_SIG_INT }, S_SIG_STR },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {

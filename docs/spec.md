@@ -264,6 +264,10 @@ The standard library provides a small set of builtin functions (see
 - `str_to_f64(s: str) -> float` — parse a float from a string.
 - `assert(cond: bool, msg: str)` — trap with `msg` if `cond` is false.
 - `exit(code: int)` — terminate the program immediately with `code`.
+- `to_hex(i: int) -> str` — lowercase hexadecimal (64-bit two's complement).
+- `to_bin(i: int) -> str` — binary.
+- `f64_to_str_prec(f: float, prec: int) -> str` — fixed-point formatting with
+  `prec` digits after the decimal point (clamped to 0..20).
 - `f64_to_i64`, `i64_to_f64` conversions.
 
 The set is intentionally minimal; it will grow through the release roadmap.
