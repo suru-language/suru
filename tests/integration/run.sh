@@ -11,6 +11,7 @@ tests=0
 for src in "$DIR"/*.suru; do
     [ -e "$src" ] || continue
     name="$(basename "$src" .suru)"
+    [ "$name" = "argtest" ] && continue   # handled specially with args
     tests=$((tests + 1))
     outfile="$DIR/$name.out"
     exitfile="$DIR/$name.exit"
