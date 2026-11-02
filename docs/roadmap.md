@@ -26,7 +26,7 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 
 ## 0.3.0 — performance and robustness
 
-- Bytecode optimizer passes (constant folding, dead code elimination).
+- [x] Bytecode optimizer passes: dead code elimination and constant folding.
 - Nursery sizing heuristics; generational collection tuning.
 - Incremental collection groundwork.
 - Fuzz corpus expansion; coverage-guided fuzzing (libFuzzer/AFL).

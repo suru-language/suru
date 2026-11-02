@@ -786,7 +786,7 @@ static bool fold_func(s_bc_ins **pins, s_u32 *pnin, s_pool *pool) {
         if (s_bc_op_table[ins[i].op].is_branch && ins[i].a < n)
             target[ins[i].a] = 1;
     }
-    s_u32 *map = malloc(sizeof(s_u32) * n);
+    s_u32 *map = calloc(n, sizeof(s_u32));
     s_bc_ins *ni = malloc(sizeof(s_bc_ins) * n);
     if (!map || !ni) { free(target); free(map); free(ni); return false; }
     s_u32 m = 0;
@@ -796,7 +796,8 @@ static bool fold_func(s_bc_ins **pins, s_u32 *pnin, s_pool *pool) {
             s_u8 a = ins[i].op, b = ins[i + 1].op, c = ins[i + 2].op;
             if (a == BC_CONST_INT && b == BC_CONST_INT) {
                 s_u8 nop; s_u32 nidx; bool ok;
-                if (!fold_lookup(pool, c, ins[i].a, ins[i + 1].a,
+                if (!fold_lookup(pool, c, pool->ints[ins[i].a],
+                                 pool->ints[ins[i + 1].a],
                                  &nop, &nidx, &ok))
                     { free(target); free(map); free(ni); return false; }
                 if (ok) {

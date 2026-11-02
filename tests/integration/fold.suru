@@ -1,0 +1,9 @@
+func main() {
+    println(to_str(2 + 3));
+    println(to_str(10 * 4));
+    println(to_str(100 / 5));
+    println(to_str(17 % 5));
+    println(to_str(1 << 4));
+    println(f64_to_str(2.5 * 2.0));
+    println(to_str(3 < 5 ? 7 : 8));
+}
