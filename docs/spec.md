@@ -309,6 +309,10 @@ The standard library provides a small set of builtin functions (see
   `prec` digits after the decimal point (clamped to 0..20).
 - `str_repeat(s: str, n: int) -> str` — `s` repeated `n` times.
 - `str_trim(s: str) -> str` — `s` with leading/trailing ASCII whitespace removed.
+- `args_len() -> int` — number of command-line arguments passed to the program.
+- `args(i: int) -> str` — the `i`-th command-line argument (0-based; traps if
+  out of range). Arguments are passed after the source file on the CLI, e.g.
+  `suru run prog.suru a b`.
 - `f64_to_i64`, `i64_to_f64` conversions.
 
 The set is intentionally minimal; it will grow through the release roadmap.

@@ -1,0 +1,5 @@
+func main() {
+    println(to_str(args_len()));
+    if args_len() > 0 { println(args(0)); }
+    if args_len() > 1 { println(args(1)); }
+}

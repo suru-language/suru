@@ -54,6 +54,20 @@ else
     echo "FAIL: sbc-exec (compile failed)"
     fail=$((fail + 1))
 fi
+
+# Program arguments: run argtest.suru with two args.
+tests=$((tests + 1))
+actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "$(cat "$DIR/argtest.out")" ]; then
+    echo "ok: argtest"
+else
+    echo "FAIL: argtest (exit $code)"
+    echo "  got: $actual"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+
 rm -rf "$tmp"
 
 rm -f "$DIR"/.stderr.*

@@ -107,11 +107,11 @@ static int cmd_exec(const char *path) {
 
 static void usage(void) {
     fprintf(stderr,
-            "usage: suru <run|check|compile|exec> <path> [out.sbc]\n"
-            "  run    <file.suru>          compile and run a source file\n"
-            "  check  <file.suru>          compile and type-check only\n"
+            "usage: suru <run|check|compile|exec> <path> [args...]\n"
+            "  run    <file.suru> [args...]   compile and run a source file\n"
+            "  check  <file.suru>             compile and type-check only\n"
             "  compile <file.suru> <out.sbc>  compile to bytecode module\n"
-            "  exec   <module.sbc>         run a precompiled bytecode module\n");
+            "  exec   <module.sbc> [args...]  run a precompiled bytecode module\n");
 }
 
 int main(int argc, char **argv) {
