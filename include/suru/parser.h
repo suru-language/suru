@@ -26,6 +26,9 @@ typedef struct s_parser {
     s_record_decl *records;
     s_size nrecords;
     s_size records_cap;
+    s_const_decl *consts;
+    s_size nconsts;
+    s_size consts_cap;
 } s_parser;
 
 /* Parse a module from source text. Returns true if the parser completed and

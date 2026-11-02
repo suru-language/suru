@@ -680,6 +680,62 @@ static bool parse_func(s_parser *p) {
     return true;
 }
 
+static bool parse_const(s_parser *p) {
+    s_source_loc loc = p->cur.loc;
+    advance(p); /* 'const' */
+    if (!at(p, S_TOK_IDENT)) {
+        s_diag_error(p->diag, p->cur.loc, 355, "expected constant name");
+        return false;
+    }
+    s_const_decl c;
+    memset(&c, 0, sizeof(c));
+    c.name = ident_text(p);
+    c.loc = loc;
+    c.index = (int)p->nconsts;
+    advance(p);
+
+    if (accept(p, S_TOK_COLON)) {
+        c.type = parse_type(p);
+        if (!c.type) return false;
+    }
+
+    if (!expect(p, S_TOK_ASSIGN, 356)) return false;
+
+    bool neg = false;
+    if (at(p, S_TOK_MINUS)) { neg = true; advance(p); }
+    if (at(p, S_TOK_INT)) {
+        c.lit_kind = S_EXPR_INT_LIT;
+        c.v.i = neg ? -p->cur.v.i : p->cur.v.i;
+        advance(p);
+    } else if (at(p, S_TOK_FLOAT)) {
+        c.lit_kind = S_EXPR_FLOAT_LIT;
+        c.v.f = neg ? -p->cur.v.f : p->cur.v.f;
+        advance(p);
+    } else if (!neg && at(p, S_TOK_STR)) {
+        c.lit_kind = S_EXPR_STR_LIT;
+        c.v.str.text = s_arena_strdup(p->arena, p->cur.v.s.text);
+        c.v.str.len = p->cur.v.s.len;
+        advance(p);
+    } else if (!neg && at(p, S_TOK_TRUE)) {
+        c.lit_kind = S_EXPR_BOOL_LIT;
+        c.v.b = true;
+        advance(p);
+    } else if (!neg && at(p, S_TOK_FALSE)) {
+        c.lit_kind = S_EXPR_BOOL_LIT;
+        c.v.b = false;
+        advance(p);
+    } else {
+        s_diag_error(p->diag, p->cur.loc, 357,
+                     "constant initializer must be a literal");
+        return false;
+    }
+
+    if (!expect(p, S_TOK_SEMI, 358)) return false;
+    VEC_PUSH(p->arena, p->consts, p->nconsts, p->consts_cap,
+             sizeof(s_const_decl), c);
+    return true;
+}
+
 static bool parse_record(s_parser *p) {
     s_source_loc loc = p->cur.loc;
     advance(p); /* 'type' */
@@ -739,6 +795,8 @@ bool s_parse(s_parser *p, const char *file, const char *src, s_size len,
             if (!parse_func(p)) { ok = false; }
         } else if (at(p, S_TOK_KW_TYPE)) {
             if (!parse_record(p)) { ok = false; }
+        } else if (at(p, S_TOK_KW_CONST)) {
+            if (!parse_const(p)) { ok = false; }
         } else {
             s_diag_error(diag, p->cur.loc, 350,
                          "unexpected %s at top level",
@@ -752,5 +810,7 @@ bool s_parse(s_parser *p, const char *file, const char *src, s_size len,
     p->mod.nfuncs = p->nfuncs;
     p->mod.records = p->records;
     p->mod.nrecords = p->nrecords;
+    p->mod.consts = p->consts;
+    p->mod.nconsts = p->nconsts;
     return ok;
 }

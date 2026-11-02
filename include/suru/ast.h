@@ -51,6 +51,7 @@ typedef enum s_expr_kind {
     S_EXPR_NONE_LIT,
     S_EXPR_ARRAY_LIT,
     S_EXPR_VAR,               /* identifier reference */
+    S_EXPR_CONST_REF,         /* a named constant used as a value */
     S_EXPR_FUNC_REF,          /* a named function used as a value */
     S_EXPR_CALL,
     S_EXPR_INDEX,
@@ -83,6 +84,7 @@ struct s_expr {
         struct { const char *text; s_size len; } str;
         bool b;
         struct { const char *name; int var_index; bool is_mut; } var;
+        struct { int const_index; } cref;
         struct { s_expr *callee; s_expr **args; s_size nargs; } call;
         struct { s_expr *obj; s_expr *index; } index;
         struct { s_expr *obj; const char *field; int field_index; } field;
@@ -178,11 +180,27 @@ typedef struct s_record_decl {
     s_source_loc loc;
 } s_record_decl;
 
+typedef struct s_const_decl {
+    const char *name;
+    s_type *type;                /* resolved type */
+    int lit_kind;                /* S_EXPR_INT_LIT / FLOAT / STR / BOOL */
+    union {
+        s_i64 i;
+        double f;
+        struct { const char *text; s_size len; } str;
+        bool b;
+    } v;
+    int index;
+    s_source_loc loc;
+} s_const_decl;
+
 typedef struct s_module {
     s_func_decl *funcs;
     s_size nfuncs;
     s_record_decl *records;
     s_size nrecords;
+    s_const_decl *consts;
+    s_size nconsts;
     int main_index;              /* -1 if absent */
     s_source_loc loc;
 } s_module;

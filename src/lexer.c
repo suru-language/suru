@@ -166,6 +166,7 @@ static s_tok_kind keyword_kind(const char *s, s_size len) {
     KW("while", S_TOK_KW_WHILE)
     KW("new", S_TOK_KW_NEW)
     KW("as", S_TOK_KW_AS)
+    KW("const", S_TOK_KW_CONST)
     KW("and", S_TOK_AND)
     KW("or", S_TOK_OR)
     KW("not", S_TOK_NOT)

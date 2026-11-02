@@ -59,6 +59,22 @@ static void scope_pop(s_scope *sc) {
 /* Type utilities                                                      */
 /* ------------------------------------------------------------------ */
 
+static const char *type_kind_name(s_type_kind k) {
+    switch (k) {
+    case S_TYPE_INT: return "int";
+    case S_TYPE_FLOAT: return "float";
+    case S_TYPE_BOOL: return "bool";
+    case S_TYPE_STR: return "str";
+    case S_TYPE_UNIT: return "unit";
+    case S_TYPE_ARRAY: return "[array]";
+    case S_TYPE_FN: return "fn";
+    case S_TYPE_RECORD: return "record";
+    case S_TYPE_VOID: return "void";
+    case S_TYPE_ANY: return "any";
+    }
+    return "?";
+}
+
 static const char *type_name(s_type *t) {
     if (!t) return "?";
     switch (t->kind) {
@@ -690,6 +706,30 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
                 int idx = resolve_record(&S, ft, rec->fields[i].loc);
                 if (idx >= 0) ft->record_index = idx;
             }
+        }
+    }
+
+    /* resolve constants: infer or validate their types */
+    for (s_size ci = 0; ci < mod->nconsts; ++ci) {
+        s_const_decl *c = &mod->consts[ci];
+        s_type_kind k;
+        switch (c->lit_kind) {
+        case S_EXPR_INT_LIT: k = S_TYPE_INT; break;
+        case S_EXPR_FLOAT_LIT: k = S_TYPE_FLOAT; break;
+        case S_EXPR_STR_LIT: k = S_TYPE_STR; break;
+        case S_EXPR_BOOL_LIT: k = S_TYPE_BOOL; break;
+        default: k = S_TYPE_VOID; break;
+        }
+        if (!c->type) {
+            c->type = s_arena_calloc(arena, 1, sizeof(s_type), _Alignof(s_type));
+            if (!c->type) return false;
+            c->type->kind = k;
+            c->type->loc = c->loc;
+        } else if (c->type->kind != k) {
+            s_diag_error(diag, c->loc, 470,
+                         "constant '%s' has type %s, but its value is %s",
+                         c->name, type_name(c->type), type_kind_name(k));
+            ok = false;
         }
     }
 
