@@ -29,6 +29,10 @@ typedef struct s_parser {
     s_const_decl *consts;
     s_size nconsts;
     s_size consts_cap;
+    char **included;         /* resolved paths of files already included */
+    s_size nincluded;
+    s_size included_cap;
+    int file_depth;          /* include recursion guard */
 } s_parser;
 
 /* Parse a module from source text. Returns true if the parser completed and
