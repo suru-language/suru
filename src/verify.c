@@ -31,6 +31,7 @@ static int ins_pushes(const s_bc_module *m, s_u32 fid, const s_bc_ins *in) {
     case BC_NEW_ARRAY:
     case BC_NEW_RECORD:
     case BC_CALL:
+    case BC_CALLV:
         return 1;
     case BC_BUILTIN:
         /* Every builtin pushes a result; unit-returning builtins push none. */
