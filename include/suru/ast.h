@@ -49,6 +49,7 @@ typedef enum s_expr_kind {
     S_EXPR_BOOL_LIT,
     S_EXPR_NONE_LIT,
     S_EXPR_VAR,               /* identifier reference */
+    S_EXPR_FUNC_REF,          /* a named function used as a value */
     S_EXPR_CALL,
     S_EXPR_INDEX,
     S_EXPR_FIELD,

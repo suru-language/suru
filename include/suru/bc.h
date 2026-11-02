@@ -51,6 +51,8 @@ typedef enum s_bc_op {
     BC_FIELD_ST,       /* a = record type index, b = field index; pops value, record */
 
     BC_CALL,           /* a = function index; pops nargs, pushes result */
+    BC_MKCLOSURE,      /* a = function index; pushes a closure referencing it */
+    BC_CALLV,          /* a = nargs; pops closure + nargs, pushes result */
     BC_BUILTIN,        /* a = builtin id */
 
     BC_RET,            /* pops result, returns */
