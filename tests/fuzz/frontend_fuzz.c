@@ -10,6 +10,7 @@
 #include "suru/sema.h"
 #include "suru/bcc.h"
 #include "suru/bc.h"
+#include "suru/verify.h"
 
 static void run_source(const char *src, size_t len) {
     s_arena arena;
@@ -22,6 +23,7 @@ static void run_source(const char *src, size_t len) {
             if (s_sema_run(&p.mod, &arena, &d)) {
                 s_bc_module m;
                 if (s_bcc_run(&p.mod, &arena, &d, &m)) {
+                    (void)s_verify_module(&m); /* check optimizer output */
                     s_bc_module_dispose(&m);
                 }
             }
