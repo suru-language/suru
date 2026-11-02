@@ -408,6 +408,8 @@ static s_expr *parse_assignment(s_parser *p) {
     return e;
 }
 
+static s_stmt *parse_block(s_parser *p);
+
 static s_expr *parse_lambda(s_parser *p) {
     s_source_loc loc = p->cur.loc;
     advance(p); /* 'fn' */

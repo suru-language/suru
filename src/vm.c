@@ -969,17 +969,25 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             }
             s_u32 callee = (s_u32)fnv.u.i;
             const s_bc_func *cf = &m->funcs[callee];
-            if (cf->nparams != nargs) {
+            bool has_env = (cl.u.o->count == 2);
+            s_u32 want = has_env ? nargs + 1 : nargs;
+            if (cf->nparams != want) {
                 vm_trap(vm, "call_v arity mismatch");
                 return 1;
             }
-            s_size fp_new = closure_slot + 1;
+            s_size fp_new;
+            if (has_env) {
+                vm->st[closure_slot] = s_obj_array_data(cl.u.o)[1];
+                fp_new = closure_slot;
+            } else {
+                fp_new = closure_slot + 1;
+            }
             s_size need = fp_new + cf->frame_size + cf->max_operand_depth + 4;
             if (!grow_stack(vm, need)) {
                 vm_trap(vm, "stack overflow in call");
                 return 1;
             }
-            for (s_size i = fp_new + nargs; i < fp_new + cf->frame_size; ++i)
+            for (s_size i = fp_new + want; i < fp_new + cf->frame_size; ++i)
                 vm->st[i] = s_val_int(0);
             if (!grow_calls(vm)) {
                 vm_trap(vm, "call stack overflow");

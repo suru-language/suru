@@ -520,6 +520,8 @@ static s_type *lambda_type(s_sema *S, const s_func_decl *f) {
     return t;
 }
 
+static bool check_block(s_sema *S, s_stmt *blk);
+
 static s_type *check_lambda(s_sema *S, s_expr *e) {
     int fidx = e->u.lambda.func_index;
     if (fidx < 0 || fidx >= (int)S->mod->nfuncs) return type_unit(S);
