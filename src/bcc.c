@@ -275,6 +275,15 @@ static bool gen_call(s_gen *g, const s_expr *e) {
         target = callee->u.var.var_index;
     } else if (callee->kind == S_EXPR_VAR) {
         classify_call(g->ast, callee->u.var.name, &kind, &target);
+        if (kind == S_CALL_FUNC && target < 0) {
+            /* dynamic call through a function-typed value */
+            if (!gen_expr(g, callee)) return false;
+            for (s_size i = 0; i < e->u.call.nargs; ++i) {
+                if (!gen_expr(g, e->u.call.args[i])) return false;
+            }
+            EM3(BC_CALLV, (s_u32)e->u.call.nargs, 0, 0);
+            return true;
+        }
     } else {
         /* dynamic call through a function-typed value */
         if (!gen_expr(g, callee)) return false;
@@ -715,6 +724,14 @@ bool s_bcc_run(const s_module *ast, s_arena *arena, s_diag_ctx *diag,
             }
         }
         finalize_labels(&g.e, &g.labels);
+        if (getenv("SURU_BCC_DUMP")) {
+            fprintf(stderr, "func %zu '%s' n=%u frame=%u:\n",
+                    f, fn->name, g.e.nins, g.frame_max);
+            for (s_u32 i = 0; i < g.e.nins; ++i)
+                fprintf(stderr, "  %u op=%-10s a=%u b=%u\n", i,
+                        s_bc_op_table[g.e.ins[i].op].name,
+                        g.e.ins[i].a, g.e.ins[i].b);
+        }
         bf->frame_size = g.frame_max;
         bf->nins = g.e.nins;
         bf->ins = g.e.ins;
