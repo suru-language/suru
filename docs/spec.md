@@ -255,6 +255,8 @@ re-checks the call site's operand types.
 - `while cond { ... }` loops. `break` exits the innermost loop; `continue`
   jumps to the loop condition.
 - `for x in arr { ... }` iterates array elements by reference.
+- `do { ... } while (cond);` runs the body once, then repeats while `cond` is
+  true.
 - `for ch in str { ... }` iterates the characters (one-character strings) of a
   string.
 

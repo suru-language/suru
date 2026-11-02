@@ -61,6 +61,7 @@ expr_stmt     = expression ";"
 return_stmt   = "return" [ expression ] ";"
 if_stmt       = "if" expression block [ "else" (if_stmt | block) ]
 while_stmt    = "while" expression block
+do_stmt       = "do" block "while" "(" expression ")" ";"
 for_stmt      = "for" identifier "in" expression block
 break_stmt    = "break" ";"
 continue_stmt = "continue" ";"
