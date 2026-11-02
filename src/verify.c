@@ -14,6 +14,8 @@ static int ins_pops(const s_bc_module *m, s_u32 fid, const s_bc_ins *in) {
     case BC_CALL:
         if (in->a >= m->nfuncs) return -1;
         return (int)m->funcs[in->a].nparams;
+    case BC_CALLV:
+        return (int)in->a + 1;
     case BC_BUILTIN:
         if (in->a >= S_BUILTIN_COUNT) return -1;
         return (int)s_builtin_table[in->a].nparams;
