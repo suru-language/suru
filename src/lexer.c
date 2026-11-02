@@ -155,6 +155,7 @@ static s_tok_kind keyword_kind(const char *s, s_size len) {
     KW("else", S_TOK_KW_ELSE)
     KW("for", S_TOK_KW_FOR)
     KW("func", S_TOK_KW_FUNC)
+    KW("fn", S_TOK_KW_FUNC)
     KW("if", S_TOK_KW_IF)
     KW("in", S_TOK_KW_IN)
     KW("let", S_TOK_KW_LET)
