@@ -102,6 +102,15 @@ analyze:
 		clang --analyze $(BASE) $$s || exit 1; \
 	done
 
+.PHONY: ci
+ci:
+	$(MAKE) clean && $(MAKE) test
+	$(MAKE) clean && $(MAKE) release
+	$(MAKE) clean && $(MAKE) asan-test
+	$(MAKE) analyze
+	$(MAKE) clean && $(MAKE) fuzz
+	$(MAKE) clean && $(MAKE)
+
 .PHONY: clean
 clean:
 	rm -rf $(BUILD)

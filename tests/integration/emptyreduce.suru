@@ -1,0 +1,3 @@
+func main() {
+    println(to_str(array_sum([])));
+}

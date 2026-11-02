@@ -30,6 +30,10 @@ The compiler frontend (lexer → bytecode compiler) is a separate program from
 the runtime/VM. The VM accepts *only* verified bytecode. The verifier runs
 before any code executes, and the VM refuses to run an unverified module.
 
+The parser supports `use "mod.suru"` module includes, resolved relative to the
+containing file and then via the `SURU_MOD_PATH` search path; includes are
+idempotent and recursion is bounded.
+
 ## 2. Source layout
 
 ```
@@ -73,7 +77,9 @@ the whole AST is freed when compilation of a module finishes.
 Resolves names, infers and checks types, and rejects ill-formed programs. It
 produces a typed AST with resolved symbol references. It also computes for
 each function the maximum operand-stack depth required, which the bytecode
-compiler uses for stack allocation.
+compiler uses for stack allocation. It implements generic functions
+(type-erased type parameters with per-call inference) and closure capture
+analysis (capture-by-value environments).
 
 ### 3.6 Bytecode format (`bc.h`)
 
@@ -85,8 +91,10 @@ into the format. See `docs/bytecode.md` (section 7 below).
 ### 3.7 Bytecode compiler (`bcc.c`)
 
 Lowers the typed AST into an execution's bytecode module. Emits constants,
-functions, and instructions. The output is always structurally valid; the
-verifier is the authority on module validity.
+functions, and instructions. A small optimizer runs on each emitted function
+before verification: dead-code elimination and constant folding. The output
+is always structurally valid; the verifier is the authority on module
+validity.
 
 ### 3.8 Bytecode verifier (`verify.c`)
 
