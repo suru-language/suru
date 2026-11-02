@@ -93,6 +93,19 @@ bool s_diag_has_errors(const s_diag_ctx *ctx) {
     return ctx->error_count > 0;
 }
 
+static void print_ctx_line(const char *s, s_size n, s_size start, s_size end,
+                           s_u32 lineno) {
+    fprintf(stderr, "%5u | ", lineno);
+    s_size i = start;
+    while (i < end && i < n) {
+        char c = s[i];
+        if (c == '\n' || c == '\r') break;
+        fputc(c, stderr);
+        i++;
+    }
+    fputc('\n', stderr);
+}
+
 static void print_snippet(const s_diag_ctx *ctx, const s_diag *d) {
     if (!ctx->src || d->loc.line == 0) return;
     const char *s = ctx->src;
@@ -104,21 +117,32 @@ static void print_snippet(const s_diag_ctx *ctx, const s_diag *d) {
         pos++;
     }
     if (cur != d->loc.line) return;
-    char buf[256];
-    s_size cap = 0;
-    while (pos < n && s[pos] != '\n' && cap + 1 < sizeof(buf)) {
-        buf[cap++] = s[pos++];
+    s_size ts = pos;
+    s_size te = ts;
+    while (te < n && s[te] != '\n') te++;
+    s_size ps = ts;
+    if (ts > 0 && s[ts - 1] == '\n') {
+        s_size p = ts - 1;
+        while (p > 0 && s[p - 1] != '\n') p--;
+        ps = p;
     }
-    while (cap > 0 && buf[cap - 1] == '\r') cap--;
-    buf[cap] = '\0';
-    fprintf(stderr, "      | %s\n", buf);
+    s_size ns = te + 1;
+    s_size ne = ns;
+    while (ne < n && s[ne] != '\n') ne++;
+
+    if (ps < ts) print_ctx_line(s, n, ps, ts, d->loc.line - 1);
+    print_ctx_line(s, n, ts, te, d->loc.line);
+
+    s_size cap = te - ts;
     s_u32 col = d->loc.col;
     if (col < 1) col = 1;
     fprintf(stderr, "      | ");
     s_u32 i;
-    for (i = 1; i < col && i <= cap; ++i) fputc(' ', stderr);
+    for (i = 1; i < col && i <= (s_u32)cap; ++i) fputc(' ', stderr);
     fputc('^', stderr);
     fputc('\n', stderr);
+
+    if (ns < n) print_ctx_line(s, n, ns, ne, d->loc.line + 1);
 }
 
 void s_diag_print(const s_diag_ctx *ctx) {
