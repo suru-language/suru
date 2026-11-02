@@ -220,12 +220,6 @@ static s_type *check_unary(s_sema *S, s_expr *e) {
         }
         return ot;
     }
-    if (ot->kind != S_TYPE_INT && ot->kind != S_TYPE_FLOAT) {
-        s_diag_error(S->diag, e->loc, 402,
-                     "unary '-' requires a numeric operand, got %s", type_name(ot));
-        return type_unit(S);
-    }
-    return ot;
     if (e->u.unary.op == S_UN_BITNOT) {
         if (ot->kind != S_TYPE_INT) {
             s_diag_error(S->diag, e->loc, 402,
@@ -234,6 +228,13 @@ static s_type *check_unary(s_sema *S, s_expr *e) {
         }
         return ot;
     }
+    if (ot->kind != S_TYPE_INT && ot->kind != S_TYPE_FLOAT) {
+        s_diag_error(S->diag, e->loc, 402,
+                     "unary '-' requires a numeric operand, got %s", type_name(ot));
+        return type_unit(S);
+    }
+    return ot;
+}
 
 static s_type *check_binary(s_sema *S, s_expr *e) {
     s_type *lt = check_expr(S, e->u.binary.lhs);
@@ -273,6 +274,15 @@ static s_type *check_binary(s_sema *S, s_expr *e) {
         }
         /* fallthrough */
         break;
+    case S_BIN_BIT_AND: case S_BIN_BIT_OR: case S_BIN_BIT_XOR:
+    case S_BIN_SHL: case S_BIN_SHR:
+        if (lt->kind != S_TYPE_INT || rt->kind != S_TYPE_INT) {
+            s_diag_error(S->diag, e->loc, 408,
+                         "bitwise/shift operators require int operands, got %s and %s",
+                         type_name(lt), type_name(rt));
+            return type_unit(S);
+        }
+        return lt;
     case S_BIN_AND: case S_BIN_OR:
         if (lt->kind != S_TYPE_BOOL || rt->kind != S_TYPE_BOOL) {
             s_diag_error(S->diag, e->loc, 407,

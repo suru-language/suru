@@ -813,6 +813,32 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
         case BC_ADD_F: case BC_SUB_F: case BC_MUL_F: case BC_DIV_F:
             if (!arith_f(vm, in->op)) return 1;
             pc++; break;
+        case BC_BIT_AND: case BC_BIT_OR: case BC_BIT_XOR:
+        case BC_SHL: case BC_SHR: {
+            s_value b = pop(vm);
+            s_value a = pop(vm);
+            if (a.tag != S_VAL_INT || b.tag != S_VAL_INT) {
+                vm_trap(vm, "bitwise/shift operation on non-int");
+                return 1;
+            }
+            s_u64 x = (s_u64)a.u.i, y = (s_u64)b.u.i;
+            s_i64 r;
+            switch (in->op) {
+            case BC_BIT_AND: r = (s_i64)(x & y); break;
+            case BC_BIT_OR: r = (s_i64)(x | y); break;
+            case BC_BIT_XOR: r = (s_i64)(x ^ y); break;
+            case BC_SHL: r = (y >= 64) ? 0 : (s_i64)(x << y); break;
+            default: r = (y >= 64) ? 0 : (s_i64)(x >> y); break;
+            }
+            if (!push(vm, s_val_int(r))) return 1;
+            pc++; break;
+        }
+        case BC_BIT_NOT: {
+            s_value a = pop(vm);
+            if (a.tag != S_VAL_INT) { vm_trap(vm, "bitwise not on non-int"); return 1; }
+            if (!push(vm, s_val_int(~a.u.i))) return 1;
+            pc++; break;
+        }
         case BC_EQ_I: case BC_NE_I: case BC_LT_I: case BC_LE_I:
         case BC_GT_I: case BC_GE_I:
             if (!cmp_i(vm, in->op)) return 1;

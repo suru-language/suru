@@ -260,6 +260,11 @@ static bool push_bin_op(s_gen *g, const s_expr *e) {
     case S_BIN_LE: EM(is_float ? BC_LE_F : is_str ? BC_LE_S : BC_LE_I); break;
     case S_BIN_GT: EM(is_float ? BC_GT_F : is_str ? BC_GT_S : BC_GT_I); break;
     case S_BIN_GE: EM(is_float ? BC_GE_F : is_str ? BC_GE_S : BC_GE_I); break;
+    case S_BIN_BIT_AND: EM(BC_BIT_AND); break;
+    case S_BIN_BIT_OR: EM(BC_BIT_OR); break;
+    case S_BIN_BIT_XOR: EM(BC_BIT_XOR); break;
+    case S_BIN_SHL: EM(BC_SHL); break;
+    case S_BIN_SHR: EM(BC_SHR); break;
     default: return false;
     }
     return true;
@@ -499,6 +504,8 @@ static bool gen_expr(s_gen *g, const s_expr *e) {
         if (e->u.unary.op == S_UN_NEG) {
             const s_type *t = e->u.unary.operand->type;
             EM(t && t->kind == S_TYPE_FLOAT ? BC_NEG_F : BC_NEG_I);
+        } else if (e->u.unary.op == S_UN_BITNOT) {
+            EM(BC_BIT_NOT);
         } else {
             EM(BC_NOT);
         }
