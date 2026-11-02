@@ -506,6 +506,62 @@ static s_type *check_assign(s_sema *S, s_expr *e) {
     return type_unit(S);
 }
 
+static s_type *lambda_type(s_sema *S, const s_func_decl *f) {
+    s_type *t = s_arena_calloc(S->arena, 1, sizeof(s_type), _Alignof(s_type));
+    if (!t) return NULL;
+    t->kind = S_TYPE_FN;
+    t->nparams = f->nparams - 1;
+    t->ret = f->ret_type;
+    t->params = s_arena_calloc(S->arena, t->nparams ? t->nparams : 1,
+                                sizeof(s_type *), _Alignof(s_type *));
+    if (!t->params) return NULL;
+    for (s_size i = 0; i < t->nparams; ++i)
+        t->params[i] = f->params[i + 1].type;
+    return t;
+}
+
+static s_type *check_lambda(s_sema *S, s_expr *e) {
+    int fidx = e->u.lambda.func_index;
+    if (fidx < 0 || fidx >= (int)S->mod->nfuncs) return type_unit(S);
+    s_func_decl *f = &S->mod->funcs[fidx];
+
+    int saved_slot = S->next_slot;
+    s_scope sc;
+    sc.parent = S->scope;
+    sc.syms = NULL;
+    sc.count = 0;
+    sc.cap = 0;
+    sc.depth = (S->scope ? S->scope->depth : 0) + 1;
+    e->u.lambda.base_depth = sc.depth;
+
+    for (s_size i = 1; i < f->nparams; ++i) {
+        s_sym sym;
+        sym.name = f->params[i].name;
+        sym.type = f->params[i].type;
+        sym.index = f->params[i].index;
+        sym.is_mut = false;
+        if (!scope_push_sym(&sc, sym)) { scope_pop(&sc); return type_unit(S); }
+    }
+
+    s_scope *saved_scope = S->scope;
+    s_func_decl *saved_fn = S->fn;
+    s_expr *saved_lam = S->lambda_owner;
+    S->scope = &sc;
+    S->fn = f;
+    S->lambda_owner = e;
+    S->next_slot = (int)f->nparams;
+
+    check_block(S, f->body);
+
+    S->scope = saved_scope;
+    S->fn = saved_fn;
+    S->lambda_owner = saved_lam;
+    S->next_slot = saved_slot;
+    scope_pop(&sc);
+
+    return lambda_type(S, f);
+}
+
 static s_type *check_expr(s_sema *S, s_expr *e) {
     if (++S->depth > 4096) {
         s_diag_error(S->diag, e->loc, 430, "expression too deep");
@@ -630,6 +686,7 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
     }
     case S_EXPR_CALL: t = check_call(S, e); break;
     case S_EXPR_RECORD_INIT: t = check_record_init(S, e); break;
+    case S_EXPR_LAMBDA: t = check_lambda(S, e); break;
     case S_EXPR_INDEX: t = check_index(S, e); break;
     case S_EXPR_FIELD: t = check_field(S, e); break;
     case S_EXPR_UNARY: t = check_unary(S, e); break;
@@ -670,6 +727,7 @@ static bool check_block(s_sema *S, s_stmt *blk) {
     sc.syms = NULL;
     sc.count = 0;
     sc.cap = 0;
+    sc.depth = S->scope ? S->scope->depth + 1 : 0;
     s_scope *saved = S->scope;
     S->scope = &sc;
     bool ok = true;
