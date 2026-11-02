@@ -562,7 +562,8 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
         break;
     }
     case S_EXPR_VAR: {
-        s_sym *sym = scope_lookup(S->scope, e->u.var.name);
+        int odepth = -1;
+        s_sym *sym = scope_lookup(S->scope, e->u.var.name, &odepth);
         if (!sym) {
             for (s_size ci = 0; ci < S->mod->nconsts; ++ci) {
                 if (strcmp(S->mod->consts[ci].name, e->u.var.name) == 0) {
@@ -583,6 +584,24 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
             s_diag_error(S->diag, e->loc, 431,
                          "unknown variable '%s'", e->u.var.name);
             t = type_unit(S);
+            break;
+        }
+        if (S->lambda_owner && odepth >= 0 &&
+            odepth < S->lambda_owner->u.lambda.base_depth) {
+            /* captured from an enclosing function scope */
+            s_expr *lam = S->lambda_owner;
+            int idx = lam->u.lambda.ncaptures;
+            int *ncap = realloc(lam->u.lambda.cap_src,
+                                sizeof(int) * (s_size)(idx + 1));
+            if (!ncap) return type_unit(S);
+            ncap[idx] = sym->index;
+            lam->u.lambda.cap_src = ncap;
+            lam->u.lambda.ncaptures = idx + 1;
+            e->u.var.is_capture = true;
+            e->u.var.capture_index = idx;
+            e->u.var.is_mut = sym->is_mut;
+            t = sym->type;
+            e->is_lvalue = true;
             break;
         }
         e->u.var.var_index = sym->index;
