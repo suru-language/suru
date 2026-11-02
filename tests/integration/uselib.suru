@@ -1,0 +1,3 @@
+const LIB_CONST = 100;
+func helper(x: int) -> int { return x * 2; }
+type Point { let x: int; let y: int; }

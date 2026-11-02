@@ -1,0 +1,7 @@
+use "uselib.suru";
+func main() {
+    println(to_str(helper(21)));
+    println(to_str(LIB_CONST));
+    let p = Point(3, 4);
+    println(to_str(p.x + p.y));
+}
