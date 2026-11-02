@@ -86,9 +86,32 @@ static int cmd_compile(const char *path, const char *outpath) {
     return 0;
 }
 
+static int cmd_exec(const char *path) {
+    s_size len;
+    char *buf = read_file(path, &len);
+    if (!buf) {
+        fprintf(stderr, "suru: cannot read '%s'\n", path);
+        return 1;
+    }
+    s_bc_module m;
+    if (s_bc_read((const s_u8 *)buf, len, &m) != 0) {
+        fprintf(stderr, "suru: invalid bytecode module '%s'\n", path);
+        free(buf);
+        return 1;
+    }
+    free(buf);
+    int rc = s_driver_run_module(&m);
+    s_bc_module_dispose(&m);
+    return rc;
+}
+
 static void usage(void) {
     fprintf(stderr,
-            "usage: suru <run|check|compile> <file.suru> [out.sbc]\n");
+            "usage: suru <run|check|compile|exec> <path> [out.sbc]\n"
+            "  run    <file.suru>          compile and run a source file\n"
+            "  check  <file.suru>          compile and type-check only\n"
+            "  compile <file.suru> <out.sbc>  compile to bytecode module\n"
+            "  exec   <module.sbc>         run a precompiled bytecode module\n");
 }
 
 int main(int argc, char **argv) {
@@ -122,6 +145,9 @@ int main(int argc, char **argv) {
             return 2;
         }
         return cmd_compile(path, argv[3]);
+    }
+    if (strcmp(cmd, "exec") == 0) {
+        return cmd_exec(path);
     }
     usage();
     return 2;

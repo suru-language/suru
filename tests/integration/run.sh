@@ -36,6 +36,26 @@ for src in "$DIR"/*.suru; do
     echo "ok: $name"
 done
 
+# Bytecode round-trip: compile hello.suru to .sbc and exec it.
+tmp="$(mktemp -d)"
+tests=$((tests + 1))
+if "$SURU" compile "$DIR/hello.suru" "$tmp/hello.sbc" >/dev/null 2>&1 &&
+   [ -s "$tmp/hello.sbc" ]; then
+    actual="$("$SURU" exec "$tmp/hello.sbc" 2>"$tmp/stderr")"
+    code=$?
+    if [ "$code" -eq 0 ] && [ "$actual" = "hello world" ]; then
+        echo "ok: sbc-exec"
+    else
+        echo "FAIL: sbc-exec (exit $code)"
+        sed 's/^/    stderr: /' "$tmp/stderr"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL: sbc-exec (compile failed)"
+    fail=$((fail + 1))
+fi
+rm -rf "$tmp"
+
 rm -f "$DIR"/.stderr.*
 echo "integration: $tests tests, $fail failures"
 [ "$fail" -eq 0 ]

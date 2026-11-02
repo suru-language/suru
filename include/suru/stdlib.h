@@ -26,6 +26,7 @@ typedef enum s_builtin_id {
     S_BUILTIN_RANGE,
     S_BUILTIN_SUBSTR,
     S_BUILTIN_STR_CONTAINS,
+    S_BUILTIN_INT_FROM_STR,
     S_BUILTIN_COUNT
 } s_builtin_id;
 

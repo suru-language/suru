@@ -29,6 +29,8 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "substr", 3, { S_SIG_STR, S_SIG_INT, S_SIG_INT }, S_SIG_STR },
     [S_BUILTIN_STR_CONTAINS] = {
         "str_contains", 2, { S_SIG_STR, S_SIG_STR }, S_SIG_BOOL },
+    [S_BUILTIN_INT_FROM_STR] = {
+        "int_from_str", 1, { S_SIG_STR }, S_SIG_INT },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {

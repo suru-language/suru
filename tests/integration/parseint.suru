@@ -1,0 +1,6 @@
+func main() -> int {
+    println(to_str(int_from_str("123")));
+    println(to_str(int_from_str("-7")));
+    println(to_str(int_from_str("abc")));
+    return 0;
+}

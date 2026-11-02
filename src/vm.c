@@ -260,6 +260,48 @@ static bool builtin_substr(s_vm *vm) {
     return push(vm, s_val_obj(o));
 }
 
+static bool builtin_int_from_str(s_vm *vm) {
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "int_from_str expects a string");
+        return false;
+    }
+    const char *p = s_obj_str_data(s.u.o);
+    s_size n = s_obj_str_len(s.u.o);
+    s_size i = 0;
+    bool neg = false;
+    if (i < n && (p[i] == '-' || p[i] == '+')) {
+        neg = (p[i] == '-');
+        i++;
+    }
+    s_u64 v = 0;
+    bool any = false;
+    while (i < n && p[i] >= '0' && p[i] <= '9') {
+        s_u64 d = (s_u64)(p[i] - '0');
+        if (v > (UINT64_MAX - d) / 10) {
+            vm_trap(vm, "int_from_str overflow");
+            return false;
+        }
+        v = v * 10 + d;
+        any = true;
+        i++;
+    }
+    if (!any) return push(vm, s_val_int(0));
+    if (neg) {
+        if (v > (s_u64)INT64_MAX + 1) {
+            vm_trap(vm, "int_from_str overflow");
+            return false;
+        }
+        if (v == (s_u64)INT64_MAX + 1) return push(vm, s_val_int(INT64_MIN));
+        return push(vm, s_val_int(-(s_i64)v));
+    }
+    if (v > (s_u64)INT64_MAX) {
+        vm_trap(vm, "int_from_str overflow");
+        return false;
+    }
+    return push(vm, s_val_int((s_i64)v));
+}
+
 static bool builtin_str_contains(s_vm *vm) {
     s_value needle = pop(vm);
     s_value hay = pop(vm);
@@ -297,6 +339,7 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_RANGE: return builtin_range(vm);
     case S_BUILTIN_SUBSTR: return builtin_substr(vm);
     case S_BUILTIN_STR_CONTAINS: return builtin_str_contains(vm);
+    case S_BUILTIN_INT_FROM_STR: return builtin_int_from_str(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;
