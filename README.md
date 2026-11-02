@@ -34,10 +34,16 @@ See `docs/architecture.md` for details.
 ## Usage
 
 ```
-suru run    hello.suru
-suru check  bad_syntax.suru
-suru compile hello.suru -o hello.sbc
+suru run hello.suru [args...]   # compile and run (args via args()/args_len())
+suru check hello.suru            # compile and type-check only
+suru compile hello.suru out.sbc  # emit a bytecode module
+suru exec out.sbc [args...]      # run a precompiled module
+suru --version | --help
 ```
+
+Banner `#!` lines are ignored, so `.suru` files can be made directly
+executable. `use "mod.suru"` imports another file, resolved relative to the
+current file and then via the `SURU_MOD_PATH` search path.
 
 ## Layout
 
@@ -48,9 +54,23 @@ src/                implementation
 tests/              unit, integration, fuzz
 ```
 
+## Language features
+
+Functions (first-class, higher-order, returning), **generics** (type-erased
+`func f<T>`), records (positional and named-field construction), arrays and
+strings (indexing, iteration, slicing, split/join), enums, compile-time
+`const` expressions, closures with capture-by-value, `use` module includes,
+and a CLI with program arguments. Operators cover arithmetic (with mixed
+int/float promotion), comparison, logical, bitwise/shift, and a ternary
+conditional. The bytecode optimizer performs dead-code elimination and
+constant folding.
+
 ## Status
 
-Milestone 0.1.0: core toolchain implemented — independent lexer/parser,
-semantic analysis, bytecode compiler, bytecode verifier, stack-based VM, custom
-managed heap with tracing GC, standard library, CLI, and automated tests
-(unit, integration, fuzz, ASan/UBSan, leak). See `docs/roadmap.md`.
+All 0.1.0 through 0.3.0 roadmap items are implemented and tested: independent
+lexer/parser, semantic analysis (including generics), bytecode compiler with
+optimizer passes, bytecode verifier, stack-based VM, custom managed heap with
+tracing GC (tunable threshold), standard library, CLI, and automated tests
+(unit, integration, fuzz, ASan/UBSan, leak). Remaining roadmap items are host
+portability (Windows/macOS/big-endian) and a fuller package system. See
+`docs/roadmap.md`.
