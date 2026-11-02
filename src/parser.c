@@ -855,7 +855,7 @@ static bool parse_func(s_parser *p) {
     advance(p);
 
     const char **tp = NULL;
-    int ntp = 0, tpc = 0;
+    s_size ntp = 0, tpc = 0;
     if (accept(p, S_TOK_LT)) {
         while (!at(p, S_TOK_GT)) {
             if (!at(p, S_TOK_IDENT)) {
@@ -872,7 +872,7 @@ static bool parse_func(s_parser *p) {
     const char **saved_tp = p->tp_names;
     int saved_ntp = p->ntp;
     p->tp_names = tp;
-    p->ntp = ntp;
+    p->ntp = (int)ntp;
 
     if (!expect(p, S_TOK_LPAREN, 331)) return false;
     s_param_entry *params = NULL;
@@ -917,7 +917,7 @@ static bool parse_func(s_parser *p) {
     p->tp_names = saved_tp;
     p->ntp = saved_ntp;
     fn.type_params = tp;
-    fn.ntype_params = ntp;
+    fn.ntype_params = (int)ntp;
     fn.func_index = (int)p->nfuncs;
 
     VEC_PUSH(p->arena, p->funcs, p->nfuncs, p->funcs_cap,
