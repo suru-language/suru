@@ -934,6 +934,21 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             if (!push(vm, s_val_obj(o))) return 1;
             pc++; break;
         }
+        case BC_MKCLOSURE_V: {
+            s_u32 ncap = in->b;
+            if (vm->sp < ncap) { vm_trap(vm, "mkclosure_v underflow"); return 1; }
+            s_gcobj *env = vm_alloc(vm, S_OBJ_ARRAY, ncap, 0);
+            if (!env) return 1;
+            vm->sp -= ncap;
+            memcpy(s_obj_array_data(env), vm->st + vm->sp,
+                   sizeof(s_value) * ncap);
+            s_gcobj *o = vm_alloc(vm, S_OBJ_CLOSURE, 2, 0);
+            if (!o) return 1;
+            s_obj_array_data(o)[0] = s_val_int((s_i64)in->a);
+            s_obj_array_data(o)[1] = s_val_obj(env);
+            if (!push(vm, s_val_obj(o))) return 1;
+            pc++; break;
+        }
         case BC_CALLV: {
             s_u32 nargs = in->a;
             if (vm->sp < nargs + 1) {
