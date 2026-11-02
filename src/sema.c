@@ -583,7 +583,7 @@ static bool check_stmt(s_sema *S, s_stmt *s) {
                              type_name(ret), type_name(it));
             }
         } else {
-            if (ret->kind != S_TYPE_UNIT) {
+            if (ret && ret->kind != S_TYPE_UNIT) {
                 s_diag_error(S->diag, s->loc, 453,
                              "function returns %s, missing return value",
                              type_name(ret));
@@ -713,7 +713,7 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
         if (strcmp(mod->funcs[f].name, "main") == 0) {
             mod->main_index = (int)f;
             s_type *rt = mod->funcs[f].ret_type;
-            if (rt->kind != S_TYPE_INT && rt->kind != S_TYPE_UNIT) {
+            if (rt && rt->kind != S_TYPE_INT && rt->kind != S_TYPE_UNIT) {
                 s_diag_error(diag, mod->funcs[f].loc, 460,
                              "main must return int or unit, got %s", type_name(rt));
                 ok = false;
