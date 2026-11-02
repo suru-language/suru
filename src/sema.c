@@ -652,12 +652,15 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
             }
             if (idx < 0) {
                 idx = lam->u.lambda.ncaptures;
-                int *ncap = realloc(lam->u.lambda.cap_src,
-                                    sizeof(int) * (s_size)(idx + 1));
+                int newn = idx + 1;
+                int *ncap = s_arena_alloc(S->arena, sizeof(int) * (s_size)newn,
+                                          _Alignof(int));
                 if (!ncap) return type_unit(S);
+                if (newn > 1)
+                    memcpy(ncap, lam->u.lambda.cap_src, sizeof(int) * (s_size)idx);
                 ncap[idx] = sym->index;
                 lam->u.lambda.cap_src = ncap;
-                lam->u.lambda.ncaptures = idx + 1;
+                lam->u.lambda.ncaptures = newn;
             }
             e->u.var.is_capture = true;
             e->u.var.capture_index = idx;
