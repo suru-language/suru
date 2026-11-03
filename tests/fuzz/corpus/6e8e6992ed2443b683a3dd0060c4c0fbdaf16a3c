@@ -1,0 +1,9 @@
+func main() {
+    println(42);
+    println(1.5); println(abs(-7));
+    println(min(3, 9));
+    println(max(3, 9));
+ln(min(3, 9));
+    println(max(3, 9));
+ ln(abtln(min(3,4("2.5")));
+}

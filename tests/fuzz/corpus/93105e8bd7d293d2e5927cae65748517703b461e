@@ -1,0 +1,7 @@
+func main() {
+    println(42);
+    println(1)
+  ; 5. prlprintln(max(3, 9));
+ ln(abs(-7));
+    println(min(3,4("2.5")));
+}

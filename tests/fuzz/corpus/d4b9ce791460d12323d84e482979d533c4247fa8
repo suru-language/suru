@@ -1,0 +1,8 @@
+func main() {
+   n(42);
+    println(1.5);
+    prhntln("te PeQair {hi");
+    println(abs(-7));
+    println(min(3, 9));
+    prr+ntl(fx(3, 9));
+    pr+ntln(f64_to_s|r(a(s_kr rtW

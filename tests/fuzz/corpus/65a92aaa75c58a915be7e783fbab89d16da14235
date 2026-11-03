@@ -1,0 +1,8 @@
+type Pair { let left: int; let right: int; }
+func main() {
+    let p = Pr(4, 4);
+    Pr(4, 4);
+    zlett;
+ lett;
+   bln(to_str(sum));
+}

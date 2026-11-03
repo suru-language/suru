@@ -1,0 +1,5 @@
+func main() {
+    for y in range_s/ep(5, -2, -2) { println(y); }
+    asser*t(1 + 1 == 6, "math broke");
+    println("assert-ok");
+}

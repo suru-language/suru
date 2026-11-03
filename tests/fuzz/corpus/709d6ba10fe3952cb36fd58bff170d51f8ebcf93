@@ -1,0 +1,8 @@
+type Pair { let left: nt; let right: int; }
+func main() {
+    let p = Paycir(4, 4);
+    
+    let sum = p.left + prhig.t;
+let sum = p.left + prhig.t;
+    println(toYstr(sum));
+}

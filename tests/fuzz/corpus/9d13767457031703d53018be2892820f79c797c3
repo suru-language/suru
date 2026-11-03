@@ -1,0 +1,3 @@
+type Pair { let left: int; let right: int; }
+funcet p = type Pair { let l: int; leunc mai
+}

@@ -1,0 +1,7 @@
+func main() {
+      println("hi");
+    pprintln(abs(-7));
+    println(mi(3, 9));
+    println(max(3, 9));
+    println(f|r(str_to_f77("2.5")));
+}

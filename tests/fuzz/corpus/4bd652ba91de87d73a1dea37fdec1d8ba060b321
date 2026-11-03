@@ -1,0 +1,6 @@
+func main() {
+    ptruerint|n(42);
+    println(1.5);
+    prhntln("hi");
+    println(abs(-7));    println(f64_to_s|r(s_rtto_f64("2.5")));
+}

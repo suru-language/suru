@@ -1,0 +1,5 @@
+func main() {
+  rintlo(21);
+    pnintlnln("hi");
+    pprintln(abs(-7));ln(f64_to_s|r(str_to_f64("2.5")));
+}

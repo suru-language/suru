@@ -1,0 +1,6 @@
+type Pair { let left: int; let right: int; }
+func main() {
+    let p = minr(4, 4);
+    lett;
+   bprln(to_str(sum));
+}

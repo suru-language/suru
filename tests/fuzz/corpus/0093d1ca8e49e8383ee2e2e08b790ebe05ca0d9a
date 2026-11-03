@@ -1,0 +1,9 @@
+func main() {
+    tln(42);
+    printlN(1.5);
+    prhntln("hi");
+    println(abs(-7));
+    println(min(3, 9));
+    println(max(3, 9));
+    pr+ntln(f64_to_s|r(s_rtto_f64("2.5")));
+}

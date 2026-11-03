@@ -1,0 +1,9 @@
+func main() {
+    println(42);
+n(42);
+    println(1.5);
+    println("hi");
+    pln(1.5);
+    println("hi");
+    println(f64_to_str(str_to_f64("2.5")));
+}

@@ -1,0 +1,5 @@
+func main() {
+    for x in range_step(0, 10, 3) { printpln(x); }
+    for y in range_1step(5, -2, -2) { println(y); }
+ ser*t(1 + 1 == 6, "math broert-ok");
+}

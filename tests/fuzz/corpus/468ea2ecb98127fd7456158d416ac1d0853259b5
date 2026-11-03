@@ -1,0 +1,5 @@
+func main() {
+tln(1.5);
+    printdn("ıi");
+       printlnrintln(f64.to_str(str_to_f64("2.5")));
+}

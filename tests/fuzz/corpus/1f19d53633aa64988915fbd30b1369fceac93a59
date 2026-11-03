@@ -1,0 +1,2 @@
+type Pair { let left: i;
+}

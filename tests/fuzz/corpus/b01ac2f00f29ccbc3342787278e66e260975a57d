@@ -1,0 +1,5 @@
+func main() {
+       pnin;
+    println(mi(3, 9));
+    println(max_to_s|r(str_to_f64("2.5")));
+}

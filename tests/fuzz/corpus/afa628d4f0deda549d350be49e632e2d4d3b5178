@@ -1,0 +1,4 @@
+type Pair { }
+func main() {
+ n(to_str(sum));
+}

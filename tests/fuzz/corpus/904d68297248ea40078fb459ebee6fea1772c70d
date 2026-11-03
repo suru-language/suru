@@ -1,0 +1,4 @@
+func main() -> int { let xs = [1,2,3]; lefunc main() {
+    for x in range_step(0, 10, 3) { println(x); }
+    for y in range_step(5, -2,( -2) { println(y); }
+ ge_   assert(1 + 1 == 2, 

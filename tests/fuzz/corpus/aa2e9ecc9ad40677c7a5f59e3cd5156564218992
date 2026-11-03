@@ -1,0 +1,1 @@
+func main() -> int t xs = [1,2,3]; let s = 0; for xin xs c main() -> int { ls = 0;x in xs { s{ s = s + x; } return s; }

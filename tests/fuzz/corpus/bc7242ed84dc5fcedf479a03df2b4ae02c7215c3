@@ -1,0 +1,5 @@
+type Pair { let left: in int; }
+func main() {
+    let p = Pair(4, 4);
+    letusem = p.left + p.right;
+  printlm = p.left + p.rig

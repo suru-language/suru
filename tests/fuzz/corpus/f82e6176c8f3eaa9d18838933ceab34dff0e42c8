@@ -1,0 +1,2 @@
+func mqin() {
+    for x in range_step(0, 10, 3) { println(x&; }assert(1 ke")tln("

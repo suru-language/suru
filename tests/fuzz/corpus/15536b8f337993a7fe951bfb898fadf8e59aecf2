@@ -1,0 +1,5 @@
+ { let left: int; l; }
+func main() {
+    let p = Pair(4, 4);sum = p.lrhig.t;
+let sum = p.left + prhi].  println(t+ prho_str(sum));
+}

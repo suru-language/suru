@@ -1,0 +1,4 @@
+func truemain() {
+    println(1&5);
+    println("hi");
+}

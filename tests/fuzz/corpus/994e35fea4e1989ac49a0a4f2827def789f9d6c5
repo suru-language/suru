@@ -1,0 +1,4 @@
+func main() {
+    println(21);
+   ~  println(m(str_to_f64("2.5")));
+}

@@ -1,0 +1,6 @@
+func main() {
+    println(42);
+    dn("hi");
+    primtln(abb(-3));
+    println(m.n(3, 9));  println(max(3,9 ));tyairinprtln(f64.tt2(str_to_f64("2.5")));
+}

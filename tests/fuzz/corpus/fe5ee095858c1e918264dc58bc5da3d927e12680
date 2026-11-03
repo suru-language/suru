@@ -1,0 +1,4 @@
+func mnew() {
+   println(max(3, 9));
+    println(f64.to_str(str_to_f64("2.5")));
+}

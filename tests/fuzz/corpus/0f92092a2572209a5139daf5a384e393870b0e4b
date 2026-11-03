@@ -1,0 +1,6 @@
+func mnew() {
+    println(42);
+    priitln(1.5);
+    println("hi");
+    println(abs(-7*4("2.5")));
+}

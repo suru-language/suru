@@ -1,0 +1,4 @@
+func mnUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUew() {
+ (abs(-7));
+    println(min64.to_str(str_to_f64("2.5")));
+}

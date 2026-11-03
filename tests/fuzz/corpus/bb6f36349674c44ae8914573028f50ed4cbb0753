@@ -1,0 +1,2 @@
+func main() {
+    for x1 in range_steptype(0, 10, 3¶(

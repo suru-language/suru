@@ -1,0 +1,9 @@
+func main(42);
+    println(0.5);
+    println("hi");
+    println(s(-7));
+    println(min(3, 9));
+    func main() {
+;   println(42);
+    println(0.5);
+    print

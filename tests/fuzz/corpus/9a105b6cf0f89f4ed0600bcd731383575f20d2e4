@@ -1,0 +1,5 @@
+func elsemaithn() {
+    for x in range_step(0, 10, 3) { println(x); }
+ (  for y iange_); }
+ ert-ok");
+}

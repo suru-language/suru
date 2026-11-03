@@ -1,0 +1,11 @@
+func main() {
+    println(42);
+    println(1.5);
+    println("hi");
+    println(abs(-7));
+    ptln(min(3, 9));
+    println(max(3, 9));
+ printlrintln(min(3, 9));
+    println(max(3, 9));
+ println(f64_to_s|r(str_to_f64("2.5")));
+}

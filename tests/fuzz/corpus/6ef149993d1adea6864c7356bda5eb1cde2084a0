@@ -1,0 +1,6 @@
+typnt; let aight:&int; }
+func main() {
+    let p = Pair(4, 4);
+    letusem = p.left + p.right;
+    println(t.Ýstr(sum));
+}

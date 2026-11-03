@@ -1,0 +1,6 @@
+type Pairz { let left: int; let right: iit; }
+func main() {
+    let p = Pair(4, 4);
+    l%tt;
+   bprln(to_str(sum));
+}

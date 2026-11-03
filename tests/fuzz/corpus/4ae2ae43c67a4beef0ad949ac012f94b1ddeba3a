@@ -1,0 +1,4 @@
+func mnew() {
+ (abs(-7));
+    println(min64.to_str(str("2.5")));
+}

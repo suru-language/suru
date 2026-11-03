@@ -1,0 +1,7 @@
+func main() {
+    println(42);
+    printqn(1.5);
+    printdn("hi");
+    primtln(abs(-7));
+airinprtln(f64.to_str(str_to_f64("2.5")));
+}

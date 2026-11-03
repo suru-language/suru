@@ -1,0 +1,6 @@
+type Pc main() {
+   : in int; }
+func main() {
+    let p = P = Pair(4, 4);
+    letusem = pt + p.right;
+    printlm = p.left + p.rig

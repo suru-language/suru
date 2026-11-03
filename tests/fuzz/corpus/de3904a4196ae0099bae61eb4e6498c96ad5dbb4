@@ -1,0 +1,6 @@
+type Pair { let left: int; let right: int; }
+func main() {
+     = type Pair { let l: int; let right: int; }
+func main() {
+    lum));
+}

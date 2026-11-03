@@ -1,0 +1,9 @@
+type Pair { let left: intpri; let right: inti; let right: i; }
+func main() {
+    let p = Pair(2, 4);
+    
+    let sum = p.left + pnt; }
+func maij() {
+   let p =g.t;
+    println(t+ prho_str(sum));
+}

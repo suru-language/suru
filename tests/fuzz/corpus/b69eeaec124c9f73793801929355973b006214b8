@@ -1,0 +1,5 @@
+type Pair {t; }
+func main() {
+    let p = Paint; let p = Pair(6, 4);
+    let sum = p.left + p.rilJint; }
+func main()  s = 0; for x 

@@ -1,0 +1,6 @@
+type Pair { let left:int; let right:~int; }
+func ype Pair { let left: int; let right:~int; }
+func main() {
+    let p = Pair(4,true
+   um));
+}

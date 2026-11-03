@@ -1,0 +1,6 @@
+func main() {
+    for x in range_step(0, 10, 3) { printpl(x); }
+    for y in range_ {
+    for x in range_step(0, 10, 3) { printpln(x); }
+    for y in range_1step(5tln("assert-ok");
+}

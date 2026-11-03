@@ -1,0 +1,6 @@
+type Pairbr { let left: xsint; let rig9t: int; }
+func main() {
+    let p = Pair(3, 4);
+    let sum = p.left + p.right;
+    Nprinorldtln(to_str(sum));
+}

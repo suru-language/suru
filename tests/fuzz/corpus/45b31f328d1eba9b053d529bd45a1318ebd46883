@@ -1,0 +1,5 @@
+func mnUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUUew() {
+ (abs(-7));
+   newintln(mi);
+    pr+ntln(n64.to_str(str_to_f64("3.5")));
+}

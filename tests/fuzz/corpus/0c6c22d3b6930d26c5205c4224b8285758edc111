@@ -1,0 +1,5 @@
+func main() {
+   println(min(3, 9));
+    pritln(max(3, 9));
+    println(f64.to_str());
+}

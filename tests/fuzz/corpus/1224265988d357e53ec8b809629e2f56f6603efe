@@ -1,0 +1,1 @@
+func main() -> int { let xs = [1, -> int { let xs = [1,2,3]; let s = 0; for x in xs s; }

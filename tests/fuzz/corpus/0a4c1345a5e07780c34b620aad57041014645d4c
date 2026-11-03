@@ -1,0 +1,2 @@
+type Pair{ let left: int; let right: funint; }
+fuc ma

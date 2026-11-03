@@ -1,0 +1,4 @@
+func main() {
+    for x in range_step(0, 10, 3) { println(x); }
+      RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRprintln("assert-0k");
+}
