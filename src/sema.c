@@ -1367,7 +1367,7 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
             sym.type = pt;
             sym.index = (int)i;
             sym.is_mut = false;
-            if (!scope_push_sym(&sc, sym)) return false;
+            if (!scope_push_sym(&sc, sym)) { scope_pop(&sc); return false; }
             fn->params[i].index = (int)i;
             S.next_slot++;
         }
