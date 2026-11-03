@@ -38,6 +38,7 @@ struct s_vm {
     s_u32 alloc_counter;
     s_u64 gc_threshold;
     s_u64 gc_min_threshold;
+    bool gc_incremental;
     bool trapped;
     char err[512];
     int exit_code;
@@ -58,6 +59,8 @@ s_vm *s_vm_create(const s_bc_module *m) {
         if (end != gs && v > 0) vm->gc_threshold = (s_u64)v;
     }
     vm->gc_min_threshold = vm->gc_threshold;
+    vm->gc_incremental = getenv("SURU_GC_INCREMENTAL") != NULL;
+    s_heap_set_incremental(vm->heap, vm->gc_incremental);
     return vm;
 }
 
@@ -117,7 +120,19 @@ static void maybe_collect(s_vm *vm) {
     if (!should) return;
     s_heap_set_stack_root(vm->heap, vm->st, vm->sp);
     s_u64 before = s_heap_live_bytes(vm->heap);
-    s_heap_collect(vm->heap);
+
+    if (vm->gc_incremental) {
+        /* Incremental collection: run a slice of marking. If the current
+         * cycle is not finished, keep the alloc counter high so the next
+         * allocation re-enters and continues making progress. */
+        if (!s_heap_collect_incremental(vm->heap, VM_GC_INCREMENTAL_BUDGET)) {
+            vm->alloc_counter = VM_GC_ALLOC_INTERVAL;
+            return;
+        }
+    } else {
+        s_heap_collect(vm->heap);
+    }
+
     s_u64 after = s_heap_live_bytes(vm->heap);
     /* Nursery sizing heuristic: size the next trigger to leave HEADROOM
      * over the surviving set, so collection frequency tracks actual
@@ -1240,6 +1255,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
         return 1;
     }
     vm->heap = heap;
+    s_heap_set_incremental(heap, vm->gc_incremental);
     vm->sp = 0;
     vm->fp = 0;
     vm->ncalls = 0;
