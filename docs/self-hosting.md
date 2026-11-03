@@ -78,12 +78,14 @@ allowed metadata normalization must be documented before it is used.
 ## Current status
 
 The first transitional modules now exist at
-`selfhost/compiler/source.suru`, `selfhost/compiler/tokens.suru`, and
-`selfhost/compiler/lexer.suru`. They use the legacy grammar because Document A
-2.0 is not yet frozen; they are not a Natural Syntax implementation. The C17 VM
-executes them through `tests/selfhost/lexer_driver.suru`.
+`selfhost/compiler/source.suru`, `selfhost/compiler/tokens.suru`,
+`selfhost/compiler/diagnostics.suru`, and `selfhost/compiler/lexer.suru`.
+They use the legacy grammar because Document A 2.0 is not yet frozen; they are
+not a Natural Syntax implementation. The C17 VM executes them through
+`tests/selfhost/lexer_driver.suru`.
 
-`source.suru` owns file loading and line/column calculations. `make
+`source.suru` owns file loading and line/column calculations, while
+`diagnostics.suru` owns stable lexer diagnostic classification. `make
 selfhost-check` validates the module through its driver, and
 `make selfhost-test` compares token kinds, source locations, identifier text,
 integer values, float values, escaped string values, and negative diagnostic

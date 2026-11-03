@@ -1,0 +1,10 @@
+use "source.suru";
+
+// Stable diagnostic classification for the transitional frontend. Formatting
+// of source snippets remains a later CLI concern; the lexer records the same
+// code and location as the C bootstrap.
+func diagnostic_emit(source: str, position: int, code: int) {
+    let line: int = source_line_at(source, position);
+    let column: int = source_column_at(source, position);
+    println("error|" + to_str(code) + "|" + to_str(line) + "|" + to_str(column));
+}
