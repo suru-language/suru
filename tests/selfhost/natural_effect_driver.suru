@@ -1,0 +1,5 @@
+use "../../selfhost/compiler/natural_effect_semantic.suru";
+
+func main() {
+    exit(natural_effect_check(source_load(args(0))));
+}

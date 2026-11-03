@@ -1,0 +1,19 @@
+routine risky() -> Unit throws FileError
+    give
+end routine
+
+routine forwarded() -> Unit throws FileError
+    show(risky())
+end routine
+
+routine handled() -> Unit
+    attempt
+        show(risky())
+    handle problem: FileError
+        show("handled")
+    end exception
+    ensure
+        show("cleanup")
+    end exception
+    end attempt
+end routine

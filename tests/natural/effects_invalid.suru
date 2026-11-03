@@ -1,0 +1,7 @@
+routine risky() -> Unit throws FileError
+    give
+end routine
+
+routine unhandled() -> Unit
+    show(risky())
+end routine
