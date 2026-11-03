@@ -538,7 +538,6 @@ static bool gen_expr(s_gen *g, const s_expr *e) {
                 /* OR: if lhs is truthy the result is true; otherwise it is
                  * the value of rhs. Both paths leave exactly one value. */
                 s_u32 ltrue = new_label(&g->labels);
-                s_u32 ldone = new_label(&g->labels);
                 if (!em_jump(&g->e, &g->labels, BC_JNZ, ltrue)) return false;
                 if (!gen_expr(g, e->u.binary.rhs)) return false;
                 if (!em_jump(&g->e, &g->labels, BC_JMP, ldone)) return false;
