@@ -386,6 +386,9 @@ The standard library provides a small set of builtin functions (see
 - `abs(i: int) -> int`, `min(a: int, b: int) -> int`,
   `max(a: int, b: int) -> int`.
 - `str_to_f64(s: str) -> float` — parse a float from a string.
+- `int_from_str(s: str) -> int` — parse a signed decimal integer (optional
+  `+`/`-` sign); returns `0` if the string does not parse as an integer,
+  traps on overflow.
 - `assert(cond: bool, msg: str)` — trap with `msg` if `cond` is false.
 - `exit(code: int)` — terminate the program immediately with `code`.
 - `to_hex(i: int) -> str` — lowercase hexadecimal (64-bit two's complement).
