@@ -127,6 +127,48 @@ static void test_read_garbage(void) {
     CHECK(s_bc_read(garbage, 2, &m) != 0);
 }
 
+static void test_read_bad_magic(void) {
+    s_bc_module m = make_valid_module();
+    s_u8 *buf = NULL;
+    s_size len = 0;
+    CHECK_EQ_INT(s_bc_write(&m, &buf, &len), 0);
+    buf[0] ^= 0xFFu; /* corrupt first magic byte */
+    s_bc_module m2;
+    CHECK(s_bc_read(buf, len, &m2) != 0);
+    free(buf);
+    s_bc_module_dispose(&m);
+}
+
+static void test_read_bad_version(void) {
+    s_bc_module m = make_valid_module();
+    s_u8 *buf = NULL;
+    s_size len = 0;
+    CHECK_EQ_INT(s_bc_write(&m, &buf, &len), 0);
+    /* version field is the u32 at offset 4 (little-endian); reject unknown */
+    buf[4] = 99;
+    s_bc_module m2;
+    CHECK(s_bc_read(buf, len, &m2) != 0);
+    free(buf);
+    s_bc_module_dispose(&m);
+}
+
+static void test_read_truncated(void) {
+    s_bc_module m = make_valid_module();
+    s_u8 *buf = NULL;
+    s_size len = 0;
+    CHECK_EQ_INT(s_bc_write(&m, &buf, &len), 0);
+    s_bc_module m2;
+    /* magic only, header incomplete, header-only (no int table), partial int
+     * table, and a cut mid-function-record must all fail cleanly. */
+    CHECK(s_bc_read(buf, 4, &m2) != 0);
+    CHECK(s_bc_read(buf, 16, &m2) != 0);
+    CHECK(s_bc_read(buf, 32, &m2) != 0);  /* nints=2, no int table bytes */
+    CHECK(s_bc_read(buf, 33, &m2) != 0);
+    CHECK(s_bc_read(buf, len - 3, &m2) != 0);
+    free(buf);
+    s_bc_module_dispose(&m);
+}
+
 static void test_read_short_record_table(void) {
     /* Regression: a header with a large nrecords but a truncated record table
      * used to leave trailing `record_names` entries uninitialized (malloc, not
@@ -151,6 +193,9 @@ TEST_MAIN_BEGIN()
     test_verify_underflow();
     test_verify_bad_local();
     test_read_garbage();
+    test_read_bad_magic();
+    test_read_bad_version();
+    test_read_truncated();
     test_read_short_record_table();
     test_le_endian();
 TEST_MAIN_END()
