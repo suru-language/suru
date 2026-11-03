@@ -91,6 +91,10 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "write_file", 2, { S_SIG_STR, S_SIG_STR }, S_SIG_UNIT },
     [S_BUILTIN_FILE_EXISTS] = {
         "file_exists", 1, { S_SIG_STR }, S_SIG_BOOL },
+    [S_BUILTIN_INT_TO_STR_BASE] = {
+        "int_to_str_base", 2, { S_SIG_INT, S_SIG_INT }, S_SIG_STR },
+    [S_BUILTIN_STR_PAD] = {
+        "str_pad", 3, { S_SIG_STR, S_SIG_INT, S_SIG_STR }, S_SIG_STR },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {

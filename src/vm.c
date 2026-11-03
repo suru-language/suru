@@ -934,6 +934,61 @@ static bool builtin_file_exists(s_vm *vm) {
     return push(vm, s_val_int(exists ? 1 : 0));
 }
 
+static bool builtin_int_to_str_base(s_vm *vm) {
+    s_value base = pop(vm);
+    s_value v = pop(vm);
+    if (v.tag != S_VAL_INT || base.tag != S_VAL_INT) {
+        vm_trap(vm, "int_to_str_base expects (int, int)");
+        return false;
+    }
+    s_i64 pb = base.u.i;
+    if (pb < 2 || pb > 36) {
+        vm_trap(vm, "int_to_str_base base must be in 2..36");
+        return false;
+    }
+    bool neg = v.u.i < 0;
+    unsigned long long x = (unsigned long long)v.u.i;
+    if (neg) x = 0 - x;
+    char buf[80];
+    s_size len = 0;
+    do {
+        unsigned d = (unsigned)(x % (unsigned long long)pb);
+        buf[len++] = (char)(d < 10 ? '0' + d : 'a' + d - 10);
+        x /= (unsigned long long)pb;
+    } while (x != 0);
+    s_size start = 0;
+    if (neg) buf[len++] = '-';
+    for (s_size i = start, j = len - 1; i < j; ++i, --j) {
+        char t = buf[i]; buf[i] = buf[j]; buf[j] = t;
+    }
+    return push_str_from_buf(vm, buf + start, len - start);
+}
+
+static bool builtin_str_pad(s_vm *vm) {
+    s_value fill = pop(vm);
+    s_value width = pop(vm);
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR ||
+        width.tag != S_VAL_INT ||
+        fill.tag != S_VAL_OBJ || fill.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "str_pad expects (str, int, str)");
+        return false;
+    }
+    s_size slen = s_obj_str_len(s.u.o);
+    s_i64 w = width.u.i;
+    if (w <= (s_i64)slen) return push(vm, s);
+    s_size pad = (s_size)(w - (s_i64)slen);
+    if (pad > (1u << 26)) { vm_trap(vm, "str_pad too wide"); return false; }
+    char fc = ' ';
+    if (s_obj_str_len(fill.u.o) > 0) fc = s_obj_str_data(fill.u.o)[0];
+    s_size total = slen + pad;
+    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
+    if (!o) return false;
+    memset(s_obj_str_data(o), fc, pad);
+    memcpy(s_obj_str_data(o) + pad, s_obj_str_data(s.u.o), slen);
+    return push(vm, s_val_obj(o));
+}
+
 static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     switch (id) {
     case S_BUILTIN_PRINT: return builtin_print(vm, false);
@@ -980,6 +1035,8 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_READ_FILE: return builtin_read_file(vm);
     case S_BUILTIN_WRITE_FILE: return builtin_write_file(vm);
     case S_BUILTIN_FILE_EXISTS: return builtin_file_exists(vm);
+    case S_BUILTIN_INT_TO_STR_BASE: return builtin_int_to_str_base(vm);
+    case S_BUILTIN_STR_PAD: return builtin_str_pad(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;
