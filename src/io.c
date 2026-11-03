@@ -50,7 +50,9 @@ int s_io_read_all(const char *path, s_u8 **out, s_size *outlen,
         pos += (s_size)got;
     }
 
-    if (ferror(f) || fclose(f) != 0) {
+    int read_error = ferror(f) ? 1 : 0;
+    int close_error = fclose(f) != 0 ? 1 : 0;
+    if (read_error || close_error) {
         free(buf);
         return -1;
     }
@@ -77,6 +79,8 @@ int s_io_write_all(const char *path, const void *data, s_size len) {
         pos += (s_size)wrote;
     }
 
-    if (fflush(f) != 0 || fclose(f) != 0) return -1;
+    int flush_error = fflush(f) != 0 ? 1 : 0;
+    int close_error = fclose(f) != 0 ? 1 : 0;
+    if (flush_error || close_error) return -1;
     return 0;
 }
