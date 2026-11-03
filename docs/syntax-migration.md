@@ -105,6 +105,7 @@ bootstrap effect runtime also specifies cleanup replacement and retained
 causes. The native GC now represents exceptions as managed objects with type,
 message, and cause fields. The bytecode VM now has handler metadata and
 language-level exception construction, throw, and handler operations; compiler
-emission now has a Natural Syntax lowering trace for effect blocks; native
-instruction-index emission and cleanup bytecode lowering remain open. No
-legacy default behavior may change during the port.
+emission now has a Natural Syntax lowering pass that resolves symbolic labels
+to numeric instruction indices and routes normal, handled, and `give` exits
+through cleanup. Full expression lowering and native instruction construction
+remain open. No legacy default behavior may change during the port.

@@ -147,3 +147,6 @@ call depth and frame/stack restoration, with a caught-exception VM test.
 `selfhost/compiler/natural_bytecode.suru` now lowers effect blocks into
 `PUSH_HANDLER`, `POP_HANDLER`, handler labels, `JMP`, `RET`, and `RET_UNIT`
 operations as the bridge to native instruction-index emission.
+Its second pass removes symbolic labels and emits numeric instruction indices;
+normal completion, handled exceptions, and `give` paths converge on the
+cleanup label before the final return label.
