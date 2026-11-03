@@ -140,7 +140,9 @@ The test suite exercises:
 - cyclic references (records that reference each other),
 - garbage-collection correctness (reachability after collection),
 - deep shared-reference graphs and reference rewiring across many frequent
-  collections (`gcstress2`/`gcstress3`, run under a tiny trigger threshold),
+  collections (`gcstress2`/`gcstress3`/`gcstress4`, run under a tiny trigger
+  threshold; `gcstress4` is write-barrier-heavy and is also exercised in
+  incremental mode),
 - invalid references (via the verifier and runtime traps), and
 - cleanup of arenas and the heap at teardown.
 
