@@ -495,6 +495,47 @@ static void test_binop_type_mismatch_note(void) {
     s_arena_dispose(&arena);
 }
 
+static bool has_note_containing(const s_diag_ctx *d, const char *sub) {
+    for (s_size i = 0; i < d->count; ++i) {
+        if (d->items[i].sev == S_DIAG_NOTE &&
+            strstr(d->items[i].msg, sub) != NULL)
+            return true;
+    }
+    return false;
+}
+
+static void test_unknown_var_suggestion(void) {
+    const char *src =
+        "func main() -> int {\n"
+        "    let counter = 5;\n"
+        "    return countr;\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(has_note_containing(&d, "did you mean 'counter'"));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
+static void test_unknown_func_suggestion(void) {
+    const char *src =
+        "func greets() -> int { return 1; }\n"
+        "func main() -> int {\n"
+        "    return greet();\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(has_note_containing(&d, "did you mean 'greets'"));
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
 TEST_MAIN_BEGIN()
     test_valid_program();
     test_type_mismatch();
@@ -525,4 +566,6 @@ TEST_MAIN_BEGIN()
     test_lambda_dynamic_call();
     test_lambda_not_function();
     test_binop_type_mismatch_note();
+    test_unknown_var_suggestion();
+    test_unknown_func_suggestion();
 TEST_MAIN_END()
