@@ -102,6 +102,10 @@ static int check_operands(const s_bc_module *m, s_u32 fid, s_u32 i) {
     case BC_JNZ:
         if (in->a >= f->nins) return VERIFY_ERR;
         break;
+    case BC_PUSH_HANDLER:
+        if (in->a >= f->nins) return VERIFY_ERR;
+        if (in->b != UINT32_MAX && in->b >= m->nstrings) return VERIFY_ERR;
+        break;
     default:
         break;
     }

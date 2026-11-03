@@ -66,6 +66,10 @@ typedef enum s_bc_op {
     BC_JZ,             /* a = target; pops bool, jumps if false */
     BC_JNZ,            /* a = target; pops bool, jumps if true */
 
+    BC_PUSH_HANDLER,   /* a = handler target, b = exception type string or UINT32_MAX */
+    BC_POP_HANDLER,    /* remove the current handler */
+    BC_THROW,          /* pops a managed exception and unwinds to a handler */
+
     BC_TRAP,           /* abort */
 
     BC_OP_COUNT

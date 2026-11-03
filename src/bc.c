@@ -74,6 +74,9 @@ const s_bc_op_info s_bc_op_table[BC_OP_COUNT] = {
     [BC_JMP]            = { "jmp",            1, 0, 0, 1, 0 },
     [BC_JZ]             = { "jz",             1, 1, 0, 1, 0 },
     [BC_JNZ]            = { "jnz",            1, 1, 0, 1, 0 },
+    [BC_PUSH_HANDLER]   = { "push_handler",   2, 0, 0, 0, 0 },
+    [BC_POP_HANDLER]    = { "pop_handler",    0, 0, 0, 0, 0 },
+    [BC_THROW]          = { "throw",          0, 1, 0, 0, 1 },
     [BC_TRAP]           = { "trap",           0, 0, 0, 0, 1 },
 };
 
