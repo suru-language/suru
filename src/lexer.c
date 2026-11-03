@@ -357,9 +357,14 @@ static bool lex_string(s_lexer *lx, s_token *tok) {
                     ok = lex_error(lx, loc, 105, "invalid \\u escape");
                     break;
                 }
+                if (cp >= 0xD800 && cp <= 0xDFFF) {
+                    ok = lex_error(lx, loc, 105,
+                                   "invalid \\u escape (surrogate code point)");
+                    break;
+                }
                 /* encode UTF-8 (cp <= 0xFFFF by construction) */
                 if (cp < 0x80) {
-                    c = (char)cp; advance(lx); /* already advanced */
+                    c = (char)cp; /* the four hex digits are already consumed */
                     /* fallthrough to append below */
                 } else {
                     char utf8[4];

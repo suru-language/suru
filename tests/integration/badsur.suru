@@ -1,0 +1,4 @@
+func main() -> int {
+    println("\uD83D");
+    return 0;
+}

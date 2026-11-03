@@ -1,0 +1,11 @@
+func main() -> int {
+    println("A\u0041");
+    println("caf\u00e9");
+    println("\u263a");
+    println("tab\tend");
+    println("nl\nend");
+    println("backslash\\end");
+    println("quote\"end");
+    println("apos\'end");
+    return 0;
+}
