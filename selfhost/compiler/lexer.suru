@@ -1,4 +1,5 @@
 use "tokens.suru";
+use "source.suru";
 
 // Transitional Stage-1 lexer. It mirrors the legacy bootstrap lexer until
 // Document A 2.0 freezes the Natural Syntax Edition.
@@ -134,30 +135,9 @@ func keyword_kind(word: str) -> int {
     return K_IDENT;
 }
 
-func line_at(source: str, position: int) -> int {
-    mut line: int = 1;
-    mut i: int = 0;
-    while i < position {
-        if source[i] == "\n" { line += 1; }
-        i += 1;
-    }
-    return line;
-}
-
-func column_at(source: str, position: int) -> int {
-    mut column: int = 1;
-    mut i: int = position;
-    while i > 0 {
-        i -= 1;
-        if source[i] == "\n" { return column; }
-        column += 1;
-    }
-    return column;
-}
-
 func emit(kind: int, source: str, start: int, finish: int) {
-    let line: int = line_at(source, start);
-    let column: int = column_at(source, start);
+    let line: int = source_line_at(source, start);
+    let column: int = source_column_at(source, start);
     let raw: str = substr(source, start, finish - start);
     mut value: str = "";
     if kind == K_IDENT { value = raw; }
@@ -168,8 +148,8 @@ func emit(kind: int, source: str, start: int, finish: int) {
 }
 
 func emit_error(source: str, position: int, code: int) {
-    let line: int = line_at(source, position);
-    let column: int = column_at(source, position);
+    let line: int = source_line_at(source, position);
+    let column: int = source_column_at(source, position);
     println("error|" + to_str(code) + "|" + to_str(line) + "|" + to_str(column));
 }
 

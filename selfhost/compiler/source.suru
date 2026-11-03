@@ -1,0 +1,26 @@
+// Source management shared by the transitional compiler frontend.
+
+func source_load(path: str) -> str {
+    return read_file(path);
+}
+
+func source_line_at(source: str, position: int) -> int {
+    mut line: int = 1;
+    mut i: int = 0;
+    while i < position {
+        if source[i] == "\n" { line += 1; }
+        i += 1;
+    }
+    return line;
+}
+
+func source_column_at(source: str, position: int) -> int {
+    mut column: int = 1;
+    mut i: int = position;
+    while i > 0 {
+        i -= 1;
+        if source[i] == "\n" { return column; }
+        column += 1;
+    }
+    return column;
+}
