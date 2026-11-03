@@ -11,6 +11,7 @@ trap 'rm -rf "$tmp"' EXIT
     "$ROOT/tests/natural/bytecode_effects.suru" >"$tmp/bytecode.out"
 grep -q '^bc|PUSH_HANDLER|handler0|\*$' "$tmp/bytecode.out"
 grep -q '^bc|JMP|ensure0$' "$tmp/bytecode.out"
+grep -q '^bc|POP_HANDLER|$' "$tmp/bytecode.out"
 grep -q '^bc|LABEL|handler0|FileError$' "$tmp/bytecode.out"
 grep -q '^bc|LABEL|ensure0$' "$tmp/bytecode.out"
 grep -q '^bc|RET_UNIT|$' "$tmp/bytecode.out"

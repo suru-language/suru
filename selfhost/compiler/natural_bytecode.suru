@@ -52,6 +52,7 @@ func natural_emit_bytecode(source: str) -> int {
         if nbc_word(line) == "handle" {
             if array_len(attempts) == 0 { println("bytecode-error|handle outside attempt"); return 1; }
             let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
+            nbc_emit("POP_HANDLER", "");
             nbc_emit("JMP", fields[1]);
             let colon: int = nbc_find(line, ":");
             let effect: str = str_trim(substr(line, colon + 1, str_len(line)));
