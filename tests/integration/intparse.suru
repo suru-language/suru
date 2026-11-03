@@ -1,0 +1,11 @@
+func main() -> int {
+    println(int_from_str("42"));
+    println(int_from_str("-7"));
+    println(int_from_str("+3"));
+    println(int_from_str("0"));
+    println(int_from_str("42abc"));
+    println(int_from_str("1.5"));
+    println(int_from_str(""));
+    println(int_from_str(" 7"));
+    return 0;
+}
