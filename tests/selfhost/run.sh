@@ -7,17 +7,22 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-"$SURU" run "$DIR/lexer_driver.suru" >"$tmp/suru.out"
-"$REFERENCE" "$DIR/lexer_input.suru" >"$tmp/reference.out"
-diff -u "$tmp/reference.out" "$tmp/suru.out"
-echo "selfhost lexer: token stream matches reference"
+for input in lexer_input.suru lexer_literals.suru; do
+    "$SURU" run "$DIR/lexer_driver.suru" "$DIR/$input" >"$tmp/suru.out"
+    "$REFERENCE" "$DIR/$input" >"$tmp/reference.out"
+    diff -u "$tmp/reference.out" "$tmp/suru.out"
+done
+echo "selfhost lexer: token kinds, locations, and literal values match reference"
 
-if "$SURU" run "$DIR/lexer_negative_driver.suru" >"$tmp/suru-invalid.out"; then
-    echo "selfhost lexer: invalid input was accepted" >&2
-    exit 1
-fi
-if "$REFERENCE" "$DIR/lexer_invalid.suru" >"$tmp/reference-invalid.out"; then
-    echo "reference lexer: invalid input was accepted" >&2
-    exit 1
-fi
-echo "selfhost lexer: invalid input rejected by both implementations"
+for input in lexer_invalid.suru lexer_badhex.suru lexer_badescape.suru; do
+    if "$SURU" run "$DIR/lexer_negative_driver.suru" "$DIR/$input" >"$tmp/suru-invalid.out"; then
+        echo "selfhost lexer: $input was accepted" >&2
+        exit 1
+    fi
+    if "$REFERENCE" "$DIR/$input" >"$tmp/reference-invalid.out"; then
+        echo "reference lexer: $input was accepted" >&2
+        exit 1
+    fi
+    diff -u "$tmp/reference-invalid.out" "$tmp/suru-invalid.out"
+done
+echo "selfhost lexer: invalid diagnostics match reference"

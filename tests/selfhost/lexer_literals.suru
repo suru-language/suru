@@ -1,0 +1,6 @@
+let decimal = 42;
+let hexadecimal = 0x2a;
+let binary = 0b101010;
+let grouped = 1_000;
+let real = 3.5e+2;
+let escaped = "a\n\t\\\"'\0";

@@ -1,69 +1,7 @@
+use "tokens.suru";
+
 // Transitional Stage-1 lexer. It mirrors the legacy bootstrap lexer until
 // Document A 2.0 freezes the Natural Syntax Edition.
-
-const K_EOF = 0;
-const K_IDENT = 1;
-const K_INT = 2;
-const K_FLOAT = 3;
-const K_STR = 4;
-const K_TRUE = 5;
-const K_FALSE = 6;
-const K_NONE = 7;
-const K_BREAK = 8;
-const K_CONTINUE = 9;
-const K_ELSE = 10;
-const K_FOR = 11;
-const K_FUNC = 12;
-const K_IF = 13;
-const K_IN = 14;
-const K_LET = 15;
-const K_MUT = 16;
-const K_RETURN = 17;
-const K_TYPE = 18;
-const K_USE = 19;
-const K_WHILE = 20;
-const K_NEW = 21;
-const K_AS = 22;
-const K_CONST = 23;
-const K_ENUM = 24;
-const K_DO = 25;
-const K_LPAREN = 26;
-const K_RPAREN = 27;
-const K_LBRACE = 28;
-const K_RBRACE = 29;
-const K_LBRACKET = 30;
-const K_RBRACKET = 31;
-const K_COMMA = 32;
-const K_SEMI = 33;
-const K_DOT = 34;
-const K_COLON = 35;
-const K_ARROW = 36;
-const K_QUESTION = 37;
-const K_ASSIGN = 38;
-const K_PLUS = 39;
-const K_MINUS = 40;
-const K_STAR = 41;
-const K_SLASH = 42;
-const K_PERCENT = 43;
-const K_AMP = 44;
-const K_PIPE = 45;
-const K_CARET = 46;
-const K_SHL = 47;
-const K_SHR = 48;
-const K_TILDE = 49;
-const K_EQ = 50;
-const K_NE = 51;
-const K_LT = 52;
-const K_LE = 53;
-const K_GT = 54;
-const K_GE = 55;
-const K_AND = 56;
-const K_OR = 57;
-const K_NOT = 58;
-const K_PLUS_ASSIGN = 59;
-const K_MINUS_ASSIGN = 60;
-const K_STAR_ASSIGN = 61;
-const K_SLASH_ASSIGN = 62;
 
 func is_digit(c: str) -> bool {
     return str_contains("0123456789", c);
@@ -83,6 +21,89 @@ func is_ident_continue(c: str) -> bool {
 
 func valid_escape(c: str) -> bool {
     return str_contains("ntr0\\\"'", c) or c == "u";
+}
+
+func strip_underscores(text: str) -> str {
+    mut out: str = "";
+    mut i: int = 0;
+    while i < str_len(text) {
+        if text[i] != "_" { out = out + text[i]; }
+        i += 1;
+    }
+    return out;
+}
+
+func hex_value(c: str) -> int {
+    if c >= "0" and c <= "9" { return int_from_str(c); }
+    if c == "a" or c == "A" { return 10; }
+    if c == "b" or c == "B" { return 11; }
+    if c == "c" or c == "C" { return 12; }
+    if c == "d" or c == "D" { return 13; }
+    if c == "e" or c == "E" { return 14; }
+    return 15;
+}
+
+func integer_value(text: str) -> int {
+    let clean: str = strip_underscores(text);
+    if str_len(clean) >= 2 and clean[0] == "0" and
+       (clean[1] == "x" or clean[1] == "X") {
+        mut value: int = 0;
+        mut i: int = 2;
+        while i < str_len(clean) {
+            value = value * 16 + hex_value(clean[i]);
+            i += 1;
+        }
+        return value;
+    }
+    if str_len(clean) >= 2 and clean[0] == "0" and
+       (clean[1] == "b" or clean[1] == "B") {
+        mut value: int = 0;
+        mut i: int = 2;
+        while i < str_len(clean) {
+            value = value * 2 + int_from_str(clean[i]);
+            i += 1;
+        }
+        return value;
+    }
+    return int_from_str(clean);
+}
+
+func decode_string(source: str, start: int, finish: int) -> str {
+    mut out: str = "";
+    mut i: int = start + 1;
+    while i < finish - 1 {
+        if source[i] != "\\" {
+            out = out + source[i];
+            i += 1;
+        } else {
+            let e: str = source[i + 1];
+            if e == "n" { out = out + "\n"; }
+            else if e == "t" { out = out + "\t"; }
+            else if e == "r" { out = out + "\r"; }
+            else if e == "0" { out = out + "\0"; }
+            else if e == "\\" { out = out + "\\"; }
+            else if e == "\"" { out = out + "\""; }
+            else { out = out + "'"; }
+            i += 2;
+        }
+    }
+    return out;
+}
+
+func escaped_value(text: str) -> str {
+    mut out: str = "";
+    mut i: int = 0;
+    while i < str_len(text) {
+        let c: str = text[i];
+        if c == "\\" { out = out + "\\\\"; }
+        else if c == "\n" { out = out + "\\n"; }
+        else if c == "\t" { out = out + "\\t"; }
+        else if c == "\r" { out = out + "\\r"; }
+        else if c == "\0" { out = out + "\\0"; }
+        else { out = out + c; }
+        i += 1;
+    }
+    return out;
 }
 
 func keyword_kind(word: str) -> int {
@@ -137,9 +158,12 @@ func column_at(source: str, position: int) -> int {
 func emit(kind: int, source: str, start: int, finish: int) {
     let line: int = line_at(source, start);
     let column: int = column_at(source, start);
-    // The reference comparison intentionally uses token identity and source
-    // location first. Literal decoding is tested separately.
-    println(to_str(kind) + "|" + to_str(line) + "|" + to_str(column));
+    let raw: str = substr(source, start, finish - start);
+    mut value: str = "";
+    if kind == K_INT { value = to_str(integer_value(raw)); }
+    else if kind == K_FLOAT { value = f64_to_str(str_to_f64(raw)); }
+    else if kind == K_STR { value = escaped_value(decode_string(source, start, finish)); }
+    println(to_str(kind) + "|" + to_str(line) + "|" + to_str(column) + "|" + value);
 }
 
 func emit_error(source: str, position: int) {

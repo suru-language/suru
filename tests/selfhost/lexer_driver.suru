@@ -1,5 +1,5 @@
 use "../../selfhost/compiler/lexer.suru";
 
 func main() {
-    lex_dump(read_file("tests/selfhost/lexer_input.suru"));
+    exit(lex_dump(read_file(args(0))));
 }
