@@ -894,14 +894,25 @@ static bool builtin_str_to_f64(s_vm *vm) {
     return push(vm, s_val_float(v));
 }
 
+static char *cstr_dup(const s_value *sv) {
+    s_size n = s_obj_str_len(sv->u.o);
+    char *buf = malloc(n + 1);
+    if (!buf) return NULL;
+    memcpy(buf, s_obj_str_data(sv->u.o), n);
+    buf[n] = '\0';
+    return buf;
+}
+
 static bool builtin_read_file(s_vm *vm) {
     s_value p = pop(vm);
     if (p.tag != S_VAL_OBJ || p.u.o->kind != S_OBJ_STR) {
         vm_trap(vm, "read_file expects a path string");
         return false;
     }
-    const char *path = s_obj_str_data(p.u.o);
+    char *path = cstr_dup(&p);
+    if (!path) { vm_trap(vm, "read_file: out of memory"); return false; }
     FILE *f = fopen(path, "rb");
+    free(path);
     if (!f) { vm_trap(vm, "read_file: cannot open file"); return false; }
     if (fseek(f, 0, SEEK_END) != 0) { fclose(f); vm_trap(vm, "read_file: seek failed"); return false; }
     long sz = ftell(f);
@@ -925,10 +936,10 @@ static bool builtin_write_file(s_vm *vm) {
         vm_trap(vm, "write_file expects (str, str)");
         return false;
     }
-    const char *path = s_obj_str_data(p.u.o);
-    s_size n = s_obj_str_len(data.u.o);
-    const char *bytes = s_obj_str_data(data.u.o);
+    char *path = cstr_dup(&p);
+    if (!path) { vm_trap(vm, "write_file: out of memory"); return false; }
     FILE *f = fopen(path, "wb");
+    free(path);
     if (!f) { vm_trap(vm, "write_file: cannot open file"); return false; }
     size_t w = n ? fwrite(bytes, 1, n, f) : 0;
     if (fclose(f) != 0 || w != n) {
