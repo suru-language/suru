@@ -989,6 +989,77 @@ static bool builtin_str_pad(s_vm *vm) {
     return push(vm, s_val_obj(o));
 }
 
+static bool builtin_array_concat(s_vm *vm) {
+    s_value b = pop(vm);
+    s_value a = pop(vm);
+    if (a.tag != S_VAL_OBJ || a.u.o->kind != S_OBJ_ARRAY ||
+        b.tag != S_VAL_OBJ || b.u.o->kind != S_OBJ_ARRAY) {
+        vm_trap(vm, "array_concat expects two arrays");
+        return false;
+    }
+    s_u32 na = a.u.o->count, nb = b.u.o->count;
+    s_u32 n = na + nb;
+    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, n, 0);
+    if (!o) return false;
+    s_value *dst = s_obj_array_data(o);
+    memcpy(dst, s_obj_array_data(a.u.o), sizeof(s_value) * na);
+    memcpy(dst + na, s_obj_array_data(b.u.o), sizeof(s_value) * nb);
+    return push(vm, s_val_obj(o));
+}
+
+static bool builtin_array_lookup(s_vm *vm, bool want_index) {
+    s_value needle = pop(vm);
+    s_value arr = pop(vm);
+    if (arr.tag != S_VAL_OBJ || arr.u.o->kind != S_OBJ_ARRAY ||
+        needle.tag != S_VAL_INT) {
+        vm_trap(vm, want_index ? "array_index_of expects (array, int)"
+                               : "array_contains expects (array, int)");
+        return false;
+    }
+    s_u32 n = arr.u.o->count;
+    s_value *el = s_obj_array_data(arr.u.o);
+    for (s_u32 i = 0; i < n; ++i) {
+        if (el[i].tag != S_VAL_INT) {
+            vm_trap(vm, "array lookup expects an int array");
+            return false;
+        }
+        if (el[i].u.i == needle.u.i) {
+            return push(vm, want_index ? s_val_int((s_i64)i)
+                                       : s_val_int(1));
+        }
+    }
+    return push(vm, want_index ? s_val_int((s_i64)-1) : s_val_int(0));
+}
+
+static int cmp_i64(const void *pa, const void *pb) {
+    s_i64 a = ((const s_value *)pa)->u.i;
+    s_i64 b = ((const s_value *)pb)->u.i;
+    return (a > b) - (a < b);
+}
+
+static bool builtin_array_sort(s_vm *vm) {
+    s_value v = pop(vm);
+    if (v.tag != S_VAL_OBJ || v.u.o->kind != S_OBJ_ARRAY) {
+        vm_trap(vm, "array_sort expects an array");
+        return false;
+    }
+    s_u32 n = v.u.o->count;
+    s_value *el = s_obj_array_data(v.u.o);
+    for (s_u32 i = 0; i < n; ++i) {
+        if (el[i].tag != S_VAL_INT) {
+            vm_trap(vm, "array_sort expects an int array");
+            return false;
+        }
+    }
+    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, n, 0);
+    if (!o) return false;
+    if (n) {
+        memcpy(s_obj_array_data(o), el, sizeof(s_value) * n);
+        qsort(s_obj_array_data(o), n, sizeof(s_value), cmp_i64);
+    }
+    return push(vm, s_val_obj(o));
+}
+
 static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     switch (id) {
     case S_BUILTIN_PRINT: return builtin_print(vm, false);
@@ -1037,6 +1108,10 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_FILE_EXISTS: return builtin_file_exists(vm);
     case S_BUILTIN_INT_TO_STR_BASE: return builtin_int_to_str_base(vm);
     case S_BUILTIN_STR_PAD: return builtin_str_pad(vm);
+    case S_BUILTIN_ARRAY_CONCAT: return builtin_array_concat(vm);
+    case S_BUILTIN_ARRAY_CONTAINS: return builtin_array_lookup(vm, false);
+    case S_BUILTIN_ARRAY_INDEX_OF: return builtin_array_lookup(vm, true);
+    case S_BUILTIN_ARRAY_SORT: return builtin_array_sort(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

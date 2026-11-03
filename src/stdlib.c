@@ -95,6 +95,14 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "int_to_str_base", 2, { S_SIG_INT, S_SIG_INT }, S_SIG_STR },
     [S_BUILTIN_STR_PAD] = {
         "str_pad", 3, { S_SIG_STR, S_SIG_INT, S_SIG_STR }, S_SIG_STR },
+    [S_BUILTIN_ARRAY_CONCAT] = {
+        "array_concat", 2, { S_SIG_ARRAY, S_SIG_ARRAY }, S_SIG_ARRAY },
+    [S_BUILTIN_ARRAY_CONTAINS] = {
+        "array_contains", 2, { S_SIG_ARRAY_INT, S_SIG_INT }, S_SIG_BOOL },
+    [S_BUILTIN_ARRAY_INDEX_OF] = {
+        "array_index_of", 2, { S_SIG_ARRAY_INT, S_SIG_INT }, S_SIG_INT },
+    [S_BUILTIN_ARRAY_SORT] = {
+        "array_sort", 1, { S_SIG_ARRAY_INT }, S_SIG_ARRAY_INT },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {
