@@ -22,7 +22,215 @@ func nbc_find(text: str, needle: str) -> int {
 }
 
 func nbc_emit(instructions: [str], op: str, operands: str) -> [str] {
-    return array_concat(instructions, [op + "|" + operands]);
+    let record: str = op + "|" + operands;
+    // Materialize a private copy before retaining the record in the growing
+    // instruction array. This keeps later source-string temporaries from
+    // aliasing an instruction record during bootstrap GC.
+    let stable: str = substr(record, 0, str_len(record));
+    return array_concat(instructions, [stable]);
+}
+
+func nbc_has_prefix(text: str, prefix: str) -> bool {
+    return str_len(text) >= str_len(prefix) and
+           substr(text, 0, str_len(prefix)) == prefix;
+}
+
+func nbc_pool_index(instructions: [str], kind: str, value: str) -> int {
+    let wanted: str = "#" + kind + "|" + value;
+    mut i: int = 0;
+    mut index: int = 0;
+    while i < array_len(instructions) {
+        if instructions[i] == wanted { return index; }
+        if nbc_has_prefix(instructions[i], "#" + kind + "|") { index += 1; }
+        i += 1;
+    }
+    return -1;
+}
+
+func nbc_pool_count(instructions: [str], kind: str) -> int {
+    mut count: int = 0;
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], "#" + kind + "|") { count += 1; }
+        i += 1;
+    }
+    return count;
+}
+
+func nbc_const(instructions: [str], kind: str, op: str, value: str) -> [str] {
+    mut result: [str] = instructions;
+    mut index: int = nbc_pool_index(result, kind, value);
+    if index < 0 {
+        index = nbc_pool_count(result, kind);
+        result = array_concat(result, ["#" + kind + "|" + value]);
+    }
+    return nbc_emit(result, op, to_str(index));
+}
+
+func nbc_slot(instructions: [str], name: str) -> int {
+    let wanted: str = "#slot|" + name + "|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], wanted) {
+            let field: str = substr(instructions[i], str_len(wanted), str_len(instructions[i]));
+            return int_from_str(field);
+        }
+        i += 1;
+    }
+    return -1;
+}
+
+func nbc_bind(instructions: [str], name: str) -> [str] {
+    if nbc_slot(instructions, name) >= 0 { return instructions; }
+    let index: int = 0 + nbc_pool_count(instructions, "slot");
+    return array_concat(instructions, ["#slot|" + name + "|" + to_str(index)]);
+}
+
+func nbc_is_digit(c: str) -> bool {
+    return c >= "0" and c <= "9";
+}
+
+func nbc_is_integer(text: str) -> bool {
+    if str_len(text) == 0 { return false; }
+    mut i: int = 0;
+    if text[0] == "-" { i = 1; }
+    if i == str_len(text) { return false; }
+    while i < str_len(text) {
+        if not nbc_is_digit(text[i]) and text[i] != "_" { return false; }
+        i += 1;
+    }
+    return true;
+}
+
+func nbc_outer_parens(text: str) -> str {
+    if str_len(text) < 2 or text[0] != "(" or
+       text[str_len(text) - 1] != ")" { return text; }
+    mut depth: int = 0;
+    mut i: int = 0;
+    while i < str_len(text) {
+        if text[i] == "(" { depth += 1; }
+        if text[i] == ")" { depth -= 1; }
+        if depth == 0 and i < str_len(text) - 1 { return text; }
+        i += 1;
+    }
+    return str_trim(substr(text, 1, str_len(text) - 1));
+}
+
+func nbc_top_operator(text: str, operators: [str]) -> [str] {
+    mut depth: int = 0;
+    mut quote: bool = false;
+    mut i: int = str_len(text) - 1;
+    while i >= 0 {
+        let c: str = text[i];
+        if c == "\"" { quote = not quote; }
+        if not quote {
+            if c == ")" or c == "]" { depth += 1; }
+            if c == "(" or c == "[" { depth -= 1; }
+            if depth == 0 {
+                mut j: int = 0;
+                while j < array_len(operators) {
+                    let op: str = operators[j];
+                    let start: int = i - str_len(op) + 1;
+                    if start >= 0 and substr(text, start, str_len(op)) == op {
+                        return [to_str(start), op];
+                    }
+                    j += 1;
+                }
+            }
+        }
+        i -= 1;
+    }
+    return ["-1", ""];
+}
+
+func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
+    mut result: [str] = instructions;
+    mut text: str = str_trim(nbc_outer_parens(str_trim(expression)));
+    let logical = nbc_top_operator(text, [" or ", " and "]);
+    if int_from_str(logical[0]) >= 0 {
+        let at: int = int_from_str(logical[0]);
+        let op: str = logical[1];
+        result = nbc_emit_expression(result, substr(text, 0, at));
+        result = nbc_emit_expression(result,
+            substr(text, at + str_len(op), str_len(text)));
+        return nbc_emit(result, op == " and " ? "BC_BIT_AND" : "BC_BIT_OR", "");
+    }
+    let comparison = nbc_top_operator(text, [" == ", " != ", " <= ", " >= ", " < ", " > "]);
+    if int_from_str(comparison[0]) >= 0 {
+        let at: int = int_from_str(comparison[0]);
+        let op: str = comparison[1];
+        result = nbc_emit_expression(result, substr(text, 0, at));
+        result = nbc_emit_expression(result,
+            substr(text, at + str_len(op), str_len(text)));
+        mut byte_op: str = "BC_EQ_I";
+        if op == " != " { byte_op = "BC_NE_I"; }
+        if op == " < " { byte_op = "BC_LT_I"; }
+        if op == " <= " { byte_op = "BC_LE_I"; }
+        if op == " > " { byte_op = "BC_GT_I"; }
+        if op == " >= " { byte_op = "BC_GE_I"; }
+        return nbc_emit(result, byte_op, "");
+    }
+    let arithmetic = nbc_top_operator(text, [" + ", " - "]);
+    if int_from_str(arithmetic[0]) >= 0 {
+        let at: int = int_from_str(arithmetic[0]);
+        let op: str = arithmetic[1];
+        result = nbc_emit_expression(result, substr(text, 0, at));
+        result = nbc_emit_expression(result,
+            substr(text, at + str_len(op), str_len(text)));
+        mut byte_op: str = "BC_ADD_I";
+        if op == " - " { byte_op = "BC_SUB_I"; }
+        return nbc_emit(result, byte_op, "");
+    }
+    let multiplicative = nbc_top_operator(text, [" * ", " / ", " % "]);
+    if int_from_str(multiplicative[0]) >= 0 {
+        let at: int = int_from_str(multiplicative[0]);
+        let op: str = multiplicative[1];
+        result = nbc_emit_expression(result, substr(text, 0, at));
+        result = nbc_emit_expression(result,
+            substr(text, at + str_len(op), str_len(text)));
+        mut byte_op: str = "BC_MUL_I";
+        if op == " / " { byte_op = "BC_DIV_I"; }
+        if op == " % " { byte_op = "BC_MOD_I"; }
+        return nbc_emit(result, byte_op, "");
+    }
+    if nbc_has_prefix(text, "-") {
+        result = nbc_emit_expression(result, substr(text, 1, str_len(text)));
+        return nbc_emit(result, "BC_NEG_I", "");
+    }
+    if nbc_has_prefix(text, "not ") {
+        result = nbc_emit_expression(result, substr(text, 4, str_len(text)));
+        return nbc_emit(result, "BC_NOT", "");
+    }
+    if nbc_has_prefix(text, "~") {
+        result = nbc_emit_expression(result, substr(text, 1, str_len(text)));
+        return nbc_emit(result, "BC_BIT_NOT", "");
+    }
+    if nbc_is_integer(text) {
+        return nbc_const(result, "int", "BC_CONST_INT", text);
+    }
+    if text == "true" or text == "false" {
+        return nbc_const(result, "int", "BC_CONST_INT", text == "true" ? "1" : "0");
+    }
+    if text == "none" {
+        return nbc_emit(result, "BC_CONST_NONE", "");
+    }
+    if str_len(text) >= 2 and text[0] == "\"" and text[str_len(text) - 1] == "\"" {
+        return nbc_const(result, "str", "BC_CONST_STR", text);
+    }
+    let slot: int = nbc_slot(instructions, text);
+    if slot >= 0 { return nbc_emit(result, "BC_LD_LOCAL", to_str(slot)); }
+    return nbc_emit(result, "BC_TRAP", "unknown expression: " + text);
+}
+
+func nbc_expression_statement(instructions: [str], line: str) -> [str] {
+    mut result: [str] = instructions;
+    if nbc_has_prefix(line, "show(") and line[str_len(line) - 1] == ")" {
+        let value: str = substr(line, 5, str_len(line) - 6);
+        result = nbc_emit_expression(result, value);
+        result = nbc_emit(result, "BC_BUILTIN", "1");
+        return nbc_emit(result, "BC_POP", "");
+    }
+    return nbc_emit_expression(result, line);
 }
 
 func nbc_label(instructions: [str], name: str) -> [str] {
@@ -56,8 +264,43 @@ func nbc_render(instructions: [str]) -> int {
         if str_len(item) > 0 and item[0] == "@" {
             labels = array_concat(labels, [substr(item, 1, str_len(item))]);
             positions = array_concat(positions, [pc]);
+        } else if str_len(item) > 0 and item[0] == "#" {
+            // Pool and slot metadata do not occupy instruction indices.
         } else {
             pc += 1;
+        }
+        i += 1;
+    }
+    mut pool_index: int = 0;
+    i = 0;
+    while i < array_len(instructions) {
+        let item: str = instructions[i];
+        if nbc_has_prefix(item, "#int|") {
+            println("pool|int|" + to_str(pool_index) + "|" +
+                    substr(item, 5, str_len(item)));
+            pool_index += 1;
+        }
+        i += 1;
+    }
+    pool_index = 0;
+    i = 0;
+    while i < array_len(instructions) {
+        let item: str = instructions[i];
+        if nbc_has_prefix(item, "#float|") {
+            println("pool|float|" + to_str(pool_index) + "|" +
+                    substr(item, 7, str_len(item)));
+            pool_index += 1;
+        }
+        i += 1;
+    }
+    pool_index = 0;
+    i = 0;
+    while i < array_len(instructions) {
+        let item: str = instructions[i];
+        if nbc_has_prefix(item, "#str|") {
+            println("pool|str|" + to_str(pool_index) + "|" +
+                    substr(item, 5, str_len(item)));
+            pool_index += 1;
         }
         i += 1;
     }
@@ -65,15 +308,22 @@ func nbc_render(instructions: [str]) -> int {
     i = 0;
     while i < array_len(instructions) {
         let item: str = instructions[i];
-        if str_len(item) == 0 or item[0] == "@" { i += 1; continue; }
-        let parts: [str] = str_split(item, "|");
-        let op: str = parts[0];
-        mut rendered: str = "";
-        mut p: int = 1;
-        while p < array_len(parts) {
-            if p > 1 { rendered = rendered + "|"; }
-            rendered = rendered + nbc_resolve_operand(parts[p], labels, positions);
-            p += 1;
+        if str_len(item) == 0 or item[0] == "@" or item[0] == "#" {
+            i += 1;
+            continue;
+        }
+        let separator: int = nbc_find(item, "|");
+        let op: str = separator < 0 ? item : substr(item, 0, separator);
+        mut rendered: str = separator < 0 ? "" :
+            substr(item, separator + 1, str_len(item));
+        let operand_separator: int = nbc_find(rendered, "|");
+        if operand_separator >= 0 {
+            let first: str = substr(rendered, 0, operand_separator);
+            let rest: str = substr(rendered, operand_separator + 1,
+                                   str_len(rendered));
+            rendered = nbc_resolve_operand(first, labels, positions) + "|" + rest;
+        } else if rendered != "" {
+            rendered = nbc_resolve_operand(rendered, labels, positions);
         }
         println("bc|" + to_str(pc) + "|" + op + "|" + rendered);
         pc += 1;
@@ -116,9 +366,19 @@ func natural_emit_bytecode(source: str) -> int {
             let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
             instructions = nbc_emit(instructions, "BC_POP_HANDLER", "");
             instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[1]);
-            let colon: int = nbc_find(line, ":");
-            let effect: str = str_trim(substr(line, colon + 1, str_len(line)));
+            let handler_rest: str = nbc_after(line, "handle");
+            let colon: int = nbc_find(handler_rest, ":");
+            let binding: str = str_trim(substr(handler_rest, 0, colon));
+            let effect: str = str_trim(substr(handler_rest, colon + 1,
+                                              str_len(handler_rest)));
             instructions = nbc_label(instructions, fields[0]);
+            if binding != "" {
+                instructions = nbc_bind(instructions, binding);
+                instructions = nbc_emit(instructions, "BC_ST_LOCAL",
+                                        to_str(nbc_slot(instructions, binding)));
+            } else {
+                instructions = nbc_emit(instructions, "BC_POP", "");
+            }
             instructions = nbc_emit(instructions, "BC_NOP", "handler:" + effect);
             attempts[array_len(attempts) - 1] = fields[0] + "|" + fields[1] + "|" + fields[2] + "|1";
             continue;
@@ -161,6 +421,11 @@ func natural_emit_bytecode(source: str) -> int {
         }
         if nbc_word(line) == "give" {
             if array_len(attempts) > 0 {
+                let value: str = str_trim(nbc_after(line, "give"));
+                if value != "" {
+                    instructions = nbc_emit_expression(instructions, value);
+                    instructions = nbc_emit(instructions, "BC_POP", "");
+                }
                 let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
                 if fields[3] == "2" {
                     instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[2]);
@@ -170,12 +435,43 @@ func natural_emit_bytecode(source: str) -> int {
             } else {
                 let value: str = str_trim(nbc_after(line, "give"));
                 if value == "" { instructions = nbc_emit(instructions, "BC_RET_UNIT", ""); }
-                else { instructions = nbc_emit(instructions, "BC_NOP", "eval:" + value); instructions = nbc_emit(instructions, "BC_RET", ""); }
+                else {
+                    instructions = nbc_emit_expression(instructions, value);
+                    instructions = nbc_emit(instructions, "BC_RET", "");
+                }
             }
             continue;
         }
         if line == "end routine" { instructions = nbc_emit(instructions, "BC_RET_UNIT", ""); continue; }
-        instructions = nbc_emit(instructions, "BC_NOP", line);
+        if nbc_word(line) == "value" or nbc_word(line) == "change" or
+           nbc_word(line) == "constant" {
+            let rest: str = nbc_after(line, nbc_word(line));
+            let equals: int = nbc_find(rest, "=");
+            if equals < 0 { println("bytecode-error|binding requires '='"); return 1; }
+            let declaration: str = str_trim(substr(rest, 0, equals));
+            let colon: int = nbc_find(declaration, ":");
+            let name: str = colon < 0 ? declaration : str_trim(substr(declaration, 0, colon));
+            instructions = nbc_bind(instructions, name);
+            instructions = nbc_emit_expression(instructions,
+                substr(rest, equals + 1, str_len(rest)));
+            instructions = nbc_emit(instructions, "BC_ST_LOCAL",
+                                    to_str(nbc_slot(instructions, name)));
+            continue;
+        }
+        if nbc_word(line) == "set" {
+            let rest: str = nbc_after(line, "set");
+            let to_at: int = nbc_find(rest, " to ");
+            if to_at < 0 { println("bytecode-error|assignment requires 'to'"); return 1; }
+            let name: str = str_trim(substr(rest, 0, to_at));
+            let slot: int = nbc_slot(instructions, name);
+            if slot < 0 { println("bytecode-error|unknown assignment target: " + name); return 1; }
+            instructions = nbc_emit_expression(instructions,
+                substr(rest, to_at + 4, str_len(rest)));
+            instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(slot));
+            continue;
+        }
+        instructions = nbc_expression_statement(instructions, line);
+        if not nbc_has_prefix(line, "show(") { instructions = nbc_emit(instructions, "BC_POP", ""); }
     }
     if array_len(attempts) != 0 { println("bytecode-error|unterminated attempt"); return 1; }
     return nbc_render(instructions);

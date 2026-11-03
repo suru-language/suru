@@ -1,0 +1,6 @@
+routine values() -> Unit
+    value answer: Whole = 1 + 2 * 3
+    set answer to answer + 4
+    show(answer)
+    give
+end routine
