@@ -35,6 +35,40 @@ The coordination rule is strict: these choices must be settled in Document A,
 then reflected together in `docs/grammar.md`, the lexer/parser, and positive
 and negative conformance tests.
 
+## Proposed decisions for Document A review
+
+The following is a design proposal, not implemented behavior:
+
+- Natural syntax uses one statement per physical line; multiline expressions
+  continue inside balanced delimiters or after an explicit continuation marker.
+- `routine`, `record`, `contract`, `choice`, `when`, `each`, and `repeat` use
+  `end` as their explicit terminator. `otherwise` belongs to the nearest open
+  `when`; an `otherwise when` chain is permitted.
+- `value` declares an immutable binding, `change` declares a mutable binding,
+  `constant` declares a compile-time binding, and `set target = expression`
+  is the only assignment statement.
+- `routine name(parameters) -> result` is the declaration form and `give`
+  supplies its result. A routine with no result type has unit result and may
+  use `give` without an expression.
+- `each item in iterable` is the array/string iteration form. `repeat
+  condition` is a pre-test loop. Neither form has an implicit value.
+- `record` replaces `type` for user records; methods are declarations whose
+  first parameter is the receiver. `supports` is a declared contract
+  constraint checked during semantic analysis, not dynamic inheritance.
+- `choice` cases are named variants with optional payloads; `choose` must be
+  exhaustive unless it contains an explicit wildcard case.
+- `bring` imports a module and `expose` marks a public declaration. Imports
+  are resolved relative to the importing file, then through `SURU_MOD_PATH`,
+  and cycles are diagnosed.
+- `Result<T, E>` and `Option<T>` are ordinary compiler-known choice types;
+  pattern matching is the only implicit unwrapping operation.
+- Exceptions are typed effects on routines. A routine either handles an
+  effect locally or declares it in its signature; an undeclared propagation
+  is a compile-time error.
+
+Document A must accept, revise, or reject these proposals before the natural
+lexer is implemented. They are intentionally not added to the legacy grammar.
+
 ## Migration strategy
 
 1. Freeze and publish the Natural Syntax EBNF and precedence table.

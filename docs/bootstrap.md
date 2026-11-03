@@ -58,6 +58,13 @@ GCC 12.2.0 is installed. Clang and `clang --analyze` were not installed in the
 audit environment, so no Clang result is claimed. The Makefile's static
 analysis target consequently cannot provide a result until Clang is available.
 
+GCC's `-fanalyzer` was available and completed successfully with:
+
+```text
+gcc -std=c17 -Iinclude -Wall -Wextra -Wpedantic -Wconversion -Wshadow \
+    -fanalyzer -fsyntax-only src/*.c
+```
+
 The first sanitizer invocation using the existing `asan-test` target was
 terminated by the environment after repeated AddressSanitizer fatal-signal
 output. It is not recorded as a pass. Sanitizer verification must be repeated
