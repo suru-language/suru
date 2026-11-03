@@ -938,6 +938,8 @@ static bool builtin_write_file(s_vm *vm) {
     }
     char *path = cstr_dup(&p);
     if (!path) { vm_trap(vm, "write_file: out of memory"); return false; }
+    s_size n = s_obj_str_len(data.u.o);
+    const char *bytes = s_obj_str_data(data.u.o);
     FILE *f = fopen(path, "wb");
     free(path);
     if (!f) { vm_trap(vm, "write_file: cannot open file"); return false; }
@@ -955,7 +957,10 @@ static bool builtin_file_exists(s_vm *vm) {
         vm_trap(vm, "file_exists expects a path string");
         return false;
     }
-    FILE *f = fopen(s_obj_str_data(p.u.o), "rb");
+    char *path = cstr_dup(&p);
+    if (!path) { vm_trap(vm, "file_exists: out of memory"); return false; }
+    FILE *f = fopen(path, "rb");
+    free(path);
     bool exists = f != NULL;
     if (f) fclose(f);
     return push(vm, s_val_int(exists ? 1 : 0));
