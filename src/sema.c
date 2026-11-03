@@ -535,6 +535,74 @@ static s_type *check_call(s_sema *S, s_expr *e) {
         }
     }
 
+    /* Method call: obj.method(args) where `method` is not a record field but a
+     * module function whose first parameter type matches obj's record type.
+     * Desugars to a plain call with the receiver prepended. */
+    if (callee->kind == S_EXPR_FIELD) {
+        s_type *rt = check_expr(S, callee->u.field.obj);
+        if (rt && rt->kind == S_TYPE_RECORD && rt->record_name) {
+            s_record_decl *rec = &S->mod->records[rt->record_index];
+            bool is_field = false;
+            for (s_size fi = 0; fi < rec->nfields; ++fi) {
+                if (strcmp(rec->fields[fi].name, callee->u.field.field) == 0) {
+                    is_field = true;
+                    break;
+                }
+            }
+            if (!is_field) {
+                const char *mname = callee->u.field.field;
+                bool found = false;
+                for (s_size fidx = 0; fidx < S->mod->nfuncs; ++fidx) {
+                    const s_func_decl *meth = &S->mod->funcs[fidx];
+                    if (strcmp(meth->name, mname) != 0) continue;
+                    if (meth->ntype_params > 0) continue; /* generic methods unsupported */
+                    if (meth->nparams < 1) continue;
+                    if (!meth->params[0].type ||
+                        meth->params[0].type->kind != S_TYPE_RECORD ||
+                        !meth->params[0].type->record_name ||
+                        strcmp(meth->params[0].type->record_name, rt->record_name) != 0)
+                        continue;
+                    found = true;
+                    if (e->u.call.nargs + 1 != meth->nparams) {
+                        s_diag_error(S->diag, e->loc, 413,
+                                     "method '%s' expects %zu argument(s), got %zu",
+                                     mname, meth->nparams - 1, e->u.call.nargs);
+                        return type_unit(S);
+                    }
+                    for (s_size i = 1; i < meth->nparams; ++i) {
+                        s_type *at = check_expr(S, e->u.call.args[i - 1]);
+                        if (at && !type_eq(at, meth->params[i].type)) {
+                            s_diag_error(S->diag, e->u.call.args[i - 1]->loc, 413,
+                                         "argument %zu of method '%s' has type %s, expected %s",
+                                         i, mname, type_name(at),
+                                         type_name(meth->params[i].type));
+                        }
+                    }
+                    /* desugar: callee -> function ref, receiver prepended */
+                    s_expr **na = s_arena_calloc(S->arena, e->u.call.nargs + 1,
+                                                  sizeof(s_expr *),
+                                                  _Alignof(s_expr *));
+                    if (!na) return type_unit(S);
+                    na[0] = callee->u.field.obj;
+                    for (s_size i = 0; i < e->u.call.nargs; ++i)
+                        na[i + 1] = e->u.call.args[i];
+                    e->u.call.args = na;
+                    e->u.call.nargs++;
+                    callee->kind = S_EXPR_FUNC_REF;
+                    callee->u.var.name = mname;
+                    callee->u.var.var_index = (int)f;
+                    return meth->ret_type;
+                }
+                if (!found) {
+                    s_diag_error(S->diag, callee->loc, 400,
+                                 "record '%s' has no field or method '%s'",
+                                 rec->name, mname);
+                    return type_unit(S);
+                }
+            }
+        }
+    }
+
     /* Dynamic call through a function-typed value. */
     {
         s_type *ct = check_expr(S, callee);
