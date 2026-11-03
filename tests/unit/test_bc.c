@@ -127,6 +127,23 @@ static void test_read_garbage(void) {
     CHECK(s_bc_read(garbage, 2, &m) != 0);
 }
 
+static void test_read_short_record_table(void) {
+    /* Regression: a header with a large nrecords but a truncated record table
+     * used to leave trailing `record_names` entries uninitialized (malloc, not
+     * calloc), so s_bc_module_dispose freed garbage pointers on the failure
+     * path. Found by coverage-guided fuzzing. */
+    static const s_u8 buf[48] = {
+        0x53,0x55,0x52,0x55,0x01,0x00,0x00,0x00,
+        0x00,0x53,0x55,0x00,0x00,0x00,0x00,0x00,
+        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+        0x00,0x53,0x55,0x00,0x00,0x00,0x00,0x00,
+        0x52,0x00,0x00,0x0e,0x00,0x55,0x2d,0x00,
+        0x0d,0x0d,0x69,0x52,0x55,0x0d,0x0d
+    };
+    s_bc_module m;
+    CHECK(s_bc_read(buf, sizeof(buf), &m) != 0);
+}
+
 TEST_MAIN_BEGIN()
     test_verify_valid();
     test_roundtrip();
@@ -134,5 +151,6 @@ TEST_MAIN_BEGIN()
     test_verify_underflow();
     test_verify_bad_local();
     test_read_garbage();
+    test_read_short_record_table();
     test_le_endian();
 TEST_MAIN_END()
