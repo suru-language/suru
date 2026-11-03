@@ -102,6 +102,12 @@ func natural_effect_check(source: str) -> int {
             handled[array_len(handled) - 1] = rest;
             continue;
         }
+        if raw == "ensure" {
+            if array_len(handled) == 0 {
+                nes_error(line, "ensure has no owning attempt"); return 1;
+            }
+            continue;
+        }
         if raw == "end exception" { continue; }
         if raw == "end attempt" {
             if array_len(handled) == 0 {

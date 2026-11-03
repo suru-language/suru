@@ -1,0 +1,55 @@
+// Natural Syntax effect runtime model.
+// State is serialized at this bootstrap stage; the native runtime will replace
+// it with a managed exception object while preserving this observable contract.
+
+func effect_normal() -> str {
+    return "normal";
+}
+
+func effect_return(value: str) -> str {
+    return "return|" + value;
+}
+
+func effect_exception(type_name: str, message: str) -> str {
+    return "exception|" + type_name + "|" + message;
+}
+
+func effect_cleanup(active: str, cleanup: str) -> str {
+    if cleanup == "" or cleanup == "normal" { return active; }
+    if active == "" or active == "normal" { return cleanup; }
+    if str_contains(cleanup, "exception|") {
+        return cleanup + "|cause=" + active;
+    }
+    return cleanup;
+}
+
+func effect_handler_matches(state: str, type_name: str) -> bool {
+    let prefix: str = "exception|" + type_name + "|";
+    return str_len(state) >= str_len(prefix) and
+           substr(state, 0, str_len(prefix)) == prefix;
+}
+
+func effect_handle(state: str, type_name: str, replacement: str) -> str {
+    if effect_handler_matches(state, type_name) { return replacement; }
+    return state;
+}
+
+func effect_unwind(inner: str, outer: str) -> str {
+    // Inner cleanup/replacement completes before the outer state is observed.
+    return effect_cleanup(outer, inner);
+}
+
+func effect_runtime_check() -> int {
+    let normal: str = effect_normal();
+    let failure: str = effect_exception("FileError", "read failed");
+    let cleanup_failure: str = effect_exception("CleanupError", "close failed");
+    let replaced: str = effect_cleanup(failure, cleanup_failure);
+    println("normal|" + normal);
+    println("return|" + effect_return("42"));
+    println("failure|" + failure);
+    println("replaced|" + replaced);
+    println("handled|" + effect_handle(failure, "FileError", normal));
+    println("unhandled|" + effect_handle(failure, "OtherError", normal));
+    println("nested|" + effect_unwind(cleanup_failure, failure));
+    return 0;
+}

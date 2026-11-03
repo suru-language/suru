@@ -135,3 +135,6 @@ matches are checked for exhaustiveness or `_`, and
 rejects missing modules and import cycles.
 `selfhost/compiler/natural_effect_semantic.suru` now checks calls to effectful
 routines against declared `throws` effects and compatible `handle` clauses.
+The bootstrap runtime effect model is in `selfhost/runtime/effects.suru`; it
+defines normal/return/exception states, typed handler matching, nested unwind,
+and cleanup replacement with retained causes.

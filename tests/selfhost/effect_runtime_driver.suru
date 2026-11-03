@@ -1,0 +1,5 @@
+use "../../selfhost/runtime/effects.suru";
+
+func main() {
+    exit(effect_runtime_check());
+}

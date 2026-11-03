@@ -100,6 +100,7 @@ runtime integration remain open; the declaration/effect gate now validates
 their initial signatures, ownership, aliases, and duplicate declarations. No
 contract method compatibility, exhaustive choice matches, and relative module
 resolution/cycles are now covered by dedicated gates. Typed routine-call
-propagation and compatible handler coverage now have a dedicated gate; runtime
-effect representation and cleanup replacement semantics remain open. No legacy
-default behavior may change during the port.
+propagation and compatible handler coverage now have a dedicated gate. The
+bootstrap effect runtime also specifies cleanup replacement and retained
+causes; native VM object representation remains open. No legacy default
+behavior may change during the port.
