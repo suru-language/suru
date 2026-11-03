@@ -45,6 +45,7 @@ typedef enum s_bc_op {
 
     BC_NEW_ARRAY,      /* a = element count, pops that many values, pushes array */
     BC_NEW_RECORD,     /* a = record type index, b = field count; pops fields */
+    BC_NEW_EXCEPTION,  /* pops type, message, cause; pushes managed exception */
 
     BC_IDX_LD,         /* pops index, array; pushes element */
     BC_IDX_ST,         /* pops value, index, array; stores */

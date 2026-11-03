@@ -11,6 +11,7 @@ static int ins_pops(const s_bc_module *m, s_u32 fid, const s_bc_ins *in) {
     switch ((int)in->op) {
     case BC_NEW_ARRAY: return (int)in->a;
     case BC_NEW_RECORD: return (int)in->b;
+    case BC_NEW_EXCEPTION: return 3;
     case BC_MKCLOSURE_V: return (int)in->b;
     case BC_CALL:
         if (in->a >= m->nfuncs) return -1;

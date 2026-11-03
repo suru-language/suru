@@ -59,6 +59,7 @@ const s_bc_op_info s_bc_op_table[BC_OP_COUNT] = {
     [BC_NE_B]           = { "ne_b",           0, 2, 1, 0, 0 },
     [BC_NEW_ARRAY]      = { "new_array",      1, 1, 1, 0, 0 }, /* pops variable */
     [BC_NEW_RECORD]     = { "new_record",     2, 1, 1, 0, 0 }, /* pops variable */
+    [BC_NEW_EXCEPTION]  = { "new_exception",  0, 3, 1, 0, 0 },
     [BC_IDX_LD]         = { "idx_ld",         0, 2, 1, 0, 0 },
     [BC_IDX_ST]         = { "idx_st",         0, 3, 0, 0, 0 },
     [BC_ARR_LEN]        = { "arr_len",        0, 1, 1, 0, 0 },

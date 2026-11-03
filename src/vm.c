@@ -23,6 +23,15 @@ typedef struct s_cont {
     s_size ret_slot;   /* caller operand slot where the result must be written */
 } s_cont;
 
+typedef struct s_handler {
+    s_u32 fid;
+    s_u32 target;
+    s_u32 type_index;
+    s_size fp;
+    s_size sp;
+    s_size call_depth;
+} s_handler;
+
 struct s_vm {
     const s_bc_module *m;
     s_heap *heap;
@@ -36,6 +45,8 @@ struct s_vm {
     char **argv;
     s_cont *calls;
     s_size ncalls, capcalls;
+    s_handler *handlers;
+    s_size nhandlers, caphandlers;
     s_u32 alloc_counter;
     s_u64 gc_threshold;
     s_u64 gc_min_threshold;
@@ -69,6 +80,7 @@ void s_vm_destroy(s_vm *vm) {
     if (!vm) return;
     free(vm->st);
     free(vm->calls);
+    free(vm->handlers);
     free(vm);
 }
 
@@ -111,6 +123,75 @@ static bool grow_calls(s_vm *vm) {
     if (!n) return false;
     vm->calls = n;
     vm->capcalls = ncap;
+    return true;
+}
+
+static bool push(s_vm *vm, s_value v);
+
+static bool grow_handlers(s_vm *vm) {
+    if (vm->nhandlers < vm->caphandlers) return true;
+    s_size ncap = vm->caphandlers ? vm->caphandlers * 2 : 32;
+    s_handler *n = realloc(vm->handlers, sizeof(*n) * ncap);
+    if (!n) return false;
+    vm->handlers = n;
+    vm->caphandlers = ncap;
+    return true;
+}
+
+static void discard_frame_handlers(s_vm *vm) {
+    while (vm->nhandlers > 0) {
+        s_handler *h = &vm->handlers[vm->nhandlers - 1];
+        if (h->fid != vm->cur_fid || h->call_depth != vm->ncalls) break;
+        vm->nhandlers--;
+    }
+}
+
+static bool exception_matches(const s_vm *vm, s_value exception,
+                              s_u32 type_index) {
+    if (exception.tag != S_VAL_OBJ ||
+        exception.u.o->kind != S_OBJ_EXCEPTION) return false;
+    if (type_index == UINT32_MAX) return true;
+    s_value type = s_obj_exception_fields(exception.u.o)[0];
+    if (type.tag != S_VAL_OBJ || type.u.o->kind != S_OBJ_STR) return false;
+    s_size want_len = vm->m->strlens[type_index];
+    return s_obj_str_len(type.u.o) == want_len &&
+           memcmp(s_obj_str_data(type.u.o), vm->m->strings[type_index], want_len) == 0;
+}
+
+static void vm_uncaught_exception(s_vm *vm, s_value exception) {
+    if (exception.tag == S_VAL_OBJ && exception.u.o->kind == S_OBJ_EXCEPTION) {
+        s_value *fields = s_obj_exception_fields(exception.u.o);
+        if (fields[0].tag == S_VAL_OBJ && fields[1].tag == S_VAL_OBJ &&
+            fields[0].u.o->kind == S_OBJ_STR && fields[1].u.o->kind == S_OBJ_STR) {
+            vm_trap(vm, "uncaught %.*s: %.*s",
+                    (int)s_obj_str_len(fields[0].u.o), s_obj_str_data(fields[0].u.o),
+                    (int)s_obj_str_len(fields[1].u.o), s_obj_str_data(fields[1].u.o));
+            return;
+        }
+    }
+    vm_trap(vm, "throw expects an exception object");
+}
+
+static bool vm_throw(s_vm *vm, s_value exception, const s_bc_module *m,
+                     const s_bc_func **f, s_u32 *pc) {
+    s_size found = vm->nhandlers;
+    while (found > 0) {
+        --found;
+        if (exception_matches(vm, exception, vm->handlers[found].type_index)) break;
+    }
+    if (found == vm->nhandlers) {
+        vm_uncaught_exception(vm, exception);
+        return false;
+    }
+    s_handler handler = vm->handlers[found];
+    vm->nhandlers = found;
+    vm->ncalls = handler.call_depth;
+    vm->cur_fid = handler.fid;
+    vm->fp = handler.fp;
+    vm->sp = handler.sp;
+    *f = &m->funcs[handler.fid];
+    if (!push(vm, exception)) return false;
+    *pc = handler.target;
     return true;
 }
 
@@ -1353,6 +1434,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
     vm->sp = 0;
     vm->fp = 0;
     vm->ncalls = 0;
+    vm->nhandlers = 0;
     vm->trapped = false;
     vm->exit_code = 0;
 
@@ -1557,6 +1639,23 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             if (!push(vm, s_val_obj(o))) return 1;
             pc++; break;
         }
+        case BC_NEW_EXCEPTION: {
+            s_value cause = pop(vm);
+            s_value message = pop(vm);
+            s_value type = pop(vm);
+            if (type.tag != S_VAL_OBJ || type.u.o->kind != S_OBJ_STR ||
+                message.tag != S_VAL_OBJ || message.u.o->kind != S_OBJ_STR ||
+                (cause.tag != S_VAL_NONE &&
+                 (cause.tag != S_VAL_OBJ || cause.u.o->kind != S_OBJ_EXCEPTION))) {
+                vm_trap(vm, "new_exception type error");
+                return 1;
+            }
+            s_gcobj *o = s_heap_new_exception(vm->heap, type, message, cause);
+            if (!o) { vm_trap(vm, "out of memory"); return 1; }
+            if (!push(vm, s_val_obj(o))) return 1;
+            pc++;
+            break;
+        }
         case BC_IDX_LD: {
             s_value idx = pop(vm);
             s_value arr = pop(vm);
@@ -1660,6 +1759,31 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             pc = 0;
             break;
         }
+        case BC_PUSH_HANDLER:
+            if (!grow_handlers(vm)) {
+                vm_trap(vm, "handler stack overflow");
+                return 1;
+            }
+            vm->handlers[vm->nhandlers++] = (s_handler){
+                vm->cur_fid, in->a, in->b, vm->fp, vm->sp, vm->ncalls
+            };
+            pc++;
+            break;
+        case BC_POP_HANDLER:
+            if (vm->nhandlers == 0 ||
+                vm->handlers[vm->nhandlers - 1].fid != vm->cur_fid ||
+                vm->handlers[vm->nhandlers - 1].call_depth != vm->ncalls) {
+                vm_trap(vm, "handler stack underflow");
+                return 1;
+            }
+            vm->nhandlers--;
+            pc++;
+            break;
+        case BC_THROW: {
+            s_value exception = pop(vm);
+            if (!vm_throw(vm, exception, m, &f, &pc)) return 1;
+            break;
+        }
         case BC_MKCLOSURE: {
             s_gcobj *o = vm_alloc(vm, S_OBJ_CLOSURE, 1, 0);
             if (!o) return 1;
@@ -1741,6 +1865,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             if (in->op == BC_RET) {
                 result = pop(vm);
             }
+            discard_frame_handlers(vm);
             if (vm->ncalls == 0) {
                 if (result.tag == S_VAL_INT) vm->exit_code = (int)result.u.i;
                 else vm->exit_code = 0;
