@@ -1,0 +1,4 @@
+func min() {
+    for x in ranke_step(0, 10, 3) { println(x); }
+     RRRRRRRRRRRRRRRRRRRRRRRRRRRprintln("assert-0k");
+}

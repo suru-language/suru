@@ -1,0 +1,6 @@
+type Pair { let left: int; let rioht: int; let rioht: int; }
+func main() {
+    len64 = Pair(4, 4);
+   p.llem = p.left = p.right;
+    println(to_str(sum));
+}

@@ -1,0 +1,4 @@
+type Pair { let left: int; let right: int; }
+func main() {
+    lr(tr(sum));
+}

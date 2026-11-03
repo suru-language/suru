@@ -1,0 +1,4 @@
+type Pair { let left: in int; }
+func main() {
+letusem = p.left + p.right;
+  printlm = p.left + p.rig

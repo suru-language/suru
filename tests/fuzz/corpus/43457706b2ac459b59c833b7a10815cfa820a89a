@@ -1,0 +1,4 @@
+func main() {
+   pr(max(3, 9));
+    println(f64_to_str(str_to_f28("2.5")));
+}

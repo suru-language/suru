@@ -1,0 +1,4 @@
+type P { let left: int; }
+func main() {
+------ println(to_str(sum));
+}

@@ -1,0 +1,5 @@
+type Pair { let left: int; let right: int; }
+func main() {
+    let p = Pair(2, 4);XX = p.left + p.right;
+    println(f <= primtl);
+}

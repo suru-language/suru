@@ -1,0 +1,4 @@
+func mnUUUUUUUUUUUUUUUUUUUbreakUUUUUUUUUUUUUUUUUUUUUUUUUew() {
+ (abs(-7));
+   newintln(min64.to_str(str_to_f64("Ù.5")));
+}

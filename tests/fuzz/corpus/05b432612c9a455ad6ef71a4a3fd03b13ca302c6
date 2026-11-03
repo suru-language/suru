@@ -1,0 +1,6 @@
+func main() {
+  ntln(1.5);
+    println("hi");
+    printintln("hi");
+    println(ab(_to_f64("2.5")));
+}

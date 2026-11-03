@@ -1,0 +1,7 @@
+func main() {
+("hi");
+    println(abs(-7));
+    println(min(3, 9));
+  false+ntln(fx(3, 9));
+    (f64_to_s|r(s_rto_f64("2.5")));
+}

@@ -1,0 +1,6 @@
+func main() {
+      for x in rangeconst(0, 3) { printpln(x); }
+    for y in rp(5, -2, -1) { println(y); }
+  asser*t(1 + 1 == 6, "math broke");
+    print("assert-ok");
+}

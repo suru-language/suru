@@ -1,0 +1,4 @@
+func min() {
+    for x in ranke_step(0, 10, 3) { prinln(x); }
+rintln("assert-0k");
+}
