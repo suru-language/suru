@@ -5,6 +5,7 @@
 
 #include <string.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #define VM_INIT_STACK 4096u
@@ -877,6 +878,62 @@ static bool builtin_str_to_f64(s_vm *vm) {
     return push(vm, s_val_float(v));
 }
 
+static bool builtin_read_file(s_vm *vm) {
+    s_value p = pop(vm);
+    if (p.tag != S_VAL_OBJ || p.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "read_file expects a path string");
+        return false;
+    }
+    const char *path = s_obj_str_data(p.u.o);
+    FILE *f = fopen(path, "rb");
+    if (!f) { vm_trap(vm, "read_file: cannot open file"); return false; }
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); vm_trap(vm, "read_file: seek failed"); return false; }
+    long sz = ftell(f);
+    if (sz < 0) { fclose(f); vm_trap(vm, "read_file: tell failed"); return false; }
+    if (fseek(f, 0, SEEK_SET) != 0) { fclose(f); vm_trap(vm, "read_file: seek failed"); return false; }
+    s_size n = (s_size)sz;
+    if (n > (1u << 26)) { fclose(f); vm_trap(vm, "read_file too large"); return false; }
+    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
+    if (!o) { fclose(f); return false; }
+    size_t got = n ? fread(s_obj_str_data(o), 1, n, f) : 0;
+    fclose(f);
+    if (got != n) { vm_trap(vm, "read_file: short read"); return false; }
+    return push(vm, s_val_obj(o));
+}
+
+static bool builtin_write_file(s_vm *vm) {
+    s_value data = pop(vm);
+    s_value p = pop(vm);
+    if (p.tag != S_VAL_OBJ || p.u.o->kind != S_OBJ_STR ||
+        data.tag != S_VAL_OBJ || data.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "write_file expects (str, str)");
+        return false;
+    }
+    const char *path = s_obj_str_data(p.u.o);
+    s_size n = s_obj_str_len(data.u.o);
+    const char *bytes = s_obj_str_data(data.u.o);
+    FILE *f = fopen(path, "wb");
+    if (!f) { vm_trap(vm, "write_file: cannot open file"); return false; }
+    size_t w = n ? fwrite(bytes, 1, n, f) : 0;
+    if (fclose(f) != 0 || w != n) {
+        vm_trap(vm, "write_file: write failed");
+        return false;
+    }
+    return push(vm, s_val_none());
+}
+
+static bool builtin_file_exists(s_vm *vm) {
+    s_value p = pop(vm);
+    if (p.tag != S_VAL_OBJ || p.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "file_exists expects a path string");
+        return false;
+    }
+    FILE *f = fopen(s_obj_str_data(p.u.o), "rb");
+    bool exists = f != NULL;
+    if (f) fclose(f);
+    return push(vm, s_val_bool(exists));
+}
+
 static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     switch (id) {
     case S_BUILTIN_PRINT: return builtin_print(vm, false);
@@ -920,6 +977,9 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_ARRAY_SUM: return builtin_array_reduce(vm, 0);
     case S_BUILTIN_ARRAY_MIN: return builtin_array_reduce(vm, 1);
     case S_BUILTIN_ARRAY_MAX: return builtin_array_reduce(vm, 2);
+    case S_BUILTIN_READ_FILE: return builtin_read_file(vm);
+    case S_BUILTIN_WRITE_FILE: return builtin_write_file(vm);
+    case S_BUILTIN_FILE_EXISTS: return builtin_file_exists(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;
