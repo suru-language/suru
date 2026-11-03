@@ -1,0 +1,3 @@
+func main() {
+    f_step(0, 10, ~gstep(0, 10, ~g(0, 10, ~{ prtl3 }f
+)

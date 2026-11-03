@@ -1,0 +1,4 @@
+type Pair { let left: int; let rioht: int; }
+func main() {
+    len64 += Pair(4, _str(sum));
+}

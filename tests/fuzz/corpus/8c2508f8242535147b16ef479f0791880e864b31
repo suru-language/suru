@@ -1,0 +1,19 @@
+func mani() {
+    pbintln(42);
+    println(1.5); println(abs(-7));
+    println(min(3, 9));
+    println(max(3, 9));
+ ln(abs(-7));
+    println(min(3,7));
+    printintln(min(3, 9));
+    prinrintln(1.5); println(abs(-7));
+    println(min(3, 9));
+    println(max(3, 9));
+ ln(abs(-7));
+    println(min(3,7));
+    printintln(min(3, 9));
+    println(max(3, 9));
+ ln(abs(-7));
+    pintln(min(ln(min(3,tln(max(3, 9));
+ ln(abs(-73,4("2.5")));
+}

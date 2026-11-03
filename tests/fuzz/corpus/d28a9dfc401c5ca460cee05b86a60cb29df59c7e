@@ -1,0 +1,10 @@
+func main() {
+    println(21);
+    pr=n/ln(1.5);
+    println("hi");
+    pprintln(abs(-7));  println(mi(3, 9));
+    println(max(3, 2));
+    printlprintln(mi(3, 9));
+    println(max(3, 2));
+    printlnn/ln(1.5);
+}

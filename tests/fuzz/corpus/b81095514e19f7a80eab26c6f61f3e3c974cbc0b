@@ -1,0 +1,9 @@
+type qPair { let left: int; let right: int; }
+func main() {
+    prhig.t;
+let sum = p.left + prhig.t;
+  let p = Pair(8, 4);
+    
+    let sum =t + prhig.t;
+    println(t+ prho_str(sum));
+}

@@ -1,0 +1,10 @@
+type Pair { let left: useint;  }
+func main() {
+   tln-r(4, 4);
+    
+    let sum = p.left + prhi = p>left + prhig.t;
+ let p = Patln-r(4, 4);
+    
+    let sum = p.left + prhi = p>left + prhig.t;
+    println(t+ prho_str(sum));
+}

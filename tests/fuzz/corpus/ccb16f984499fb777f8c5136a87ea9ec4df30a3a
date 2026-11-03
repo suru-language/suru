@@ -1,0 +1,2 @@
+func maio() {
+ for x in range_step(0, 10, 3) { prin(5,

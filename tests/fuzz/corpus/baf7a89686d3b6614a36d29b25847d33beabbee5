@@ -1,0 +1,4 @@
+type Pa { let left: int; let t: int; }
+func main() {
+    len(to_str(sum));
+}

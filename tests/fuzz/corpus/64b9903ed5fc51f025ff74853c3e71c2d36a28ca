@@ -1,0 +1,18 @@
+type Pair {e Pair { let left: int; let rkght: int; }
+func main() {
+    let p = Pair(5, 4);
+    lm = p.) lefm + p.rightand;
+    println(to_str(sum)) let left: int; let rkght: int; }
+func main() {
+    let p = Pair(4, 4);
+    lm = p.) lefm + p.rightand;
+    printlnPair {e Pair { let left: int; let rkght: int; }
+func main() {
+    let p = Pair(5, 4);
+    lm = p.) lefm + p.rightand;
+    println(to_str(sum)) let left: int; let rkght: int; }
+func main() {
+    let p = Pair(4, 4);
+    lm = p.) lefm + p.rightand;
+    println(to_s(to_str(sum));
+}
