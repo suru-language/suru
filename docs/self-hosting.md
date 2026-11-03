@@ -117,3 +117,6 @@ Core statement parsing and the first AST node record are in
 `selfhost/compiler/natural_statement_parser.suru` and
 `selfhost/compiler/natural_ast.suru`, currently covering `value`, `change`,
 `constant`, `set ... to`, `show`, and `give`.
+Control-flow AST parsing is now covered by
+`selfhost/compiler/natural_control_parser.suru` for `when`, `otherwise`,
+`repeat`, `each`, `choose`, `case`, and matching block terminators.

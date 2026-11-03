@@ -92,5 +92,6 @@ currently checks declarations, binding initializers, public signatures,
 constant scope, mutable assignment targets, and routine return context. The
 token-based expression parser and core statement AST bridge now cover
 precedence expressions, bindings, assignment, `show`, and `give`; type and
-semantic gates remain open. No legacy default behavior may change during the
-port.
+semantic gates remain open. Control-flow AST nodes and nested block ownership
+are covered by the Natural Syntax parser gate. No legacy default behavior may
+change during the port.

@@ -1,0 +1,208 @@
+// Token-based control-flow AST parser. Core statements are delegated to the
+// statement parser; this module owns block nesting and clause ownership.
+
+use "natural_statement_parser.suru";
+use "natural_ast.suru";
+
+func nac_ok(next: int, node: str, action: str, kind: str) -> [str] {
+    return ["ok", to_str(next), node, action, kind, ""];
+}
+
+func nac_fail(position: int, message: str) -> [str] {
+    return ["error", to_str(position), "", "", "", message];
+}
+
+func nac_next(result: [str]) -> int {
+    return int_from_str(result[1]);
+}
+
+func nac_is_ok(result: [str]) -> bool {
+    return result[0] == "ok";
+}
+
+func nac_node(result: [str]) -> str {
+    return result[2];
+}
+
+func nac_action(result: [str]) -> str {
+    return result[3];
+}
+
+func nac_kind(result: [str]) -> str {
+    return result[4];
+}
+
+func nac_message(result: [str]) -> str {
+    return result[5];
+}
+
+func nac_skip_lines(source: str, position: int) -> int {
+    mut p: int = position;
+    while true {
+        let t = natural_next(source, p);
+        if t.kind != NT_NEWLINE { return p; }
+        p = t.next;
+    }
+    return p;
+}
+
+func nac_finish(source: str, position: int, node: str, action: str, kind: str) -> [str] {
+    let t = natural_next(source, position);
+    if t.kind == NT_NEWLINE or t.kind == NT_EOF {
+        return nac_ok(t.next, node, action, kind);
+    }
+    return nac_fail(t.start, "expected statement terminator");
+}
+
+func nac_parse_when(source: str, first: NToken) -> [str] {
+    let expression = ne_parse_expression(source, first.next, 0);
+    if ne_is_ok(expression) == false {
+        return nac_fail(first.next, ne_message(expression));
+    }
+    let node = na_make("when", first.line, ne_value(expression));
+    return nac_finish(source, ne_next(expression), na_render(node), "push", "when");
+}
+
+func nac_parse_repeat(source: str, first: NToken) -> [str] {
+    let while_word = natural_next(source, first.next);
+    if while_word.text != "while" {
+        return nac_fail(while_word.start, "repeat requires 'while'");
+    }
+    let expression = ne_parse_expression(source, while_word.next, 0);
+    if ne_is_ok(expression) == false {
+        return nac_fail(while_word.next, ne_message(expression));
+    }
+    let node = na_make("repeat", first.line, "while " + ne_value(expression));
+    return nac_finish(source, ne_next(expression), na_render(node), "push", "repeat");
+}
+
+func nac_parse_each(source: str, first: NToken) -> [str] {
+    let item = natural_next(source, first.next);
+    if item.kind != NT_IDENT {
+        return nac_fail(item.start, "each requires a binding name");
+    }
+    let mode = natural_next(source, item.next);
+    if mode.text == "across" {
+        let expression = ne_parse_expression(source, mode.next, 0);
+        if ne_is_ok(expression) == false {
+            return nac_fail(mode.next, ne_message(expression));
+        }
+        let node = na_make("each", first.line,
+                           item.text + " across " + ne_value(expression));
+        return nac_finish(source, ne_next(expression), na_render(node), "push", "each");
+    }
+    if mode.text != "from" {
+        return nac_fail(mode.start, "each requires 'across' or 'from'");
+    }
+    let start = ne_parse_expression(source, mode.next, 0);
+    if ne_is_ok(start) == false { return nac_fail(mode.next, ne_message(start)); }
+    let range_mode = natural_next(source, nac_skip_lines(source, ne_next(start)));
+    if range_mode.text != "until" and range_mode.text != "through" {
+        return nac_fail(range_mode.start, "each range requires 'until' or 'through'");
+    }
+    let finish = ne_parse_expression(source, range_mode.next, 0);
+    if ne_is_ok(finish) == false { return nac_fail(range_mode.next, ne_message(finish)); }
+    let node = na_make("each", first.line,
+                       item.text + " from " + ne_value(start) + " " +
+                       range_mode.text + " " + ne_value(finish));
+    return nac_finish(source, ne_next(finish), na_render(node), "push", "each");
+}
+
+func nac_parse_choose(source: str, first: NToken) -> [str] {
+    let expression = ne_parse_expression(source, first.next, 0);
+    if ne_is_ok(expression) == false {
+        return nac_fail(first.next, ne_message(expression));
+    }
+    let node = na_make("choose", first.line, ne_value(expression));
+    return nac_finish(source, ne_next(expression), na_render(node), "push", "choose");
+}
+
+func nac_parse_clause(source: str, first: NToken, stack: [str]) -> [str] {
+    let owner = stack[array_len(stack) - 1];
+    if first.text == "otherwise" {
+        if owner != "when" { return nac_fail(first.start, "otherwise has no owning when"); }
+        let next = natural_next(source, first.next);
+        if next.text == "when" {
+            let expression = ne_parse_expression(source, next.next, 0);
+            if ne_is_ok(expression) == false { return nac_fail(next.next, ne_message(expression)); }
+            let node = na_make("otherwise-when", first.line, ne_value(expression));
+            return nac_finish(source, ne_next(expression), na_render(node), "none", "");
+        }
+        let node = na_make("otherwise", first.line, "");
+        return nac_finish(source, first.next, na_render(node), "none", "");
+    }
+    if owner != "choose" { return nac_fail(first.start, "case has no owning choose"); }
+    let pattern = ne_parse_expression(source, first.next, 0);
+    if ne_is_ok(pattern) == false { return nac_fail(first.next, ne_message(pattern)); }
+    let node = na_make("case", first.line, ne_value(pattern));
+    return nac_finish(source, ne_next(pattern), na_render(node), "none", "");
+}
+
+func nac_parse_end(source: str, first: NToken, stack: [str]) -> [str] {
+    if array_len(stack) == 0 { return nac_fail(first.start, "end has no open block"); }
+    let kind = natural_next(source, first.next);
+    let owner = stack[array_len(stack) - 1];
+    if kind.text != owner {
+        return nac_fail(kind.start, "mismatched block terminator");
+    }
+    let node = na_make("end-" + owner, first.line, "");
+    return nac_finish(source, kind.next, na_render(node), "pop", owner);
+}
+
+func natural_control_ast_check(source: str) -> int {
+    mut position: int = 0;
+    mut stack: [str] = [];
+    while true {
+        let first = natural_next(source, position);
+        if first.error {
+            println("control-error|" + to_str(first.error_code));
+            return 1;
+        }
+        if first.kind == NT_EOF {
+            if array_len(stack) != 0 {
+                println("control-error|unterminated " + stack[array_len(stack) - 1]);
+                return 1;
+            }
+            return 0;
+        }
+        if first.kind == NT_NEWLINE {
+            position = first.next;
+            continue;
+        }
+
+        mut result: [str] = nac_fail(first.start, "unsupported control statement");
+        if first.text == "when" {
+            result = nac_parse_when(source, first);
+        } else if first.text == "repeat" {
+            result = nac_parse_repeat(source, first);
+        } else if first.text == "each" {
+            result = nac_parse_each(source, first);
+        } else if first.text == "choose" {
+            result = nac_parse_choose(source, first);
+        } else if first.text == "otherwise" or first.text == "case" {
+            result = nac_parse_clause(source, first, stack);
+        } else if first.text == "end" {
+            result = nac_parse_end(source, first, stack);
+        } else {
+            let statement = nas_statement(source, position);
+            if nas_is_ok(statement) {
+                println(nas_node(statement));
+                position = nas_next(statement);
+                continue;
+            }
+            result = nac_fail(first.start, nas_message(statement));
+        }
+        if nac_is_ok(result) == false {
+            println("control-error|" + to_str(first.line) + "|" + nac_message(result));
+            return 1;
+        }
+        println(nac_node(result));
+        if nac_action(result) == "push" {
+            stack = array_concat(stack, [nac_kind(result)]);
+        } else if nac_action(result) == "pop" {
+            stack = slice(stack, 0, array_len(stack) - 1);
+        }
+        position = nac_next(result);
+    }
+    return 0;
+}

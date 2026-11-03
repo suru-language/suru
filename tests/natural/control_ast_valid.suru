@@ -1,0 +1,22 @@
+repeat while attempts < 3
+    set attempts to attempts + 1
+end repeat
+when attempts == 3
+    show("done")
+otherwise when attempts > 3
+    show("too many")
+otherwise
+    show("not finished")
+end when
+each item across items
+    show(item)
+end each
+each number from 1 until 3
+    show(number)
+end each
+choose state
+case Connected(address)
+    show(address)
+case _
+    show("unknown")
+end choose

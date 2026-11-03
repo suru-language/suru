@@ -1,0 +1,3 @@
+when true
+    show("yes")
+end repeat

@@ -1,0 +1,5 @@
+use "../../selfhost/compiler/natural_control_parser.suru";
+
+func main() {
+    exit(natural_control_ast_check(source_load(args(0))));
+}
