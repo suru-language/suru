@@ -18,28 +18,28 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 
 ## 0.2.0 — language completeness
 
-- Closures with full capture and higher-order functions.
-- `for` loops over arrays with bounds guarantees.
-- Records with methods (via module-associated functions).
-- Error reporting improvements: multi-line snippets, notes (secondary
+- [x] Closures with full capture and higher-order functions.
+- [x] `for` loops over arrays with bounds guarantees.
+- Records with methods (via module-associated functions). Module-associated
+  functions are supported; a `obj.method()` call syntax is not yet implemented.
+- [x] Error reporting improvements: multi-line snippets, notes (secondary
   diagnostics with their own caret), and suggestions (did-you-mean) for
   misspelled names.
-- Integer and float formatting options in the standard library.
+- [x] Integer and float formatting options in the standard library.
 
 ## 0.3.0 — performance and robustness
 
 - [x] Bytecode optimizer passes: dead code elimination and constant folding.
 - [x] Nursery sizing heuristics (adaptive live-bytes threshold with headroom
   sizing). Generational collection tuning remains.
-- Incremental collection groundwork. The collector uses tri-color marking
-  (white/grey/black) with a persistent grey worklist and a write barrier at
-  array/record stores that shades white targets written into black objects.
-  `SURU_GC_INCREMENTAL=1` enables incremental collection: marking runs in
-  slices interleaved with allocation (budgeted `s_heap_collect_step`), new
-  objects are shaded grey during a cycle, roots are re-seeded per slice, and
-  the sweep runs when marking completes. Default (unset) is the full
-  stop-the-world collect; `make integration-incremental` runs the suite in
-  incremental mode.
+- [x] Incremental collection: tri-color marking (white/grey/black) with a
+  persistent grey worklist and a write barrier at array/record stores that
+  shades white targets written into black objects. `SURU_GC_INCREMENTAL=1`
+  enables incremental collection: marking runs in slices interleaved with
+  allocation (budgeted `s_heap_collect_step`), new objects are shaded grey
+  during a cycle, roots are re-seeded per slice, and the sweep runs when
+  marking completes. Default (unset) is the full stop-the-world collect;
+  `make integration-incremental` runs the suite in incremental mode.
 - [x] Fuzz corpus expansion; coverage-guided fuzzing (libFuzzer via
   `make fuzz-libfuzzer`). Fuzzing found and fixed an uninitialized-read
   free in the bytecode deserializer's failure path.
@@ -47,20 +47,27 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 ## 0.4.0 — portability
 
 - Windows support (MSVC-compatible build path, isolated OS layer).
-- macOS support.
+  Compile-time MSVC blockers (builtins, `__builtin_unreachable`,
+  `__attribute__`) are resolved; the OS-layer/build integration is deferred.
+- [x] macOS support. Toolchain validated under Clang (debug, ASan/UBSan,
+  and CMake); the portable CMake build targets MSVC/macOS.
 - Big-endian hosts validated against the fixed-endian bytecode format.
+  Format/code are explicit little-endian with a pinning test
+  (`test_le_endian`); no big-endian cross-toolchain is available to run a
+  true big-endian validation here.
 
 ## 0.5.0 — ecosystem
 
-- Package/module system (`use` for user modules).
-- Standard library expansion: file I/O (read_file/write_file/file_exists),
+- [x] Package/module system (`use` for user modules; resolved via
+  `SURU_MOD_PATH`).
+- [x] Standard library expansion: file I/O (read_file/write_file/file_exists),
   formatted output (int_to_str_base/str_pad), collections
   (array_concat/array_contains/array_index_of/array_sort). `int_from_str`
   documented and made strict (rejects trailing garbage).
-- Build-time hardening: default builds (Makefile and CMake) now enable
+- [x] Build-time hardening: default builds (Makefile and CMake) now enable
   `-fstack-protector-strong` and `-D_FORTIFY_SOURCE=2`; security assessment
   corrected to match the actual fuzz targets (frontend + verifier).
-- Grammar and spec stabilization (freeze for 1.0). In progress: reconciled the
+- [x] Grammar and spec stabilization (freeze for 1.0): reconciled the
   keyword list across grammar/spec/implementation (`enum`, `do`, `and`,
   `or`, `not`); grammar now includes `do_stmt`; the spec's reserved `__`
   identifier rule is now enforced by the lexer (error 111). Found and fixed a
