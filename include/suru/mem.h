@@ -17,6 +17,7 @@ typedef enum s_obj_kind {
     S_OBJ_ARRAY = 1,
     S_OBJ_RECORD = 2,
     S_OBJ_CLOSURE = 3,
+    S_OBJ_EXCEPTION = 4,
 } s_obj_kind;
 
 struct s_gcobj {
@@ -40,6 +41,7 @@ struct s_gcobj {
 static inline char *s_obj_str_data(s_gcobj *o) { return (char *)(o + 1); }
 static inline s_value *s_obj_array_data(s_gcobj *o) { return (s_value *)(o + 1); }
 static inline s_value *s_obj_record_fields(s_gcobj *o) { return (s_value *)(o + 1); }
+static inline s_value *s_obj_exception_fields(s_gcobj *o) { return (s_value *)(o + 1); }
 
 static inline s_size s_obj_str_len(s_gcobj *o) { return (s_size)o->count; }
 
@@ -61,6 +63,9 @@ s_gcobj *s_heap_alloc(s_heap *h, s_obj_kind kind, s_u32 count, s_size payload_by
 s_gcobj *s_heap_new_str(s_heap *h, const char *bytes, s_size len);
 s_gcobj *s_heap_new_array(s_heap *h, s_u32 count);
 s_gcobj *s_heap_new_record(s_heap *h, s_u32 nfields);
+/* Exception fields are [type text, message text, cause exception or none]. */
+s_gcobj *s_heap_new_exception(s_heap *h, s_value type, s_value message,
+                              s_value cause);
 
 /* Roots. The runtime registers the live region of its stack as the primary
  * root range, and may register additional single slots. */

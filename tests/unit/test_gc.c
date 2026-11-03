@@ -124,6 +124,30 @@ static void test_incremental_graph(void) {
     s_heap_destroy(h);
 }
 
+static void test_exception_object_graph(void) {
+    s_heap *h = s_heap_create();
+    s_gcobj *type = s_heap_new_str(h, "FileError", 9);
+    s_gcobj *message = s_heap_new_str(h, "read failed", 11);
+    s_gcobj *cause_type = s_heap_new_str(h, "CauseError", 10);
+    s_gcobj *cause_message = s_heap_new_str(h, "close failed", 12);
+    s_gcobj *cause = s_heap_new_exception(h, s_val_obj(cause_type),
+                                          s_val_obj(cause_message),
+                                          s_val_none());
+    s_gcobj *exception = s_heap_new_exception(h, s_val_obj(type),
+                                              s_val_obj(message),
+                                              s_val_obj(cause));
+    CHECK(exception != NULL);
+    CHECK_EQ_INT(exception->kind, S_OBJ_EXCEPTION);
+    CHECK(s_obj_exception_fields(exception)[2].u.o == cause);
+    s_value root[1] = { s_val_obj(exception) };
+    s_heap_set_stack_root(h, root, 1);
+    s_heap_collect(h);
+    CHECK_EQ_INT((int)s_heap_live_objects(h), 6);
+    CHECK(memcmp(s_obj_str_data(s_obj_exception_fields(exception)[0].u.o),
+                 "FileError", 9) == 0);
+    s_heap_destroy(h);
+}
+
 TEST_MAIN_BEGIN()
     test_alloc_free();
     test_collect_garbage();
@@ -133,4 +157,5 @@ TEST_MAIN_BEGIN()
     test_alloc_fail_after();
     test_incremental_step();
     test_incremental_graph();
+    test_exception_object_graph();
 TEST_MAIN_END()

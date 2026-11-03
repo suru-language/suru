@@ -242,6 +242,8 @@ static bool fmt_into(s_vm *vm, s_value v, s_buf *b, int depth) {
             return buf_app(b, s_obj_str_data(o), s_obj_str_len(o));
         if (o->kind == S_OBJ_CLOSURE)
             return buf_app(b, "<closure>", 9);
+        if (o->kind == S_OBJ_EXCEPTION)
+            return buf_app(b, "<exception>", 11);
         if (o->kind == S_OBJ_ARRAY) {
             if (!buf_app(b, "[", 1)) return false;
             s_value *el = s_obj_array_data(o);
@@ -428,6 +430,7 @@ static bool builtin_type_of(s_vm *vm) {
         case S_OBJ_STR: s = "str"; len = 3; break;
         case S_OBJ_ARRAY: s = "array"; len = 5; break;
         case S_OBJ_RECORD: s = "record"; len = 6; break;
+        case S_OBJ_EXCEPTION: s = "exception"; len = 9; break;
         default: s = "closure"; len = 7; break;
         }
         break;

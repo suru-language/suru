@@ -138,3 +138,6 @@ routines against declared `throws` effects and compatible `handle` clauses.
 The bootstrap runtime effect model is in `selfhost/runtime/effects.suru`; it
 defines normal/return/exception states, typed handler matching, nested unwind,
 and cleanup replacement with retained causes.
+The native GC now has `S_OBJ_EXCEPTION` with managed type, message, and cause
+fields; its graph is marked and collected like other heap objects, and VM type
+formatting identifies it as `exception`.

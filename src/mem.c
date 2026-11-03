@@ -135,7 +135,8 @@ s_gcobj *s_heap_alloc(s_heap *h, s_obj_kind kind, s_u32 count, s_size payload_by
     h->alloc_count++;
 
     s_size payload = payload_bytes;
-    if (kind == S_OBJ_ARRAY || kind == S_OBJ_RECORD || kind == S_OBJ_CLOSURE) {
+    if (kind == S_OBJ_ARRAY || kind == S_OBJ_RECORD ||
+        kind == S_OBJ_CLOSURE || kind == S_OBJ_EXCEPTION) {
         s_size n;
         if (!s_size_mul_ovf(count, sizeof(s_value), &n)) return NULL;
         payload = n;
@@ -195,6 +196,17 @@ s_gcobj *s_heap_new_array(s_heap *h, s_u32 count) {
 
 s_gcobj *s_heap_new_record(s_heap *h, s_u32 nfields) {
     return s_heap_alloc(h, S_OBJ_RECORD, nfields, 0);
+}
+
+s_gcobj *s_heap_new_exception(s_heap *h, s_value type, s_value message,
+                              s_value cause) {
+    s_gcobj *o = s_heap_alloc(h, S_OBJ_EXCEPTION, 3, 0);
+    if (!o) return NULL;
+    s_value *fields = s_obj_exception_fields(o);
+    fields[0] = type;
+    fields[1] = message;
+    fields[2] = cause;
+    return o;
 }
 
 void s_heap_set_stack_root(s_heap *h, s_value *base, s_size len) {
@@ -263,7 +275,7 @@ static bool mark_process_one(s_heap *h) {
     if (h->mark_len == 0) return false;
     s_gcobj *o = h->mark_stack[--h->mark_len];
     if (o->kind == S_OBJ_ARRAY || o->kind == S_OBJ_RECORD ||
-        o->kind == S_OBJ_CLOSURE) {
+        o->kind == S_OBJ_CLOSURE || o->kind == S_OBJ_EXCEPTION) {
         s_value *vals = s_obj_array_data(o);
         for (s_u32 i = 0; i < o->count; ++i) {
             mark_from_value(h, vals[i]);
