@@ -30,6 +30,14 @@ typedef uintptr_t s_uptr;
 #define SU_STRINGIFY_(x) #x
 #define SU_STRINGIFY(x) SU_STRINGIFY_(x)
 
+/* printf-style format attribute; empty on compilers that reject
+ * __attribute__ (e.g. MSVC). */
+#if defined(__GNUC__) || defined(__clang__)
+#define SU_PRINTF(fmt_idx, arg_idx) __attribute__((format(printf, fmt_idx, arg_idx)))
+#else
+#define SU_PRINTF(fmt_idx, arg_idx)
+#endif
+
 #if defined(SU_ENABLE_ASSERT)
 #define SU_ASSERT(cond) do {                                                \
     if (!(cond)) {                                                          \

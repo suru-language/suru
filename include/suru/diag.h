@@ -50,12 +50,12 @@ void s_diag_set_source(s_diag_ctx *ctx, const char *src, s_size len);
 void s_diag_report(s_diag_ctx *ctx, s_diag_sev sev,
                    s_source_loc loc, int code,
                    const char *fmt, ...)
-    __attribute__((format(printf, 5, 6)));
+    SU_PRINTF(5, 6);
 
 void s_diag_warn(s_diag_ctx *ctx, s_source_loc loc, int code, const char *fmt, ...)
-    __attribute__((format(printf, 4, 5)));
+    SU_PRINTF(4, 5);
 void s_diag_error(s_diag_ctx *ctx, s_source_loc loc, int code, const char *fmt, ...)
-    __attribute__((format(printf, 4, 5)));
+    SU_PRINTF(4, 5);
 
 bool s_diag_has_errors(const s_diag_ctx *ctx);
 
