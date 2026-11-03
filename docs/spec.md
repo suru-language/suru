@@ -400,9 +400,10 @@ diagnostics and exits nonzero. Diagnostics render the offending source line
 along with a caret at the error column; a preceding line is included when the
 error falls on a later line. A diagnostic may carry one or more `note:` lines
 (secondary diagnostics with their own caret), e.g. to show the type of an
-offending operand. Notes never count as errors. Runtime traps (bounds,
-division by zero, overflow) abort execution with a message and a nonzero exit
-code.
+offending operand. Notes never count as errors. When a name (variable,
+function, type, or constant) is misspelled, a `note:` suggests the closest
+matching declared name. Runtime traps (bounds, division by zero,
+overflow) abort execution with a message and a nonzero exit code.
 
 ## 11. Future Work
 
