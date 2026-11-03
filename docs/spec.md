@@ -353,6 +353,8 @@ The standard library provides a small set of builtin functions (see
 - `array_len(a: [T]) -> int` — element count (any element type).
 - `to_str(v: any) -> str` — int/float/bool to string.
 - `str_compare(a: str, b: str) -> int` — lexicographic (-1/0/1).
+- `type_of(v: any) -> str` — runtime type tag: `int`, `float`, `str`,
+  `array`, `record`, `closure` (bools are represented as `int` at runtime).
 - `f64_to_str(f: float) -> str`.
 - `read_line() -> str` — read a line from stdin ("" on EOF).
 - `make_array(n: int) -> [int]` — a zero-filled array of `n` elements.

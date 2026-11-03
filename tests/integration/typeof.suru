@@ -1,0 +1,9 @@
+type P { let x: int; }
+func main() {
+    println(type_of(1));
+    println(type_of(1.5));
+    println(type_of("s"));
+    println(type_of([1, 2]));
+    println(type_of(P { x = 1 }));
+    println(type_of(fn(x: int) -> int { return x; }));
+}

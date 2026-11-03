@@ -299,6 +299,30 @@ static bool builtin_to_str(s_vm *vm) {
     return push(vm, s_val_obj(o));
 }
 
+static bool builtin_type_of(s_vm *vm) {
+    s_value v = pop(vm);
+    const char *s;
+    s_size len;
+    switch (v.tag) {
+    case S_VAL_INT: s = "int"; len = 3; break;
+    case S_VAL_FLOAT: s = "float"; len = 5; break;
+    case S_VAL_BOOL: s = "bool"; len = 4; break;
+    case S_VAL_NONE: s = "unit"; len = 4; break;
+    default:
+        switch (v.u.o->kind) {
+        case S_OBJ_STR: s = "str"; len = 3; break;
+        case S_OBJ_ARRAY: s = "array"; len = 5; break;
+        case S_OBJ_RECORD: s = "record"; len = 6; break;
+        default: s = "closure"; len = 7; break;
+        }
+        break;
+    }
+    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
+    if (!o) return false;
+    if (len) memcpy(s_obj_str_data(o), s, len);
+    return push(vm, s_val_obj(o));
+}
+
 static bool builtin_str_compare(s_vm *vm) {
     s_value b = pop(vm);
     s_value a = pop(vm);
@@ -863,6 +887,7 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_STR_UPPER: return builtin_str_map(vm, 1);
     case S_BUILTIN_STR_LOWER: return builtin_str_map(vm, 2);
     case S_BUILTIN_STR_COMPARE: return builtin_str_compare(vm);
+    case S_BUILTIN_TYPE_OF: return builtin_type_of(vm);
     case S_BUILTIN_LEN: return builtin_len(vm);
     case S_BUILTIN_ARRAY_REVERSE: return builtin_array_reverse(vm);
     case S_BUILTIN_ARRAY_SUM: return builtin_array_reduce(vm, 0);

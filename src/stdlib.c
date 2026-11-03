@@ -17,6 +17,8 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "to_str", 1, { S_SIG_ANY }, S_SIG_STR },
     [S_BUILTIN_STR_COMPARE] = {
         "str_compare", 2, { S_SIG_STR, S_SIG_STR }, S_SIG_INT },
+    [S_BUILTIN_TYPE_OF] = {
+        "type_of", 1, { S_SIG_ANY }, S_SIG_STR },
     [S_BUILTIN_F64_TO_STR] = {
         "f64_to_str", 1, { S_SIG_FLOAT }, S_SIG_STR },
     [S_BUILTIN_I64_TO_F64] = {
