@@ -11,3 +11,13 @@ trap 'rm -rf "$tmp"' EXIT
 "$REFERENCE" "$DIR/lexer_input.suru" >"$tmp/reference.out"
 diff -u "$tmp/reference.out" "$tmp/suru.out"
 echo "selfhost lexer: token stream matches reference"
+
+if "$SURU" run "$DIR/lexer_negative_driver.suru" >"$tmp/suru-invalid.out"; then
+    echo "selfhost lexer: invalid input was accepted" >&2
+    exit 1
+fi
+if "$REFERENCE" "$DIR/lexer_invalid.suru" >"$tmp/reference-invalid.out"; then
+    echo "reference lexer: invalid input was accepted" >&2
+    exit 1
+fi
+echo "selfhost lexer: invalid input rejected by both implementations"
