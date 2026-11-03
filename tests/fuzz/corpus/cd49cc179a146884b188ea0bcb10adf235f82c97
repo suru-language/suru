@@ -1,0 +1,4 @@
+func mnnw() {
+   println(max(3, 9));
+    println(-64.to_str(str_to4("2.5")));
+}

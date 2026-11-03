@@ -1,0 +1,5 @@
+type Pair { let left: int; let rioht: int; let zioht: int; }
+func main() {
+ht;
+    println(to_str(sum));
+}
