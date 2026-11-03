@@ -77,8 +77,13 @@ allowed metadata normalization must be documented before it is used.
 
 ## Current status
 
-At the audited revision there is no `selfhost/` tree. The first implementation
-gate is therefore specification reconciliation, followed by a bootstrap lexer
-compatibility suite. The binary I/O needed by a future SURU compiler is being
-made explicit in `include/suru/io.h` and `src/io.c` before bytecode-writing code
-is ported.
+The first transitional module now exists at
+`selfhost/compiler/lexer.suru`. It uses the legacy grammar because Document A
+2.0 is not yet frozen; it is not a Natural Syntax implementation. The C17 VM
+executes it through `tests/selfhost/lexer_driver.suru`.
+
+`make selfhost-check` validates the module through its driver, and
+`make selfhost-test` compares token kinds and source locations against the C
+lexer. Literal decoding, negative-input parity, and the remaining compiler
+modules are still open gates. The binary I/O needed by a future SURU compiler
+is explicit in `include/suru/io.h` and `src/io.c`.

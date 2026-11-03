@@ -86,9 +86,11 @@ until the existing command-line conventions and Document A approve it.
 
 ## Lexer compatibility gate
 
-The first self-hosted lexer must be tested on the same corpus as the C lexer.
-For every input, compare token kind, decoded literal bytes/value, byte offset,
-line/column, and diagnostics. Include malformed UTF-8/escapes as required by
-Document A, nested block comments, both comment styles, numeric boundaries,
-interpolation, and resource limits. Only after this gate passes should a large
-parser replacement begin.
+The transitional lexer in `selfhost/compiler/lexer.suru` is tested on the same
+valid corpus as the C lexer by `make selfhost-test`. The current comparison
+covers token kind and line/column location, including shebangs, nested block
+comments, keywords, literals, operators, and source boundaries. Before this
+gate can be called complete, compare decoded literal values and diagnostics on
+negative inputs. Document A must additionally define malformed UTF-8, string
+interpolation, and natural-syntax resource-limit behavior. Only after that
+expanded gate passes should a large parser replacement begin.
