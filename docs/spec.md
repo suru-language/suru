@@ -1,11 +1,14 @@
 # SURU Language Specification
 
-Version 0.1.0 (Draft)
+Version 0.1.0 (legacy bootstrap reference)
 
 SURU is an independent, statically typed, compiled general-purpose programming
 language. It is implemented from scratch in ISO C17. This document is the
-authoritative reference for the SURU language: its syntax, semantics, type
-system, memory model, and runtime behavior.
+authoritative reference for the legacy bootstrap language: its syntax,
+semantics, type system, memory model, and runtime behavior. The Natural Syntax
+Edition is not yet specified in this repository; see
+`docs/syntax-migration.md`. Builtin signatures and runtime behavior are listed
+in `docs/builtins.md`.
 
 ## 1. Overview
 
