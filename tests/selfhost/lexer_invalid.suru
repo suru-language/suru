@@ -1,0 +1,3 @@
+func main() {
+    let __bad = 1;
+}
