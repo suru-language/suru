@@ -69,7 +69,11 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
   order, so `a[i] += x` (and the captured-variable form `n += x` inside
   closures) failed at runtime with an "index store/type error". Both paths
   now stage obj/index/result in temp frame slots (covered by a new `cmpassign`
-  test).
+  test). Fixed two string-escape defects: `\u00XX` escapes (code points below
+  0x80) consumed the closing quote and were mis-reported as unterminated
+  strings, and lone surrogate code points (`\uD800`-`\uDFFF`) were encoded as
+  invalid UTF-8 instead of being rejected. Both are corrected; surrogate
+  escapes are now a compile error (covered by `escapes`/`badsur` tests).
 
 ## 1.0.0 — stable
 
