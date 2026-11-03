@@ -535,10 +535,12 @@ static bool gen_expr(s_gen *g, const s_expr *e) {
                 if (!em_const_int(g, 0)) return false;
                 place_label(&g->e, &g->labels, ldone);
             } else {
+                fprintf(stderr, "BCC-DEBUG or branch ldone=%u\n", ldone);
                 if (!em_jump(&g->e, &g->labels, BC_JNZ, ldone)) return false;
                 if (!gen_expr(g, e->u.binary.rhs)) return false;
                 if (!em_jump(&g->e, &g->labels, BC_JMP, ldone)) return false;
                 place_label(&g->e, &g->labels, ldone);
+                fprintf(stderr, "BCC-DEBUG or branch done\n");
             }
             return true;
         }
