@@ -71,13 +71,15 @@ verification succeeded, and refuses to execute otherwise.
 
 The fuzz targets in `tests/fuzz` are:
 
-- `verify_fuzz` feeds arbitrary bytes to the verifier and asserts it either
-  accepts or rejects cleanly, without crashing.
-- `lex_fuzz` and `parse_fuzz` feed arbitrary bytes to the frontend and assert
-  no crash and no out-of-memory.
-- `vm_fuzz` feeds arbitrary verified modules (when they verify) to the VM.
+- `verify_fuzz` feeds arbitrary bytes to the bytecode verifier and asserts it
+  either accepts or rejects cleanly, without crashing.
+- `frontend_fuzz` feeds arbitrary bytes as source text through the full
+  frontend — lexer, parser, semantic analysis, bytecode compilation, and a
+  final verifier pass on the optimized output — and asserts it never crashes
+  and reports errors cleanly without leaking.
 
-All fuzz targets are built under ASan/UBSan in CI.
+Both targets are built under ASan/UBSan via `make fuzz-libfuzzer` (libFuzzer)
+and as stdin-fed harnesses via `make fuzz`.
 
 ## 5. Build-time defense
 
