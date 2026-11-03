@@ -50,7 +50,8 @@ LIBOBJ = $(LIBSRC:src/%.c=$(OBJDIR)/%.o)
 UNIT_SRC = $(wildcard tests/unit/test_*.c)
 SELFHOST_SRC = $(wildcard selfhost/compiler/*.suru)
 SELFHOST_DRIVERS = tests/selfhost/lexer_driver.suru \
-	tests/selfhost/token_stream_driver.suru
+	tests/selfhost/token_stream_driver.suru \
+	tests/selfhost/natural_lexer_driver.suru
 SELFHOST_REF = $(UNITDIR)/selfhost_reference_lexer
 
 all: $(BINDIR)/suru
@@ -105,6 +106,7 @@ $(SELFHOST_REF): tests/selfhost/reference_lexer.c $(LIBOBJ) | $(UNITDIR)
 .PHONY: selfhost-test
 selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/run.sh $(BINDIR)/suru $(SELFHOST_REF)
+	@tests/selfhost/natural_run.sh $(BINDIR)/suru
 
 .PHONY: fuzz
 fuzz: $(BINDIR)/suru | $(UNITDIR)

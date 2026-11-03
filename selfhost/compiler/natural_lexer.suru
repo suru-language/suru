@@ -1,0 +1,190 @@
+// Natural Syntax 2.0 lexer gate. This module intentionally emits a textual
+// token trace; parser integration is a later phase and legacy lexer semantics
+// remain in lexer.suru.
+
+const N_EOF = 0;
+const N_NEWLINE = 1;
+const N_IDENT = 2;
+const N_NUMBER = 3;
+const N_STRING = 4;
+const N_KEYWORD = 5;
+const N_OPERATOR = 6;
+const N_PUNCT = 7;
+
+func n_is_digit(c: str) -> bool {
+    return str_contains("0123456789", c);
+}
+
+func n_is_alpha(c: str) -> bool {
+    return str_contains("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_", c);
+}
+
+func n_is_continue(c: str) -> bool {
+    return n_is_alpha(c) or n_is_digit(c) or c >= "\u0080";
+}
+
+func n_is_keyword(word: str) -> bool {
+    return str_contains(" across as attempt bring case change choose constant contract each end ensure exception expose false from give handle if in through until otherwise record repeat routine set show supports true value when while throws this none ", " " + word + " ");
+}
+
+func n_emit(kind: str, source: str, start: int, finish: int) {
+    println(kind + "|" + to_str(source_line_at(source, start)) + "|" +
+            to_str(source_column_at(source, start)) + "|" +
+            substr(source, start, finish - start));
+}
+
+func n_error(source: str, position: int, code: int) {
+    println("error|" + to_str(code) + "|" +
+            to_str(source_line_at(source, position)) + "|" +
+            to_str(source_column_at(source, position)));
+}
+
+func natural_lex_dump(source: str) -> int {
+    let n: int = str_len(source);
+    mut i: int = 0;
+    mut parens: int = 0;
+    mut brackets: int = 0;
+    mut line_start: bool = true;
+
+    if n >= 2 and source[0] == "#" and source[1] == "!" {
+        while i < n and source[i] != "\n" { i += 1; }
+    }
+
+    while i < n {
+        let c: str = source[i];
+        if c == " " or c == "\t" or c == "\r" {
+            i += 1;
+            continue;
+        }
+        if c == "\n" {
+            if parens == 0 and brackets == 0 and not line_start {
+                n_emit("NEWLINE", source, i, i + 1);
+            }
+            i += 1;
+            line_start = true;
+            continue;
+        }
+        if i + 1 < n and c == "/" and source[i + 1] == "/" {
+            i += 2;
+            while i < n and source[i] != "\n" { i += 1; }
+            continue;
+        }
+        if i + 1 < n and c == "/" and source[i + 1] == "*" {
+            mut depth: int = 1;
+            i += 2;
+            while i < n and depth > 0 {
+                if i + 1 < n and source[i] == "/" and source[i + 1] == "*" {
+                    depth += 1;
+                    i += 2;
+                } else if i + 1 < n and source[i] == "*" and source[i + 1] == "/" {
+                    depth -= 1;
+                    i += 2;
+                } else {
+                    i += 1;
+                }
+            }
+            if depth > 0 {
+                n_error(source, i, 201);
+                return 1;
+            }
+            continue;
+        }
+
+        let start: int = i;
+        if n_is_alpha(c) or c >= "\u0080" {
+            i += 1;
+            while i < n and n_is_continue(source[i]) { i += 1; }
+            let word: str = substr(source, start, i - start);
+            if n_is_keyword(word) { n_emit("KEYWORD", source, start, i); }
+            else { n_emit("IDENT", source, start, i); }
+            line_start = false;
+            continue;
+        }
+
+        if n_is_digit(c) {
+            i += 1;
+            while i < n and (n_is_digit(source[i]) or
+                             str_contains("abcdefABCDEFxXbB_.eE+-", source[i])) {
+                // Stop a sign unless it directly follows an exponent marker.
+                if (source[i] == "+" or source[i] == "-") and
+                   i > start and source[i - 1] != "e" and source[i - 1] != "E" {
+                    break;
+                }
+                i += 1;
+            }
+            n_emit("NUMBER", source, start, i);
+            line_start = false;
+            continue;
+        }
+
+        if c == "\"" {
+            i += 1;
+            mut interpolation_depth: int = 0;
+            while i < n and source[i] != "\"" {
+                if source[i] == "\n" {
+                    n_error(source, start, 202);
+                    return 1;
+                }
+                if source[i] == "\\" {
+                    if i + 1 >= n or not str_contains("ntr0\\\"'u", source[i + 1]) {
+                        n_error(source, i, 203);
+                        return 1;
+                    }
+                    if source[i + 1] == "u" {
+                        if i + 5 >= n { n_error(source, i, 203); return 1; }
+                        mut h: int = 0;
+                        while h < 4 {
+                            if not str_contains("0123456789abcdefABCDEF", source[i + 2 + h]) {
+                                n_error(source, i, 203);
+                                return 1;
+                            }
+                            h += 1;
+                        }
+                        i += 6;
+                    } else { i += 2; }
+                } else if i + 1 < n and source[i] == "{" and source[i + 1] == "{" {
+                    i += 2;
+                } else if i + 1 < n and source[i] == "}" and source[i + 1] == "}" {
+                    i += 2;
+                } else if source[i] == "{" {
+                    interpolation_depth += 1;
+                    i += 1;
+                } else if source[i] == "}" and interpolation_depth > 0 {
+                    interpolation_depth -= 1;
+                    i += 1;
+                } else {
+                    i += 1;
+                }
+            }
+            if i >= n { n_error(source, start, 202); return 1; }
+            if interpolation_depth != 0 { n_error(source, start, 204); return 1; }
+            i += 1;
+            n_emit("STRING", source, start, i);
+            line_start = false;
+            continue;
+        }
+
+        if c == "(" { parens += 1; n_emit("PUNCT", source, i, i + 1); i += 1; line_start = false; continue; }
+        if c == ")" { if parens > 0 { parens -= 1; } else { n_error(source, i, 205); return 1; } n_emit("PUNCT", source, i, i + 1); i += 1; line_start = false; continue; }
+        if c == "[" { brackets += 1; n_emit("PUNCT", source, i, i + 1); i += 1; line_start = false; continue; }
+        if c == "]" { if brackets > 0 { brackets -= 1; } else { n_error(source, i, 205); return 1; } n_emit("PUNCT", source, i, i + 1); i += 1; line_start = false; continue; }
+        if c == "{" or c == "}" or c == "," or c == ":" or c == "." {
+            n_emit("PUNCT", source, i, i + 1);
+            i += 1;
+            line_start = false;
+            continue;
+        }
+        if str_contains("+-*/%=<>!&|^?~", c) {
+            i += 1;
+            if i < n and (source[i] == "=" or source[i] == c or
+                          (c == "-" and source[i] == ">")) { i += 1; }
+            n_emit("OPERATOR", source, start, i);
+            line_start = false;
+            continue;
+        }
+        n_error(source, i, 206);
+        return 1;
+    }
+    n_emit("EOF", source, n, n);
+    return 0;
+}
