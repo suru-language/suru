@@ -129,3 +129,7 @@ Declaration/effect validation is in
 routine signatures and return paths, record fields and contract references,
 choice payloads and duplicate variants, module aliases, and `attempt` handler/
 `ensure` ownership.
+Contract method signatures are compared against record implementations, choice
+matches are checked for exhaustiveness or `_`, and
+`selfhost/compiler/natural_module_semantic.suru` resolves relative imports and
+rejects missing modules and import cycles.
