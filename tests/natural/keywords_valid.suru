@@ -1,0 +1,50 @@
+value a = true
+change b = false
+set b to 1
+constant c = none
+routine calculate(first: Whole, second: Whole) -> Whole throws FileError
+    give first + second
+end routine
+record R supports Describable
+    change field: Text
+end record
+contract Describable
+    routine describe() -> Text
+end contract
+choice C
+    Case(value: Text)
+end choice
+bring "m.suru" as m
+expose routine public_api() -> Unit
+end routine
+show(if)
+show(in)
+show(this)
+when true
+    show("yes")
+otherwise when false
+    show("no")
+otherwise
+    show("none")
+end when
+each item across items
+end each
+each number from 1 until 3
+end each
+each number from 1 through 3
+end each
+repeat while true
+end repeat
+attempt
+    show("try")
+handle problem: FileError
+    show(problem)
+end exception
+ensure
+    show("done")
+end exception
+end attempt
+choose state
+case _
+    show("wildcard")
+end choose

@@ -89,6 +89,7 @@ constant folding.
 The legacy bootstrap has a working lexer/parser, semantic analysis (including
 generics), bytecode compiler with optimizer passes, bytecode verifier,
 stack-based VM, managed heap, standard library, CLI, and automated unit and
-integration tests. Natural syntax and the SURU-native compiler/runtime are not
-implemented yet. See `docs/bootstrap.md` and `docs/self-hosting.md` for the
-audited baseline and acceptance gates.
+integration tests. Natural Syntax 2.0 is specified and its transitional lexer
+gate passes; its parser and the SURU-native compiler/runtime are next-phase
+work. See `docs/document-a-2.0.md`, `docs/bootstrap.md`, and
+`docs/self-hosting.md` for the contracts and acceptance gates.

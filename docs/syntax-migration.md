@@ -72,5 +72,10 @@ limits, and invalid input. The C17 compiler remains the reference where
 semantics overlap; new syntax uses the approved expectations in
 `tests/natural/`.
 
-Only after this expanded lexer gate passes may the Natural Syntax parser port
-begin. No legacy default behavior may change during the port.
+The Natural Syntax lexer is implemented in
+`selfhost/compiler/natural_lexer.suru` and its approved lexical corpus passes
+through `make selfhost-test`, including Unicode scalar locations, malformed
+UTF-8, interpolation, nested comments, keyword coverage, resource limits, and
+stable lexical diagnostic messages. The parser port is the next phase;
+`--syntax=natural` is not enabled until that parser and its semantic gates
+exist. No legacy default behavior may change during the port.

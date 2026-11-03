@@ -80,7 +80,8 @@ allowed metadata normalization must be documented before it is used.
 The first transitional modules now exist at
 `selfhost/compiler/source.suru`, `selfhost/compiler/tokens.suru`,
 `selfhost/compiler/diagnostics.suru`, `selfhost/compiler/lexer.suru`, and
-`selfhost/compiler/token_stream.suru`.
+`selfhost/compiler/token_stream.suru`. The approved Natural Syntax lexer is in
+`selfhost/compiler/natural_lexer.suru`.
 They use the legacy grammar because Document A 2.0 is not yet frozen; they are
 not a Natural Syntax implementation. The C17 VM executes them through
 `tests/selfhost/lexer_driver.suru`.
@@ -98,4 +99,6 @@ reserved identifiers, missing hexadecimal/binary digits, invalid escapes,
 unterminated strings, and unexpected punctuation. Complete diagnostic message
 parity and the remaining compiler modules are still open gates. The binary I/O
 needed by a future SURU compiler is explicit in `include/suru/io.h` and
-`src/io.c`.
+`src/io.c`. The Natural Syntax lexer gate also passes the approved corpus in
+`tests/natural/`; the parser, semantic analyzer, and natural CLI mode remain
+next-phase work.
