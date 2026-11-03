@@ -86,8 +86,8 @@ until the existing command-line conventions and Document A approve it.
 
 ## Lexer compatibility gate
 
-The transitional lexer in `selfhost/compiler/lexer.suru` is tested on the same
-valid corpus as the C lexer by `make selfhost-test`. The current comparison
+The transitional source manager and lexer in `selfhost/compiler/` are tested on
+the same valid corpus as the C lexer by `make selfhost-test`. The current comparison
 covers token kind and line/column location, including shebangs, nested block
 comments, keywords, literals, operators, source boundaries, and decoded
 literal payloads. The negative corpus currently checks a reserved `__`
