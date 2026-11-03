@@ -144,3 +144,6 @@ formatting identifies it as `exception`.
 The bytecode/VM foundation now defines `BC_NEW_EXCEPTION`,
 `BC_PUSH_HANDLER`, `BC_POP_HANDLER`, and `BC_THROW`; handler metadata is tied to
 call depth and frame/stack restoration, with a caught-exception VM test.
+`selfhost/compiler/natural_bytecode.suru` now lowers effect blocks into
+`PUSH_HANDLER`, `POP_HANDLER`, handler labels, `JMP`, `RET`, and `RET_UNIT`
+operations as the bridge to native instruction-index emission.
