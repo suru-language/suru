@@ -32,6 +32,7 @@ UNITDIR := $(BUILD)/unit
 
 LIBSRC = \
 	src/arena.c \
+	src/io.c \
 	src/diag.c \
 	src/lexer.c \
 	src/parser.c \

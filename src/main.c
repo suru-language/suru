@@ -1,23 +1,28 @@
 #include "suru/driver.h"
 #include "suru/bc.h"
+#include "suru/io.h"
 
 #include <stdio.h>
 #include <string.h>
 
 static char *read_file(const char *path, s_size *len) {
-    FILE *f = fopen(path, "rb");
-    if (!f) return NULL;
-    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return NULL; }
-    long sz = ftell(f);
-    if (sz < 0) { fclose(f); return NULL; }
-    if (fseek(f, 0, SEEK_SET) != 0) { fclose(f); return NULL; }
-    char *buf = malloc((s_size)sz + 1);
-    if (!buf) { fclose(f); return NULL; }
-    s_size rd = fread(buf, 1, (s_size)sz, f);
-    fclose(f);
-    buf[rd] = '\0';
-    *len = rd;
-    return buf;
+    s_u8 *bytes = NULL;
+    s_size n = 0;
+    if (s_io_read_all(path, &bytes, &n, S_IO_MAX_FILE_SIZE) != 0) return NULL;
+    if (n == SIZE_MAX) {
+        free(bytes);
+        return NULL;
+    }
+    char *text = (char *)malloc(n + 1u);
+    if (!text) {
+        free(bytes);
+        return NULL;
+    }
+    if (n != 0) memcpy(text, bytes, n);
+    text[n] = '\0';
+    free(bytes);
+    *len = n;
+    return text;
 }
 
 static int cmd_run(const char *path, int argc, char **argv) {
@@ -72,15 +77,12 @@ static int cmd_compile(const char *path, const char *outpath) {
         s_bc_module_dispose(&m);
         return 1;
     }
-    FILE *f = fopen(outpath, "wb");
-    if (!f) {
+    if (s_io_write_all(outpath, buf, buflen) != 0) {
         fprintf(stderr, "suru: cannot write '%s'\n", outpath);
         free(buf);
         s_bc_module_dispose(&m);
         return 1;
     }
-    fwrite(buf, 1, buflen, f);
-    fclose(f);
     free(buf);
     s_bc_module_dispose(&m);
     return 0;

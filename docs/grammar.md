@@ -1,5 +1,11 @@
 # SURU Formal Grammar
 
+> **Status:** This file describes the implemented legacy grammar (the grammar
+> accepted by the C17 bootstrap at commit `b467901`). The Natural Syntax Edition
+> named by the self-hosting plan is not present as a complete Document A in this
+> repository yet. Its keywords are therefore recorded as migration questions in
+> `docs/syntax-migration.md`, not silently added to this normative grammar.
+
 This is the normative grammar for SURU, written in EBNF. In the productions
 below, terminal symbols are quoted or shown in `monospace`; nonterminals are
 in italics. The constructs `?`, `*`, and `+` denote optional, zero-or-more,
@@ -111,7 +117,33 @@ bool_literal = "true" | "false"
 arg_list    = [ expression { "," expression } ]
 ```
 
-## 6. Ambiguity resolution
+## 6. Operator precedence and associativity
+
+Precedence increases from lowest to highest. Assignment and conditional
+expressions are right-associative; all other binary operators are
+left-associative. Postfix operators associate left-to-right.
+
+| precedence | operators | associativity |
+|---:|---|---|
+| 1 | `=` `+=` `-=` `*=` `/=` | right |
+| 2 | `? :` | right |
+| 3 | `or` | left |
+| 4 | `and` | left |
+| 5 | `==` `!=` `<` `<=` `>` `>=` | left |
+| 6 | `|` | left |
+| 7 | `^` | left |
+| 8 | `&` | left |
+| 9 | `<<` `>>` | left |
+| 10 | `+` `-` | left |
+| 11 | `*` `/` `%` | left |
+| 12 | unary `-` `not` `~` | right |
+| 13 | calls, indexing, field access | left |
+
+The grammar above is the authoritative parser shape; this table makes the
+precedence implicit in the productions explicit for compiler ports and test
+generators.
+
+## 7. Ambiguity resolution
 
 - `if`/`while`/`for` statements greedily take a single expression as their
   condition. The `{` that begins the body separates the condition from the
@@ -120,3 +152,13 @@ arg_list    = [ expression { "," expression } ]
   expression; blocks are allowed only in statement position in the current
   grammar.
 - `else` binds to the nearest preceding unmatched `if`.
+
+- A semicolon is required after every declaration or statement that is
+  terminated by `;`; newlines are whitespace in the legacy grammar.
+- `func` and `fn` are accepted as the function keyword by the lexer. The AST
+  and diagnostics use `func`.
+- `use` includes are resolved relative to the containing file first, then by
+  `SURU_MOD_PATH`; an already included path is ignored.
+- A record literal is recognized after an identifier only when the following
+  token is `{` in expression position. A block is only valid in statement
+  position.

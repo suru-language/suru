@@ -1,4 +1,5 @@
 #include "suru/parser.h"
+#include "suru/io.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -1051,19 +1052,23 @@ static bool parse_record(s_parser *p) {
 }
 
 static bool read_file(const char *path, char **out, s_size *outlen) {
-    FILE *f = fopen(path, "rb");
-    if (!f) return false;
-    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return false; }
-    long sz = ftell(f);
-    if (sz < 0 || fseek(f, 0, SEEK_SET) != 0) { fclose(f); return false; }
-    char *buf = malloc((s_size)sz + 1);
-    if (!buf) { fclose(f); return false; }
-    size_t rd = fread(buf, 1, (size_t)sz, f);
-    fclose(f);
-    if (rd != (size_t)sz) { free(buf); return false; }
-    buf[sz] = '\0';
-    *out = buf;
-    *outlen = (s_size)sz;
+    s_u8 *bytes = NULL;
+    s_size len = 0;
+    if (s_io_read_all(path, &bytes, &len, S_IO_MAX_FILE_SIZE) != 0) return false;
+    if (len == SIZE_MAX) {
+        free(bytes);
+        return false;
+    }
+    char *text = (char *)malloc(len + 1u);
+    if (!text) {
+        free(bytes);
+        return false;
+    }
+    if (len != 0) memcpy(text, bytes, len);
+    text[len] = '\0';
+    free(bytes);
+    *out = text;
+    *outlen = len;
     return true;
 }
 

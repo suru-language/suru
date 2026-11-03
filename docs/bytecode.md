@@ -23,7 +23,8 @@ never leak into the format.
 | record table | nrecords × u32 field-count | |
 | function table | nfuncs × function record | |
 
-A function record is: u32 name length + bytes, u32 nparams, u32 frame_size,
+A record names are compiler metadata and are not serialized in version 1. A
+function record is: u32 name length + bytes, u32 nparams, u32 frame_size,
 u32 max_operand_depth, u32 nins, then nins instructions. Each instruction is a
 1-byte opcode plus three u32 operands (`a`, `b`, `c`).
 
