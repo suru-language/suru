@@ -120,3 +120,7 @@ Core statement parsing and the first AST node record are in
 Control-flow AST parsing is now covered by
 `selfhost/compiler/natural_control_parser.suru` for `when`, `otherwise`,
 `repeat`, `each`, `choose`, `case`, and matching block terminators.
+The first semantic pass is in `selfhost/compiler/natural_semantic.suru`; it
+tracks bindings and types, infers local types, validates numeric/logical
+expressions, checks mutable assignment targets, and requires Boolean control
+conditions.
