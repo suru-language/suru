@@ -34,6 +34,7 @@ func n_is_keyword(word: str) -> bool {
 func n_emit(kind: str, source: str, start: int, finish: int) {
     println(kind + "|" + to_str(source_line_at(source, start)) + "|" +
             to_str(source_scalar_column_at(source, start)) + "|" +
+            to_str(start) + "|" + to_str(finish) + "|" +
             substr(source, start, finish - start));
 }
 
@@ -49,7 +50,7 @@ func n_error(source: str, position: int, code: int) {
     else if code == 208 { message = "source-too-large"; }
     else if code == 209 { message = "comment-nesting-too-deep"; }
     else if code == 210 { message = "interpolation-nesting-too-deep"; }
-    println("error|" + to_str(code) + "|" +
+    println("error|" + to_str(code) + "|" + to_str(position) + "|" +
             to_str(source_line_at(source, position)) + "|" +
             to_str(source_scalar_column_at(source, position)) + "|" + message);
 }

@@ -92,7 +92,7 @@ modules.
 `diagnostics.suru` owns stable lexer diagnostic classification.
 `token_stream.suru` exposes structured legacy tokens with source locations,
 spans, decoded string values, and numeric values for the parser port. `make
-selfhost-check` validates both frontend drivers, and `make selfhost-test`
+selfhost-check` validates all frontend drivers, and `make selfhost-test`
 compares the direct lexer and token stream for token kinds, source locations,
 identifier text,
 integer values, float values, escaped string values, and negative diagnostic

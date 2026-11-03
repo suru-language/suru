@@ -9,9 +9,17 @@ defined by `docs/document-a-2.0.md`.
 Document A 2.0 records the approved decisions for matching block terminators,
 `value`/`change`/`set`, explicit routine types, `across`/`from`/`until`/
 `through` iteration, records and contracts, choices, modules, interpolation,
-typed exceptions, and UTF-8/newline behavior. Natural syntax is now specified,
-but remains an implementation gate until its lexer and parser conformance
-tests pass. Legacy remains the compatibility baseline.
+typed exceptions, and UTF-8/newline behavior. Natural syntax is now specified;
+its lexer gate passes, while parser and semantic implementation remain future
+gates. Legacy remains the compatibility baseline.
+
+## Phase 1 status
+
+**Complete:** Document A 2.0 is approved, the formal EBNF and precedence table
+are published, lexical/type/effect rules and resource limits are documented,
+positive and negative conformance fixtures exist, and the Natural Syntax lexer
+passes its expanded gate. Parser, semantic, and CLI integration are the next
+phase and are not represented as complete here.
 
 ## Decisions recorded in Document A 2.0
 
