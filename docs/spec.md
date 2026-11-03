@@ -361,6 +361,11 @@ The standard library provides a small set of builtin functions (see
 - `write_file(path: str, contents: str)` — write `contents` to a file
   (overwrites; fails silently on error).
 - `file_exists(path: str) -> bool` — whether `path` exists.
+- `int_to_str_base(i: int, base: int) -> str` — `i` in base `base`
+  (2..36); negative numbers get a `-` prefix.
+- `str_pad(s: str, width: int, fill: str) -> str` — right-pad `s` to at
+  least `width` bytes using the first character of `fill`; unchanged if `s`
+  is already `width` bytes or longer.
 - `make_array(n: int) -> [int]` — a zero-filled array of `n` elements.
 - `range(lo: int, hi: int) -> [int]` — the integers `lo .. hi-1`.
 - `range_step(lo: int, hi: int, step: int) -> [int]` — like `range`,
