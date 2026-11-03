@@ -1,0 +1,28 @@
+bring "mathematics.suru" as mathematics
+
+contract Describable
+    routine describe() -> Text
+end contract
+
+record Student supports Describable
+    change name: Text
+    routine describe() -> Text
+        give "student"
+    end routine
+end record
+
+choice NetworkState
+    Connected(address: Text)
+    Disconnected(reason: Text)
+end choice
+
+expose routine calculate(first: Whole, second: Whole) -> Whole throws FileError
+    give first + second
+end routine
+
+attempt
+    show("try")
+handle problem: FileError
+    show(problem)
+end exception
+end attempt

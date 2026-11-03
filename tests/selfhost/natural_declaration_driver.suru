@@ -1,0 +1,5 @@
+use "../../selfhost/compiler/natural_declaration_semantic.suru";
+
+func main() {
+    exit(natural_declaration_check(source_load(args(0))));
+}

@@ -1,0 +1,4 @@
+choice State
+    Ready(code: Whole)
+    Ready(code: Whole)
+end choice

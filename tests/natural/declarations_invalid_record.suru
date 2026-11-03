@@ -1,0 +1,3 @@
+record Student supports MissingContract
+    name: Text
+end record

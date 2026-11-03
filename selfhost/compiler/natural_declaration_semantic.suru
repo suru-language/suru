@@ -1,0 +1,289 @@
+// Declaration and effect semantic gate for Natural Syntax 2.0.
+// This pass validates cross-declaration contracts while the typed AST is still
+// represented by the incremental parser modules.
+
+use "natural_semantic.suru";
+
+func nds_word(line: str) -> str {
+    mut i: int = 0;
+    while i < str_len(line) and line[i] != " " and line[i] != "\t" { i += 1; }
+    return substr(line, 0, i);
+}
+
+func nds_find(text: str, needle: str, start: int) -> int {
+    mut i: int = start;
+    while i + str_len(needle) <= str_len(text) {
+        if substr(text, i, str_len(needle)) == needle { return i; }
+        i += 1;
+    }
+    return -1;
+}
+
+func nds_after(line: str, word: str) -> str {
+    return str_trim(substr(line, str_len(word), str_len(line)));
+}
+
+func nds_open_word(line: str) -> str {
+    let word: str = nds_word(line);
+    if word == "expose" { return nds_word(nds_after(line, word)); }
+    return word;
+}
+
+func nds_open_name(line: str, word: str) -> str {
+    mut normalized: str = line;
+    if nds_word(normalized) == "expose" {
+        normalized = nds_after(normalized, "expose");
+    }
+    let rest: str = nds_after(normalized, word);
+    let open: int = nds_find(rest, "(", 0);
+    if open >= 0 { return str_trim(substr(rest, 0, open)); }
+    let space: int = nds_find(rest, " ", 0);
+    if space >= 0 { return substr(rest, 0, space); }
+    return rest;
+}
+
+func nds_type_ok(type_name: str) -> bool {
+    return type_name == "Whole" or type_name == "Real" or
+           type_name == "Bool" or type_name == "Text" or
+           type_name == "Unit" or type_name != "";
+}
+
+func nds_params_ok(params: str) -> bool {
+    if str_trim(params) == "" { return true; }
+    let parts: [str] = str_split(params, ",");
+    mut i: int = 0;
+    while i < array_len(parts) {
+        let part: str = str_trim(parts[i]);
+        let colon: int = nds_find(part, ":", 0);
+        if colon <= 0 or str_trim(substr(part, colon + 1, str_len(part))) == "" {
+            return false;
+        }
+        i += 1;
+    }
+    return true;
+}
+
+func nds_routine_return(line: str) -> str {
+    let arrow: int = nds_find(line, "->", 0);
+    if arrow < 0 { return "Unit"; }
+    let rest: str = str_trim(substr(line, arrow + 2, str_len(line)));
+    let throws: int = nds_find(rest, " throws ", 0);
+    if throws >= 0 { return str_trim(substr(rest, 0, throws)); }
+    return rest;
+}
+
+func nds_routine_params(line: str) -> str {
+    let open: int = nds_find(line, "(", 0);
+    let close: int = nds_find(line, ")", open + 1);
+    if open < 0 or close < 0 { return "!invalid!"; }
+    return substr(line, open + 1, close - open - 1);
+}
+
+func nds_throws_ok(line: str) -> bool {
+    let at: int = nds_find(line, " throws ", 0);
+    if at < 0 { return true; }
+    let effects: str = str_trim(substr(line, at + 8, str_len(line)));
+    return effects != "";
+}
+
+func nds_top(stack: [str]) -> str {
+    if array_len(stack) == 0 { return ""; }
+    return stack[array_len(stack) - 1];
+}
+
+func nds_pop_str(stack: [str]) -> [str] {
+    return slice(stack, 0, array_len(stack) - 1);
+}
+
+func nds_pop_bool(stack: [bool]) -> [bool] {
+    return slice(stack, 0, array_len(stack) - 1);
+}
+
+func nds_error(line: int, message: str) {
+    println("declaration-error|" + to_str(line) + "|" + message);
+}
+
+func natural_declaration_check(source: str) -> int {
+    let lines: [str] = str_split(source, "\n");
+    mut stack: [str] = [];
+    mut routine_returns: [str] = [];
+    mut routine_give: [bool] = [];
+    mut contract_names: [str] = [];
+    mut record_names: [str] = [];
+    mut choice_names: [str] = [];
+    mut routine_names: [str] = [];
+    mut module_aliases: [str] = [];
+    mut field_keys: [str] = [];
+    mut variant_keys: [str] = [];
+    mut contract_methods: [str] = [];
+    mut record_methods: [str] = [];
+    mut i: int = 0;
+
+    while i < array_len(lines) {
+        let raw: str = str_trim(lines[i]);
+        let line: int = i + 1;
+        i += 1;
+        if raw == "" or nds_word(raw) == "//" or nds_word(raw) == "#!" { continue; }
+
+        if raw == "end routine" {
+            if nds_top(stack) != "routine" {
+                nds_error(line, "mismatched end routine"); return 1;
+            }
+            let result_type: str = routine_returns[array_len(routine_returns) - 1];
+            if result_type != "Unit" and routine_give[array_len(routine_give) - 1] == false {
+                nds_error(line, "non-Unit routine has no give"); return 1;
+            }
+            stack = nds_pop_str(stack);
+            routine_returns = nds_pop_str(routine_returns);
+            routine_give = nds_pop_bool(routine_give);
+            continue;
+        }
+        if raw == "end record" or raw == "end contract" or raw == "end choice" {
+            let kind: str = nds_word(substr(raw, 4, str_len(raw)));
+            if nds_top(stack) != kind {
+                nds_error(line, "mismatched declaration terminator"); return 1;
+            }
+            stack = nds_pop_str(stack);
+            continue;
+        }
+        if raw == "end attempt" {
+            if nds_top(stack) != "attempt" {
+                nds_error(line, "mismatched end attempt"); return 1;
+            }
+            stack = nds_pop_str(stack);
+            continue;
+        }
+        if raw == "end exception" {
+            if nds_top(stack) != "exception" {
+                nds_error(line, "mismatched end exception"); return 1;
+            }
+            stack = nds_pop_str(stack);
+            continue;
+        }
+
+        let open: str = nds_open_word(raw);
+        if open == "contract" or open == "record" or open == "choice" {
+            let name: str = nds_open_name(raw, open);
+            if name == "" { nds_error(line, "declaration requires a name"); return 1; }
+            if open == "contract" {
+                if nss_has(contract_names, name) { nds_error(line, "duplicate contract"); return 1; }
+                contract_names = array_concat(contract_names, [name]);
+            } else if open == "record" {
+                if nss_has(record_names, name) { nds_error(line, "duplicate record"); return 1; }
+                let supports: int = nds_find(raw, " supports ", 0);
+                if supports >= 0 {
+                    let contract: str = str_trim(substr(raw, supports + 10, str_len(raw)));
+                    if nss_has(contract_names, contract) == false {
+                        nds_error(line, "record supports unknown contract '" + contract + "'"); return 1;
+                    }
+                }
+                record_names = array_concat(record_names, [name]);
+            } else {
+                if nss_has(choice_names, name) { nds_error(line, "duplicate choice"); return 1; }
+                choice_names = array_concat(choice_names, [name]);
+            }
+            stack = array_concat(stack, [open]);
+            continue;
+        }
+
+        if open == "routine" {
+            let params: str = nds_routine_params(raw);
+            if params == "!invalid!" or nds_params_ok(params) == false {
+                nds_error(line, "routine parameters require explicit types"); return 1;
+            }
+            let name: str = nds_open_name(raw, "routine");
+            if name == "" { nds_error(line, "routine requires a name"); return 1; }
+            let public: bool = nds_word(raw) == "expose";
+            if public and nds_find(raw, "->", 0) < 0 {
+                nds_error(line, "public routine requires an explicit return type"); return 1;
+            }
+            if nds_throws_ok(raw) == false { nds_error(line, "throws requires an effect type"); return 1; }
+            let result_type: str = nds_routine_return(raw);
+            if nds_type_ok(result_type) == false { nds_error(line, "invalid routine return type"); return 1; }
+            if nds_top(stack) == "contract" {
+                contract_methods = array_concat(contract_methods, [name]);
+                continue;
+            }
+            mut key: str = name;
+            if nds_top(stack) == "record" {
+                key = nds_top(stack) + "." + name;
+                record_methods = array_concat(record_methods, [key]);
+            }
+            if nss_has(routine_names, key) { nds_error(line, "duplicate routine '" + key + "'"); return 1; }
+            routine_names = array_concat(routine_names, [key]);
+            stack = array_concat(stack, ["routine"]);
+            routine_returns = array_concat(routine_returns, [result_type]);
+            routine_give = array_concat(routine_give, [false]);
+            continue;
+        }
+
+        if open == "bring" {
+            let quote: int = nds_find(raw, "\"", 0);
+            let quote_end: int = nds_find(raw, "\"", quote + 1);
+            if quote < 0 or quote_end <= quote + 1 {
+                nds_error(line, "bring requires a module path"); return 1;
+            }
+            let alias_at: int = nds_find(raw, " as ", quote_end);
+            if alias_at >= 0 {
+                let alias: str = str_trim(substr(raw, alias_at + 4, str_len(raw)));
+                if nss_has(module_aliases, alias) { nds_error(line, "duplicate module alias"); return 1; }
+                module_aliases = array_concat(module_aliases, [alias]);
+            }
+            continue;
+        }
+
+        if raw == "attempt" {
+            stack = array_concat(stack, ["attempt"]);
+            continue;
+        }
+        if nds_word(raw) == "handle" {
+            if nds_top(stack) != "attempt" { nds_error(line, "handle has no owning attempt"); return 1; }
+            if nds_find(raw, ":", 0) < 0 { nds_error(line, "handle requires an exception type"); return 1; }
+            stack = array_concat(stack, ["exception"]);
+            continue;
+        }
+        if raw == "ensure" {
+            if nds_top(stack) != "attempt" { nds_error(line, "ensure has no owning attempt"); return 1; }
+            stack = array_concat(stack, ["exception"]);
+            continue;
+        }
+        if nds_word(raw) == "give" {
+            if nds_top(stack) != "routine" { nds_error(line, "give is outside a routine"); return 1; }
+            routine_give[array_len(routine_give) - 1] = true;
+            let value: str = str_trim(nds_after(raw, "give"));
+            let result_type: str = routine_returns[array_len(routine_returns) - 1];
+            if value == "" and result_type != "Unit" {
+                nds_error(line, "non-Unit routine requires a value"); return 1;
+            }
+            continue;
+        }
+
+        if nds_top(stack) == "record" {
+            mut field_line: str = raw;
+            if nds_word(field_line) == "change" { field_line = nds_after(field_line, "change"); }
+            let colon: int = nds_find(field_line, ":", 0);
+            if colon < 1 { nds_error(line, "record field requires a type"); return 1; }
+            let field: str = str_trim(substr(field_line, 0, colon));
+            let key: str = nds_top(stack) + "." + field;
+            if nss_has(field_keys, key) { nds_error(line, "duplicate record field"); return 1; }
+            field_keys = array_concat(field_keys, [key]);
+            continue;
+        }
+        if nds_top(stack) == "choice" {
+            let variant: str = nds_word(raw);
+            let key: str = nds_top(stack) + "." + variant;
+            if nss_has(variant_keys, key) { nds_error(line, "duplicate choice variant"); return 1; }
+            let open_paren: int = nds_find(raw, "(", 0);
+            if open_paren >= 0 {
+                let close_paren: int = nds_find(raw, ")", open_paren + 1);
+                if close_paren < 0 or nds_params_ok(substr(raw, open_paren + 1, close_paren - open_paren - 1)) == false {
+                    nds_error(line, "choice payloads require explicit types"); return 1;
+                }
+            }
+            variant_keys = array_concat(variant_keys, [key]);
+            continue;
+        }
+    }
+    if array_len(stack) != 0 { nds_error(array_len(lines), "unterminated declaration or effect block"); return 1; }
+    return 0;
+}
