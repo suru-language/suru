@@ -9,6 +9,7 @@ option(SU_SANITIZE "Build with AddressSanitizer + UndefinedBehaviorSanitizer" OF
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
   add_compile_options(-Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+  add_compile_options(-fstack-protector-strong -D_FORTIFY_SOURCE=2)
   if(SU_SANITIZE)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer -g)
     add_link_options(-fsanitize=address,undefined)
