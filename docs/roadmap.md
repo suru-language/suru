@@ -21,7 +21,9 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 - Closures with full capture and higher-order functions.
 - `for` loops over arrays with bounds guarantees.
 - Records with methods (via module-associated functions).
-- Error reporting improvements: multi-line snippets, notes, suggestions.
+- Error reporting improvements: multi-line snippets, notes (secondary
+  diagnostics with their own caret). Suggestions for misspelled names are not
+  yet implemented.
 - Integer and float formatting options in the standard library.
 
 ## 0.3.0 — performance and robustness
