@@ -160,7 +160,8 @@ func emit(kind: int, source: str, start: int, finish: int) {
     let column: int = column_at(source, start);
     let raw: str = substr(source, start, finish - start);
     mut value: str = "";
-    if kind == K_INT { value = to_str(integer_value(raw)); }
+    if kind == K_IDENT { value = raw; }
+    else if kind == K_INT { value = to_str(integer_value(raw)); }
     else if kind == K_FLOAT { value = f64_to_str(str_to_f64(raw)); }
     else if kind == K_STR { value = escaped_value(decode_string(source, start, finish)); }
     println(to_str(kind) + "|" + to_str(line) + "|" + to_str(column) + "|" + value);
