@@ -565,6 +565,8 @@ static s_type *check_call(s_sema *S, s_expr *e) {
         const char *bestc = NULL;
         for (s_size i = 0; i < S->mod->nfuncs; ++i)
             update_suggestion(fname, S->mod->funcs[i].name, &best, &bestc);
+        for (s_size i = 0; i < S->mod->nrecords; ++i)
+            update_suggestion(fname, S->mod->records[i].name, &best, &bestc);
         maybe_note_suggestion(S, e->loc, fname, best, bestc);
     }
     return type_unit(S);
