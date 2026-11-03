@@ -1,1 +1,1 @@
-invalid-utf8|source offset 0|line 1|column 1
+error|207|1|1|invalid-utf8

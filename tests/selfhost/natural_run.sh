@@ -35,7 +35,8 @@ if "$SURU" run "$DIR/natural_lexer_driver.suru" \
     echo "natural lexer: malformed interpolation was accepted" >&2
     exit 1
 fi
-grep -q '^error|204|' "$tmp/invalid.out"
+tail -n 1 "$tmp/invalid.out" | diff -u \
+    "$ROOT/tests/natural/invalid_interpolation.diag" -
 
 if "$SURU" run "$DIR/natural_lexer_driver.suru" \
        "$ROOT/tests/natural/invalid_escape.suru" \
@@ -43,7 +44,8 @@ if "$SURU" run "$DIR/natural_lexer_driver.suru" \
     echo "natural lexer: invalid escape was accepted" >&2
     exit 1
 fi
-grep -q '^error|203|.*|invalid-escape$' "$tmp/invalid-escape.out"
+tail -n 1 "$tmp/invalid-escape.out" | diff -u \
+    "$ROOT/tests/natural/invalid_escape.diag" -
 
 if "$SURU" run "$DIR/natural_lexer_driver.suru" \
        "$ROOT/tests/natural/lexical_invalid_utf8.suru" \
@@ -51,6 +53,7 @@ if "$SURU" run "$DIR/natural_lexer_driver.suru" \
     echo "natural lexer: malformed UTF-8 was accepted" >&2
     exit 1
 fi
-grep -q '^error|207|.*|invalid-utf8$' "$tmp/invalid-utf8.out"
+tail -n 1 "$tmp/invalid-utf8.out" | diff -u \
+    "$ROOT/tests/natural/lexical_invalid_utf8.diag" -
 
 echo "natural lexer: approved lexical corpus passed"

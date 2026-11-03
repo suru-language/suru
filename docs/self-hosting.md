@@ -82,9 +82,11 @@ The first transitional modules now exist at
 `selfhost/compiler/diagnostics.suru`, `selfhost/compiler/lexer.suru`, and
 `selfhost/compiler/token_stream.suru`. The approved Natural Syntax lexer is in
 `selfhost/compiler/natural_lexer.suru`.
-They use the legacy grammar because Document A 2.0 is not yet frozen; they are
-not a Natural Syntax implementation. The C17 VM executes them through
-`tests/selfhost/lexer_driver.suru`.
+The source, token, diagnostics, and legacy lexer modules use the legacy grammar
+for bootstrap compatibility. The Natural Syntax lexer follows approved
+Document A 2.0 and is exercised through
+`tests/selfhost/natural_lexer_driver.suru`. The C17 VM executes all transitional
+modules.
 
 `source.suru` owns file loading and line/column calculations, while
 `diagnostics.suru` owns stable lexer diagnostic classification.

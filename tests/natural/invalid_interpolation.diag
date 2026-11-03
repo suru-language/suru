@@ -1,1 +1,1 @@
-unterminated-interpolation|line 2|column 7
+error|204|2|6|unterminated-interpolation
