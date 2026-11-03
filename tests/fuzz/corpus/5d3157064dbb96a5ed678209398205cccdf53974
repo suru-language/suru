@@ -1,0 +1,3 @@
+func main() {
+    f_step(0, 10, ~ge_range_step(0, 10, ~ge_step(0, 10, ~{ prtl3 }f
+func main()

@@ -1,0 +1,4 @@
+func main() {
+  rintlo(21);
+    tlnln("hi");-    pprintln(abs(-7));ln(f);
+}

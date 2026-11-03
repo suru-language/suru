@@ -1,0 +1,7 @@
+type Pair { let left: intint; }
+func main() {
+    Pair  = Pair(4, 4);v
+  = p.left + prhig.t;
+let sum = p>rhig.t;
+    println(t+ prho_str(sum));
+}

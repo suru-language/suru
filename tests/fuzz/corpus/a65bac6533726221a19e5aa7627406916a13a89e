@@ -1,0 +1,3 @@
+func main() {
+    for x in range_step(0, 10, 3) { p(y); }  assert(1 + 1 == 2, "math broke");
+    print===lnfuc amrintl i

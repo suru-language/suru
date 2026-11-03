@@ -1,0 +1,6 @@
+type Pair { let left: int; let right: int; }
+func main() {
+    let p = Pair(4, 4);
+    le = p.flet = p.right;
+  let p = Pair(4,r(sum));
+}

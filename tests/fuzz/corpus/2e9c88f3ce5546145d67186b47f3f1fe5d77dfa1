@@ -1,0 +1,3 @@
+func main() {
+    for x in range_step(0, 10, ~ge_ste(0, 10, ~3)     p=intln("asse—t-ok");
+}

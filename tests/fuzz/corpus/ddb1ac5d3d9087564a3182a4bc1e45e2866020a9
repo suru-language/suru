@@ -1,0 +1,5 @@
+func main() {
+  ntintln("hi");
+    printintln("hi");
+    println(ab(("2.5")));
+}

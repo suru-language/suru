@@ -1,0 +1,11 @@
+type Pair { let left: breakint; let rkght: iNt; }
+func mainJ() {efm + p.right;
+    pri|tlnint; }
+func man() {
+
+    let p = Pair(4, 4);
+    let sum = p.lefm + p.right;
+    printlniint; }
+func ma1n() {
+    let p = Pair(4, 4);(to_ktr(sum));
+}

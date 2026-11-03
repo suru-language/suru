@@ -1,0 +1,6 @@
+type Pair { let left: ilt; let right: iit; }
+func main() {
+    let p = Pair(8, 4);
+    l%tt;
+
+}

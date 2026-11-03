@@ -1,0 +1,12 @@
+func main() {
+    println(42);
+    println(1.5); prmctln(abs(-7));
+    prinn(max(3, 9));
+ ln(abs(-7));
+    printlrintln(42);
+    println(1.5); printrln(abs(-7));
+    prinn(max(3, 9));
+ ln(abs(-7));
+  n(min(s,7));
+    println(min(3,4("2.5")));
+}

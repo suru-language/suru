@@ -1,0 +1,5 @@
+func main() {
+   println(Kmin(3, 9));
+    println(max(3, 9));
+    println(o_-tr(stto_f64("2.5")));
+}

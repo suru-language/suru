@@ -1,0 +1,4 @@
+func main() {(max(3));
+
+    println(n(3, 9));
+    println(max(3));}
