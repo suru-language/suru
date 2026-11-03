@@ -131,7 +131,8 @@ static void maybe_collect(s_vm *vm) {
         if (target < vm->gc_min_threshold) target = vm->gc_min_threshold;
         if (target > VM_GC_MAX_THRESHOLD) target = VM_GC_MAX_THRESHOLD;
     }
-    if (target < vm->gc_threshold && before <= after * 2)
+    if (target < vm->gc_threshold &&
+        (after > VM_GC_MAX_THRESHOLD / 2 || before <= after * 2))
         target = vm->gc_threshold;
     vm->gc_threshold = target;
     vm->alloc_counter = 0;
