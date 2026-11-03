@@ -141,3 +141,6 @@ and cleanup replacement with retained causes.
 The native GC now has `S_OBJ_EXCEPTION` with managed type, message, and cause
 fields; its graph is marked and collected like other heap objects, and VM type
 formatting identifies it as `exception`.
+The bytecode/VM foundation now defines `BC_NEW_EXCEPTION`,
+`BC_PUSH_HANDLER`, `BC_POP_HANDLER`, and `BC_THROW`; handler metadata is tied to
+call depth and frame/stack restoration, with a caught-exception VM test.

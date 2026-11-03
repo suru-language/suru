@@ -103,5 +103,7 @@ resolution/cycles are now covered by dedicated gates. Typed routine-call
 propagation and compatible handler coverage now have a dedicated gate. The
 bootstrap effect runtime also specifies cleanup replacement and retained
 causes. The native GC now represents exceptions as managed objects with type,
-message, and cause fields. VM unwinding and language-level throw opcodes remain
-open. No legacy default behavior may change during the port.
+message, and cause fields. The bytecode VM now has handler metadata and
+language-level exception construction, throw, and handler operations; compiler
+emission and cleanup bytecode lowering remain open. No legacy default behavior
+may change during the port.
