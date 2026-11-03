@@ -7,15 +7,21 @@ STRING|4|20|"Amina"
 NEWLINE|4|27|
 
 KEYWORD|5|1|value
-IDENT|5|7|age
-OPERATOR|5|11|=
-NUMBER|5|13|20
-NEWLINE|5|15|
+IDENT|5|7|café
+OPERATOR|5|12|=
+STRING|5|14|"Kampala — café"
+NEWLINE|5|33|
 
-KEYWORD|6|1|show
-PUNCT|6|5|(
-STRING|6|6|"Hello, {name}! Next year: {age + 1}"
-PUNCT|6|43|)
-NEWLINE|6|44|
+KEYWORD|6|1|value
+IDENT|6|7|age
+OPERATOR|6|11|=
+NUMBER|6|13|20
+NEWLINE|6|15|
 
-EOF|7|1|
+KEYWORD|7|1|show
+PUNCT|7|5|(
+STRING|7|6|"Hello, {name}! Next year: {age + 1}"
+PUNCT|7|43|)
+NEWLINE|7|44|
+
+EOF|8|1|

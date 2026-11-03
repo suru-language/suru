@@ -28,4 +28,12 @@ if "$SURU" run "$DIR/natural_lexer_driver.suru" \
 fi
 grep -q '^error|204|' "$tmp/invalid.out"
 
+if "$SURU" run "$DIR/natural_lexer_driver.suru" \
+       "$ROOT/tests/natural/lexical_invalid_utf8.suru" \
+       >"$tmp/invalid-utf8.out"; then
+    echo "natural lexer: malformed UTF-8 was accepted" >&2
+    exit 1
+fi
+grep -q '^error|207|' "$tmp/invalid-utf8.out"
+
 echo "natural lexer: approved lexical corpus passed"

@@ -20,7 +20,11 @@ func n_is_alpha(c: str) -> bool {
 }
 
 func n_is_continue(c: str) -> bool {
-    return n_is_alpha(c) or n_is_digit(c) or c >= "\u0080";
+    // The runtime exposes source slices as UTF-8 text. Non-ASCII scalar
+    // values are accepted as identifier continuation characters; punctuation
+    // remains excluded so malformed source cannot be absorbed into a name.
+    return n_is_alpha(c) or n_is_digit(c) or
+           (str_contains(" \t\r\n()[]{}:,.;+-*/%=<>!&|^?~\"", c) == false);
 }
 
 func n_is_keyword(word: str) -> bool {
@@ -45,6 +49,11 @@ func natural_lex_dump(source: str) -> int {
     mut parens: int = 0;
     mut brackets: int = 0;
     mut line_start: bool = true;
+
+    if str_valid_utf8(source) == false {
+        n_error(source, 0, 207);
+        return 1;
+    }
 
     if n >= 2 and source[0] == "#" and source[1] == "!" {
         while i < n and source[i] != "\n" { i += 1; }

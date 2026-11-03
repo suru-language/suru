@@ -295,6 +295,52 @@ static bool builtin_str_len(s_vm *vm) {
     return push(vm, s_val_int((s_i64)s_obj_str_len(s.u.o)));
 }
 
+static bool valid_utf8(const char *bytes, s_size len) {
+    s_size i = 0;
+    while (i < len) {
+        unsigned char c = (unsigned char)bytes[i++];
+        if (c <= 0x7fu) continue;
+        if (c >= 0xc2u && c <= 0xdfu) {
+            if (i >= len) return false;
+            unsigned char d = (unsigned char)bytes[i++];
+            if (d < 0x80u || d > 0xbfu) return false;
+            continue;
+        }
+        if (c >= 0xe0u && c <= 0xefu) {
+            if (i + 1u >= len) return false;
+            unsigned char d = (unsigned char)bytes[i++];
+            unsigned char e = (unsigned char)bytes[i++];
+            if (d < 0x80u || d > 0xbfu || e < 0x80u || e > 0xbfu ||
+                (c == 0xe0u && d < 0xa0u) ||
+                (c == 0xedu && d > 0x9fu)) return false;
+            continue;
+        }
+        if (c >= 0xf0u && c <= 0xf4u) {
+            if (i + 2u >= len) return false;
+            unsigned char d = (unsigned char)bytes[i++];
+            unsigned char e = (unsigned char)bytes[i++];
+            unsigned char f = (unsigned char)bytes[i++];
+            if (d < 0x80u || d > 0xbfu || e < 0x80u || e > 0xbfu ||
+                f < 0x80u || f > 0xbfu ||
+                (c == 0xf0u && d < 0x90u) ||
+                (c == 0xf4u && d > 0x8fu)) return false;
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
+static bool builtin_str_valid_utf8(s_vm *vm) {
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "str_valid_utf8 expects a string");
+        return false;
+    }
+    return push(vm, s_val_int(valid_utf8(s_obj_str_data(s.u.o),
+                                         s_obj_str_len(s.u.o)) ? 1 : 0));
+}
+
 static bool builtin_array_len(s_vm *vm) {
     s_value v = pop(vm);
     if (v.tag != S_VAL_OBJ || v.u.o->kind != S_OBJ_ARRAY) {
@@ -1145,6 +1191,7 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_ARRAY_CONTAINS: return builtin_array_lookup(vm, false);
     case S_BUILTIN_ARRAY_INDEX_OF: return builtin_array_lookup(vm, true);
     case S_BUILTIN_ARRAY_SORT: return builtin_array_sort(vm);
+    case S_BUILTIN_STR_VALID_UTF8: return builtin_str_valid_utf8(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;
