@@ -71,5 +71,6 @@ func nms_check_file(path: str, active: [str]) -> int {
 }
 
 func natural_module_check(path: str) -> int {
-    return nms_check_file(path, []);
+    let active: [str] = [];
+    return nms_check_file(path, active);
 }

@@ -99,6 +99,42 @@ func nds_pop_bool(stack: [bool]) -> [bool] {
     return slice(stack, 0, array_len(stack) - 1);
 }
 
+func nds_variant_name(line: str) -> str {
+    let rest: str = str_trim(nds_after(line, "case"));
+    let open: int = nds_find(rest, "(", 0);
+    if open >= 0 { return str_trim(substr(rest, 0, open)); }
+    return rest;
+}
+
+func nds_methods_match(contract_methods: [str], record_methods: [str],
+                       contract: str, record: str) -> bool {
+    let prefix: str = contract + "|";
+    mut i: int = 0;
+    while i < array_len(contract_methods) {
+        if substr(contract_methods[i], 0, str_len(prefix)) == prefix {
+            let signature: str = substr(contract_methods[i], str_len(prefix),
+                                        str_len(contract_methods[i]));
+            let expected: str = record + "|" + signature;
+            if nss_has(record_methods, expected) == false { return false; }
+        }
+        i += 1;
+    }
+    return true;
+}
+
+func nds_choice_complete(variants: [str], seen: str, choice: str,
+                         wildcard: bool) -> bool {
+    if wildcard { return true; }
+    let prefix: str = choice + ".";
+    mut i: int = 0;
+    while i < array_len(variants) {
+        if substr(variants[i], 0, str_len(prefix)) == prefix and
+           str_contains(seen, "|" + variants[i] + "|") == false { return false; }
+        i += 1;
+    }
+    return true;
+}
+
 func nds_error(line: int, message: str) {
     println("declaration-error|" + to_str(line) + "|" + message);
 }
@@ -117,6 +153,13 @@ func natural_declaration_check(source: str) -> int {
     mut variant_keys: [str] = [];
     mut contract_methods: [str] = [];
     mut record_methods: [str] = [];
+    mut record_supports: [str] = [];
+    mut choose_stack: [str] = [];
+    mut choose_seen: [str] = [];
+    mut choose_wildcard: [bool] = [];
+    mut current_record: str = "";
+    mut current_contract: str = "";
+    mut current_choice: str = "";
     mut i: int = 0;
 
     while i < array_len(lines) {
@@ -143,7 +186,43 @@ func natural_declaration_check(source: str) -> int {
             if nds_top(stack) != kind {
                 nds_error(line, "mismatched declaration terminator"); return 1;
             }
+            if kind == "record" {
+                let support_prefix: str = current_record + "|";
+                mut support_index: int = 0;
+                while support_index < array_len(record_supports) {
+                    if substr(record_supports[support_index], 0,
+                              str_len(support_prefix)) == support_prefix {
+                        let contract: str = substr(record_supports[support_index],
+                                                   str_len(support_prefix),
+                                                   str_len(record_supports[support_index]));
+                        if nds_methods_match(contract_methods, record_methods,
+                                             contract, current_record) == false {
+                            nds_error(line, "record does not implement contract '" + contract + "'");
+                            return 1;
+                        }
+                    }
+                    support_index += 1;
+                }
+                current_record = "";
+            }
+            if kind == "contract" { current_contract = ""; }
+            if kind == "choice" { current_choice = ""; }
             stack = nds_pop_str(stack);
+            continue;
+        }
+        if raw == "end choose" {
+            if array_len(choose_stack) == 0 {
+                nds_error(line, "mismatched end choose"); return 1;
+            }
+            let choice: str = choose_stack[array_len(choose_stack) - 1];
+            if nds_choice_complete(variant_keys,
+                                   choose_seen[array_len(choose_seen) - 1], choice,
+                                   choose_wildcard[array_len(choose_wildcard) - 1]) == false {
+                nds_error(line, "choice match is not exhaustive"); return 1;
+            }
+            choose_stack = nds_pop_str(choose_stack);
+            choose_seen = nds_pop_str(choose_seen);
+            choose_wildcard = nds_pop_bool(choose_wildcard);
             continue;
         }
         if raw == "end attempt" {
@@ -172,16 +251,26 @@ func natural_declaration_check(source: str) -> int {
                 if nss_has(record_names, name) { nds_error(line, "duplicate record"); return 1; }
                 let supports: int = nds_find(raw, " supports ", 0);
                 if supports >= 0 {
-                    let contract: str = str_trim(substr(raw, supports + 10, str_len(raw)));
-                    if nss_has(contract_names, contract) == false {
-                        nds_error(line, "record supports unknown contract '" + contract + "'"); return 1;
+                    let support_text: str = str_trim(substr(raw, supports + 10, str_len(raw)));
+                    let contracts: [str] = str_split(support_text, ",");
+                    mut support_index: int = 0;
+                    while support_index < array_len(contracts) {
+                        let contract: str = str_trim(contracts[support_index]);
+                        if nss_has(contract_names, contract) == false {
+                            nds_error(line, "record supports unknown contract '" + contract + "'"); return 1;
+                        }
+                        record_supports = array_concat(record_supports, [name + "|" + contract]);
+                        support_index += 1;
                     }
                 }
                 record_names = array_concat(record_names, [name]);
+                current_record = name;
             } else {
                 if nss_has(choice_names, name) { nds_error(line, "duplicate choice"); return 1; }
                 choice_names = array_concat(choice_names, [name]);
+                current_choice = name;
             }
+            if open == "contract" { current_contract = name; }
             stack = array_concat(stack, [open]);
             continue;
         }
@@ -201,13 +290,17 @@ func natural_declaration_check(source: str) -> int {
             let result_type: str = nds_routine_return(raw);
             if nds_type_ok(result_type) == false { nds_error(line, "invalid routine return type"); return 1; }
             if nds_top(stack) == "contract" {
-                contract_methods = array_concat(contract_methods, [name]);
+                contract_methods = array_concat(contract_methods,
+                                                [current_contract + "|" + name + "|" +
+                                                 params + "|" + result_type]);
                 continue;
             }
             mut key: str = name;
             if nds_top(stack) == "record" {
-                key = nds_top(stack) + "." + name;
-                record_methods = array_concat(record_methods, [key]);
+                key = current_record + "." + name;
+                record_methods = array_concat(record_methods,
+                                              [current_record + "|" + name + "|" +
+                                               params + "|" + result_type]);
             }
             if nss_has(routine_names, key) { nds_error(line, "duplicate routine '" + key + "'"); return 1; }
             routine_names = array_concat(routine_names, [key]);
@@ -229,6 +322,38 @@ func natural_declaration_check(source: str) -> int {
                 if nss_has(module_aliases, alias) { nds_error(line, "duplicate module alias"); return 1; }
                 module_aliases = array_concat(module_aliases, [alias]);
             }
+            continue;
+        }
+
+        if nds_word(raw) == "choose" {
+            let choice: str = str_trim(nds_after(raw, "choose"));
+            if nss_has(choice_names, choice) == false {
+                nds_error(line, "choose references unknown choice '" + choice + "'"); return 1;
+            }
+            choose_stack = array_concat(choose_stack, [choice]);
+            choose_seen = array_concat(choose_seen, [""]);
+            choose_wildcard = array_concat(choose_wildcard, [false]);
+            continue;
+        }
+        if nds_word(raw) == "case" {
+            if array_len(choose_stack) == 0 {
+                nds_error(line, "case has no owning choose"); return 1;
+            }
+            let choice: str = choose_stack[array_len(choose_stack) - 1];
+            let variant: str = nds_variant_name(raw);
+            if variant == "_" {
+                choose_wildcard[array_len(choose_wildcard) - 1] = true;
+                continue;
+            }
+            let key: str = choice + "." + variant;
+            if nss_has(variant_keys, key) == false {
+                nds_error(line, "case references unknown variant '" + variant + "'"); return 1;
+            }
+            if str_contains(choose_seen[array_len(choose_seen) - 1], "|" + key + "|") {
+                nds_error(line, "duplicate choice case"); return 1;
+            }
+            choose_seen[array_len(choose_seen) - 1] =
+                choose_seen[array_len(choose_seen) - 1] + "|" + key + "|";
             continue;
         }
 
@@ -264,14 +389,14 @@ func natural_declaration_check(source: str) -> int {
             let colon: int = nds_find(field_line, ":", 0);
             if colon < 1 { nds_error(line, "record field requires a type"); return 1; }
             let field: str = str_trim(substr(field_line, 0, colon));
-            let key: str = nds_top(stack) + "." + field;
+            let key: str = current_record + "." + field;
             if nss_has(field_keys, key) { nds_error(line, "duplicate record field"); return 1; }
             field_keys = array_concat(field_keys, [key]);
             continue;
         }
         if nds_top(stack) == "choice" {
             let variant: str = nds_word(raw);
-            let key: str = nds_top(stack) + "." + variant;
+            let key: str = current_choice + "." + variant;
             if nss_has(variant_keys, key) { nds_error(line, "duplicate choice variant"); return 1; }
             let open_paren: int = nds_find(raw, "(", 0);
             if open_paren >= 0 {

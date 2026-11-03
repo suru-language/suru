@@ -1,0 +1,8 @@
+choice State
+    Ready
+    Done
+end choice
+
+choose State
+case Ready
+end choose

@@ -1,0 +1,9 @@
+contract Describable
+    routine describe() -> Text
+end contract
+
+record Student supports Describable
+    routine other() -> Text
+        give "other"
+    end routine
+end record

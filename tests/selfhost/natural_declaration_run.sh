@@ -11,7 +11,8 @@ trap 'rm -rf "$tmp"' EXIT
     "$ROOT/tests/natural/declarations_semantic_valid.suru" >"$tmp/valid.out"
 
 for input in declarations_invalid_record declarations_invalid_choice \
-             declarations_invalid_module declarations_invalid_effect; do
+             declarations_invalid_module declarations_invalid_effect \
+             declarations_invalid_exhaustive declarations_invalid_contract; do
     if "$SURU" run "$DIR/natural_declaration_driver.suru" \
            "$ROOT/tests/natural/$input.suru" >"$tmp/$input.out"; then
         echo "natural declaration semantics: $input was accepted" >&2

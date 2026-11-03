@@ -16,6 +16,13 @@ choice NetworkState
     Disconnected(reason: Text)
 end choice
 
+choose NetworkState
+case Connected(address)
+    show(address)
+case Disconnected(reason)
+    show(reason)
+end choose
+
 expose routine calculate(first: Whole, second: Whole) -> Whole throws FileError
     give first + second
 end routine
