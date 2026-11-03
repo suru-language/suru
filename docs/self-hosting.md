@@ -106,4 +106,6 @@ needed by a future SURU compiler is explicit in `include/suru/io.h` and
 next-phase work. The first parser increment is
 `selfhost/compiler/natural_parser.suru`, which validates block terminators,
 routine context, `otherwise`/`case` ownership, and exception clauses against
-the structural corpus.
+the structural corpus. It now also validates binding initializers, explicit
+routine parameter/public return types, module-scope constants, mutable
+assignment targets, and routine `give` context.

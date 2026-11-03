@@ -46,6 +46,55 @@ func np_pop(stack: [str]) -> [str] {
     return slice(stack, 0, array_len(stack) - 1);
 }
 
+func np_pop_bool(stack: [bool]) -> [bool] {
+    return slice(stack, 0, array_len(stack) - 1);
+}
+
+func np_find_text(text: str, needle: str, start: int) -> int {
+    mut i: int = start;
+    while i + str_len(needle) <= str_len(text) {
+        if substr(text, i, str_len(needle)) == needle { return i; }
+        i += 1;
+    }
+    return -1;
+}
+
+func np_binding_name(line: str, word: str) -> str {
+    let rest: str = str_trim(substr(line, str_len(word), str_len(line)));
+    mut i: int = 0;
+    while i < str_len(rest) and rest[i] != " " and rest[i] != ":" and
+          rest[i] != "=" {
+        i += 1;
+    }
+    return substr(rest, 0, i);
+}
+
+func np_assignment_target(line: str) -> str {
+    let rest: str = str_trim(substr(line, 4, str_len(line)));
+    let at: int = np_find_text(rest, " to ", 0);
+    if at < 0 { return rest; }
+    return str_trim(substr(rest, 0, at));
+}
+
+func np_signature_params_valid(line: str) -> bool {
+    let open: int = np_find_text(line, "(", 0);
+    let close: int = np_find_text(line, ")", open + 1);
+    if open < 0 or close < 0 { return false; }
+    let params: str = str_trim(substr(line, open + 1, close - open - 1));
+    if params == "" { return true; }
+    let parts: [str] = str_split(params, ",");
+    mut i: int = 0;
+    while i < array_len(parts) {
+        if str_contains(parts[i], ":") == false { return false; }
+        i += 1;
+    }
+    return true;
+}
+
+func np_routine_returned_value(line: str) -> bool {
+    return str_contains(line, "->") and str_contains(line, "-> Unit") == false;
+}
+
 func np_open_kind(line: str) -> str {
     let word: str = np_word(line);
     if word == "expose" {
@@ -72,6 +121,10 @@ func np_end_kind(line: str) -> str {
 func natural_parse_check(source: str) -> int {
     let lines: [str] = str_split(source, "\n");
     mut stack: [str] = [];
+    mut routine_nonunit: [bool] = [];
+    mut routine_has_give: [bool] = [];
+    mut immutable_names: [str] = [];
+    mut mutable_names: [str] = [];
     mut in_routine: int = 0;
     mut i: int = 0;
 
@@ -95,7 +148,16 @@ func natural_parse_check(source: str) -> int {
                 np_error(number, 301, "mismatched block terminator");
                 return 1;
             }
-            if end_kind == "routine" { in_routine -= 1; }
+            if end_kind == "routine" {
+                if routine_nonunit[array_len(routine_nonunit) - 1] and
+                   routine_has_give[array_len(routine_has_give) - 1] == false {
+                    np_error(number, 311, "non-Unit routine has no give");
+                    return 1;
+                }
+                routine_nonunit = np_pop_bool(routine_nonunit);
+                routine_has_give = np_pop_bool(routine_has_give);
+                in_routine -= 1;
+            }
             stack = np_pop(stack);
             continue;
         }
@@ -106,7 +168,24 @@ func natural_parse_check(source: str) -> int {
             // nested routine bodies. Record methods and top-level routines do
             // open a routine block.
             if open_kind == "routine" and np_top(stack) == "contract" {
+                if np_signature_params_valid(line) == false {
+                    np_error(number, 308, "routine parameters require explicit types");
+                    return 1;
+                }
                 continue;
+            }
+            if open_kind == "routine" {
+                if np_signature_params_valid(line) == false {
+                    np_error(number, 308, "routine parameters require explicit types");
+                    return 1;
+                }
+                if np_starts(line, "expose ") and str_contains(line, "->") == false {
+                    np_error(number, 309, "public routine requires an explicit return type");
+                    return 1;
+                }
+                routine_nonunit = array_concat(routine_nonunit,
+                                               [np_routine_returned_value(line)]);
+                routine_has_give = array_concat(routine_has_give, [false]);
             }
             stack = np_push(stack, open_kind);
             if open_kind == "routine" { in_routine += 1; }
@@ -139,9 +218,68 @@ func natural_parse_check(source: str) -> int {
             np_error(number, 305, "give is outside a routine");
             return 1;
         }
+        if np_starts(line, "give") and in_routine > 0 {
+            routine_has_give[array_len(routine_has_give) - 1] = true;
+            if line == "give" and routine_nonunit[array_len(routine_nonunit) - 1] {
+                np_error(number, 310, "non-Unit routine requires a value");
+                return 1;
+            }
+        }
+        if np_starts(line, "value ") or np_starts(line, "change ") {
+            let binding_word: str = np_word(line);
+            if np_top(stack) == "record" and str_contains(line, "=") == false {
+                let field: str = np_binding_name(line, binding_word);
+                if binding_word == "change" {
+                    mutable_names = array_concat(mutable_names, [field]);
+                } else {
+                    immutable_names = array_concat(immutable_names, [field]);
+                }
+                continue;
+            }
+            if str_contains(line, "=") == false {
+                np_error(number, 307, "binding requires an initializer");
+                return 1;
+            }
+            let binding: str = np_binding_name(line, binding_word);
+            if binding == "" {
+                np_error(number, 308, "binding requires a name");
+                return 1;
+            }
+            if binding_word == "change" {
+                mutable_names = array_concat(mutable_names, [binding]);
+            } else {
+                immutable_names = array_concat(immutable_names, [binding]);
+            }
+        }
+        if np_starts(line, "constant ") {
+            if in_routine > 0 {
+                np_error(number, 312, "constant is module-scoped");
+                return 1;
+            }
+            if str_contains(line, "=") == false {
+                np_error(number, 307, "constant requires an initializer");
+                return 1;
+            }
+        }
         if np_starts(line, "set ") and str_contains(line, " to ") == false {
             np_error(number, 306, "set requires 'to'");
             return 1;
+        }
+        if np_starts(line, "set ") {
+            let target: str = np_assignment_target(line);
+            mut simple_target: str = target;
+            if np_starts(target, "this.") {
+                simple_target = substr(target, 5, str_len(target));
+            }
+            if array_len(mutable_names) == 0 or
+               str_contains(str_join(mutable_names, "|"), simple_target) == false {
+                if str_contains(str_join(immutable_names, "|"), simple_target) {
+                    np_error(number, 313, "assignment target is immutable");
+                } else {
+                    np_error(number, 314, "assignment target is not mutable");
+                }
+                return 1;
+            }
         }
     }
 

@@ -87,5 +87,7 @@ UTF-8, interpolation, nested comments, keyword coverage, resource limits, and
 stable lexical diagnostic messages. The parser port is the next phase;
 the initial structural parser gate is now in
 `selfhost/compiler/natural_parser.suru`. `--syntax=natural` is not enabled
-until expression/type parsing and semantic gates exist. No legacy default
-behavior may change during the port.
+until expression/type parsing and semantic gates exist. The structural gate
+currently checks declarations, binding initializers, public signatures,
+constant scope, mutable assignment targets, and routine return context. No
+legacy default behavior may change during the port.

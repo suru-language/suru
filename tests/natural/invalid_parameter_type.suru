@@ -1,0 +1,3 @@
+routine add(first, second: Whole) -> Whole
+    give first
+end routine

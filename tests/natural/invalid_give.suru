@@ -1,0 +1,3 @@
+routine calculate() -> Whole
+    give
+end routine
