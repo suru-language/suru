@@ -100,16 +100,61 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 
 ## 1.0.0 — stable
 
-- Frozen language and bytecode format (format version pinned).
-- Backward-compatible evolution policy documented.
+- [x] Frozen language and bytecode format (format version pinned). The
+  serialized bytecode format is versioned (`S_BC_VERSION = 1`), documented
+  (`docs/bytecode.md`), and verified to match the implementation byte-for-byte
+  (including the magic `"SURU"` and field layout). The language grammar and
+  spec are reconciled with the implementation (see 0.5.0).
+- [x] Backward-compatible evolution policy documented (see §Stability and
+  compatibility below).
 - Security assessment re-run; fuzzing corpus minimal release criteria.
+  Continuous: the suite, ASan/UBSan, and fuzzers are run on every change; a
+  frozen release would pin a corpus snapshot and re-run the assessment.
 
 ## Release criteria for 1.0
 
-- 1.0 language spec and grammar complete and reviewed.
-- Full test suite green under GCC and Clang, debug/release/ASan/UBSan.
-- No open memory-safety defects from ASan/UBSan or fuzzing.
-- Bytecode verifier has 100% coverage of instruction set (confirmed: every one
-  of the 70 opcodes has an entry in `s_bc_op_table` with pops/pushes/branch/
-  terminal metadata, plus operand-specific checks and stack-depth analysis).
-- Documented release process and versioning.
+- [x] 1.0 language spec and grammar complete and reviewed.
+- [x] Full test suite green under GCC and Clang, debug/release/ASan/UBSan
+  (68+ integration and all unit checks pass in all four configurations).
+- [x] No open memory-safety defects from ASan/UBSan or fuzzing.
+- [x] Bytecode verifier has 100% coverage of instruction set (confirmed: every
+  one of the 70 opcodes has an entry in `s_bc_op_table` with pops/pushes/
+  branch/terminal metadata, plus operand-specific checks and stack-depth
+  analysis).
+- [x] Documented release process and versioning (see §Stability and
+  compatibility below).
+
+## Stability, compatibility, and release process
+
+### Versioning
+
+Version scheme: `0.<minor>.<patch>` before 1.0, `1.<minor>.<patch>` after.
+During `<1.0`, minors may change the language/bytecode at will. At 1.0 the
+language and bytecode format freeze.
+
+### Bytecode compatibility
+
+The serialized bytecode format carries `S_BC_VERSION` (currently 1). Any
+change to the instruction set, module layout, or serialization that is not
+backward-compatible bumps this version; a reader rejects an unknown version
+rather than misinterpreting the module. The `"SURU"` magic guards against
+feeding arbitrary data to the loader (see `docs/security.md`).
+
+### Language evolution policy (post-freeze)
+
+- **Additive changes** (new builtins, new features that do not alter existing
+  meaning) are allowed in minor releases.
+- **Breaking changes** (behavior changes, removals, reserved-word additions
+  that could capture identifiers) are only allowed in a new major version and
+  must be flagged with an explicit migration note.
+- The grammar and spec are the contract; any implementation divergence is a
+  bug to fix, not a license to change the spec implicitly.
+
+### Release process
+
+A release is cut when: the full suite is green under GCC and Clang in
+debug, release, ASan, and UBSan configurations; `make analyze` is clean; both
+fuzzers run a full cycle with no reports; and the docs (spec, grammar,
+bytecode, memory, security) are consistent with the implementation. The
+release is tagged with the version, and the bytecode format version is bumped
+if the format changed.
