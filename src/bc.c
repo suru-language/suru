@@ -299,7 +299,7 @@ int s_bc_read(const s_u8 *buf, s_size buflen, s_bc_module *out) {
     }
     if (m.nrecords) {
         m.record_nfields = malloc(sizeof(s_u32) * m.nrecords);
-        m.record_names = malloc(sizeof(char *) * m.nrecords);
+        m.record_names = calloc(m.nrecords, sizeof(char *));
         if (!m.record_nfields || !m.record_names) goto fail;
         for (s_u32 i = 0; i < m.nrecords; ++i) {
             m.record_nfields[i] = r_u32(&r);
