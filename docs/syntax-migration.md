@@ -96,5 +96,6 @@ semantic gates remain open. Control-flow AST nodes and nested block ownership
 are covered by the Natural Syntax parser gate. The initial semantic gate now
 covers local symbol/type inference, assignment mutability, expression operand
 types, and Boolean conditions. Full records, choices, modules, effects, and
-runtime integration remain open. No legacy default behavior may change during
-the port.
+runtime integration remain open; the declaration/effect gate now validates
+their initial signatures, ownership, aliases, and duplicate declarations. No
+legacy default behavior may change during the port.

@@ -124,3 +124,8 @@ The first semantic pass is in `selfhost/compiler/natural_semantic.suru`; it
 tracks bindings and types, infers local types, validates numeric/logical
 expressions, checks mutable assignment targets, and requires Boolean control
 conditions.
+Declaration/effect validation is in
+`selfhost/compiler/natural_declaration_semantic.suru`; its current gate checks
+routine signatures and return paths, record fields and contract references,
+choice payloads and duplicate variants, module aliases, and `attempt` handler/
+`ensure` ownership.
