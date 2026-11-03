@@ -308,6 +308,8 @@ static s_type *check_binary(s_sema *S, s_expr *e) {
             s_diag_error(S->diag, e->loc, 408,
                          "bitwise/shift operators require int operands, got %s and %s",
                          type_name(lt), type_name(rt));
+            s_diag_note(S->diag, e->u.binary.rhs->loc, 0,
+                        "right operand has type %s", type_name(rt));
             return type_unit(S);
         }
         return lt;
@@ -316,6 +318,8 @@ static s_type *check_binary(s_sema *S, s_expr *e) {
             s_diag_error(S->diag, e->loc, 407,
                          "'and'/'or' require bool operands, got %s and %s",
                          type_name(lt), type_name(rt));
+            s_diag_note(S->diag, e->u.binary.rhs->loc, 0,
+                        "right operand has type %s", type_name(rt));
             return type_unit(S);
         }
         break;
