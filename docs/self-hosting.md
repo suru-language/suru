@@ -77,14 +77,18 @@ allowed metadata normalization must be documented before it is used.
 
 ## Current status
 
-The first transitional module now exists at
-`selfhost/compiler/lexer.suru`. It uses the legacy grammar because Document A
-2.0 is not yet frozen; it is not a Natural Syntax implementation. The C17 VM
-executes it through `tests/selfhost/lexer_driver.suru`.
+The first transitional modules now exist at
+`selfhost/compiler/tokens.suru` and `selfhost/compiler/lexer.suru`. They use
+the legacy grammar because Document A 2.0 is not yet frozen; they are not a
+Natural Syntax implementation. The C17 VM executes them through
+`tests/selfhost/lexer_driver.suru`.
 
-`make selfhost-check` validates the module through its drivers, and
-`make selfhost-test` compares token kinds and source locations against the C
-lexer while checking that both implementations reject a malformed identifier.
-Decoded literal values, complete negative-diagnostic parity, and the remaining
-compiler modules are still open gates. The binary I/O needed by a future SURU
-compiler is explicit in `include/suru/io.h` and `src/io.c`.
+`make selfhost-check` validates the module through its driver, and
+`make selfhost-test` compares token kinds, source locations, identifier text,
+integer values, float values, escaped string values, and negative diagnostic
+codes/locations against the C lexer. The current negative corpus covers
+reserved identifiers, missing hexadecimal/binary digits, invalid escapes,
+unterminated strings, and unexpected punctuation. Complete diagnostic message
+parity and the remaining compiler modules are still open gates. The binary I/O
+needed by a future SURU compiler is explicit in `include/suru/io.h` and
+`src/io.c`.

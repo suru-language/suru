@@ -64,7 +64,8 @@ int main(int argc, char **argv) {
     int failed = s_diag_has_errors(&diag) ? 1 : 0;
     for (s_size i = 0; i < diag.count; ++i) {
         if (diag.items[i].sev == S_DIAG_ERROR) {
-            printf("error|%u|%u\n", diag.items[i].loc.line, diag.items[i].loc.col);
+            printf("error|%d|%u|%u\n", diag.items[i].code,
+                   diag.items[i].loc.line, diag.items[i].loc.col);
         }
     }
     s_diag_dispose(&diag);

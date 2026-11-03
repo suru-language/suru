@@ -14,7 +14,8 @@ for input in lexer_input.suru lexer_literals.suru; do
 done
 echo "selfhost lexer: token kinds, locations, and literal values match reference"
 
-for input in lexer_invalid.suru lexer_badhex.suru lexer_badescape.suru; do
+for input in lexer_invalid.suru lexer_badhex.suru lexer_badbinary.suru \
+             lexer_badescape.suru lexer_unterminated.suru lexer_unexpected.suru; do
     if "$SURU" run "$DIR/lexer_negative_driver.suru" "$DIR/$input" >"$tmp/suru-invalid.out"; then
         echo "selfhost lexer: $input was accepted" >&2
         exit 1
