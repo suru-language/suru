@@ -1,0 +1,86 @@
+// Natural Syntax effect lowering trace.
+// This is the first compiler-emission bridge; the native bytecode builder will
+// replace labels with instruction indices while preserving this operation order.
+
+func nbc_word(line: str) -> str {
+    mut i: int = 0;
+    while i < str_len(line) and line[i] != " " and line[i] != "\t" { i += 1; }
+    return substr(line, 0, i);
+}
+
+func nbc_after(line: str, word: str) -> str {
+    return str_trim(substr(line, str_len(word), str_len(line)));
+}
+
+func nbc_find(text: str, needle: str) -> int {
+    mut i: int = 0;
+    while i + str_len(needle) <= str_len(text) {
+        if substr(text, i, str_len(needle)) == needle { return i; }
+        i += 1;
+    }
+    return -1;
+}
+
+func nbc_emit(op: str, value: str) {
+    println("bc|" + op + "|" + value);
+}
+
+func natural_emit_bytecode(source: str) -> int {
+    let lines: [str] = str_split(source, "\n");
+    mut attempts: [str] = [];
+    mut labels: int = 0;
+    mut i: int = 0;
+    while i < array_len(lines) {
+        let line: str = str_trim(lines[i]);
+        i += 1;
+        if line == "" or nbc_word(line) == "//" or nbc_word(line) == "#!" { continue; }
+
+        if nbc_word(line) == "routine" or
+           (nbc_word(line) == "expose" and nbc_word(nbc_after(line, "expose")) == "routine") {
+            nbc_emit("FUNC", line);
+            continue;
+        }
+        if line == "attempt" {
+            let handler: str = "handler" + to_str(labels);
+            let ensure: str = "ensure" + to_str(labels);
+            let finish: str = "end-attempt" + to_str(labels);
+            labels += 1;
+            attempts = array_concat(attempts, [handler + "|" + ensure + "|" + finish]);
+            nbc_emit("PUSH_HANDLER", handler + "|*");
+            continue;
+        }
+        if nbc_word(line) == "handle" {
+            if array_len(attempts) == 0 { println("bytecode-error|handle outside attempt"); return 1; }
+            let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
+            nbc_emit("JMP", fields[1]);
+            let colon: int = nbc_find(line, ":");
+            let effect: str = str_trim(substr(line, colon + 1, str_len(line)));
+            nbc_emit("LABEL", fields[0] + "|" + effect);
+            continue;
+        }
+        if line == "ensure" {
+            if array_len(attempts) == 0 { println("bytecode-error|ensure outside attempt"); return 1; }
+            let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
+            nbc_emit("LABEL", fields[1]);
+            continue;
+        }
+        if line == "end attempt" {
+            if array_len(attempts) == 0 { println("bytecode-error|end attempt without attempt"); return 1; }
+            let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
+            nbc_emit("LABEL", fields[2]);
+            attempts = slice(attempts, 0, array_len(attempts) - 1);
+            continue;
+        }
+        if nbc_word(line) == "give" {
+            let value: str = str_trim(nbc_after(line, "give"));
+            if value == "" { nbc_emit("RET_UNIT", ""); }
+            else { nbc_emit("EVAL", value); nbc_emit("RET", ""); }
+            continue;
+        }
+        if line == "end routine" { nbc_emit("END_FUNC", ""); continue; }
+        if nbc_word(line) == "show" { nbc_emit("STMT", line); continue; }
+        nbc_emit("STMT", line);
+    }
+    if array_len(attempts) != 0 { println("bytecode-error|unterminated attempt"); return 1; }
+    return 0;
+}

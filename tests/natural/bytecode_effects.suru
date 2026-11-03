@@ -1,0 +1,12 @@
+routine handled() -> Unit
+    attempt
+        show("try")
+    handle problem: FileError
+        show("handled")
+    end exception
+    ensure
+        show("cleanup")
+    end exception
+    give
+end attempt
+end routine

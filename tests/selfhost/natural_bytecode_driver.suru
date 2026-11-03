@@ -1,0 +1,5 @@
+use "../../selfhost/compiler/natural_bytecode.suru";
+
+func main() {
+    exit(natural_emit_bytecode(source_load(args(0))));
+}
