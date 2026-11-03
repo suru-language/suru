@@ -29,6 +29,19 @@ make ubsan      # UndefinedBehaviorSanitizer build
 make test       # run the full test suite
 ```
 
+A CMake build is also provided (gcc/clang on Linux/macOS, and the MSVC
+toolchain on Windows):
+
+```
+cmake -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+ctest --test-dir build
+# AddressSanitizer + UndefinedBehaviorSanitizer build:
+cmake -B build-asan -DSU_SANITIZE=ON
+cmake --build build-asan
+ctest --test-dir build-asan
+```
+
 See `docs/architecture.md` for details.
 
 ## Usage
