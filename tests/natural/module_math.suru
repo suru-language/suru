@@ -1,0 +1,3 @@
+expose routine add(first: Whole, second: Whole) -> Whole
+    give first + second
+end routine

@@ -1,0 +1,5 @@
+use "../../selfhost/compiler/natural_module_semantic.suru";
+
+func main() {
+    exit(natural_module_check(args(0)));
+}
