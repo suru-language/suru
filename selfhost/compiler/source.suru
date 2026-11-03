@@ -26,5 +26,13 @@ func source_column_at(source: str, position: int) -> int {
 }
 
 func source_scalar_column_at(source: str, position: int) -> int {
-    return str_utf8_len(substr(source, 0, position)) + 1;
+    mut line_start: int = position;
+    while line_start > 0 {
+        line_start -= 1;
+        if source[line_start] == "\n" {
+            line_start += 1;
+            break;
+        }
+    }
+    return str_utf8_len(substr(source, line_start, position - line_start)) + 1;
 }

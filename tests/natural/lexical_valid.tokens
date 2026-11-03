@@ -10,7 +10,7 @@ KEYWORD|5|1|value
 IDENT|5|7|café
 OPERATOR|5|12|=
 STRING|5|14|"Kampala — café"
-NEWLINE|5|33|
+NEWLINE|5|30|
 
 KEYWORD|6|1|value
 IDENT|6|7|age
