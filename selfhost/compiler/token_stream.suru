@@ -1,0 +1,245 @@
+// Structured token stream for the transitional legacy frontend.
+// Natural Syntax token kinds remain blocked until Document A 2.0 is approved.
+
+use "lexer.suru";
+
+type Token {
+    let kind: int;
+    let line: int;
+    let column: int;
+    let next: int;
+    let text: str;
+    let int_value: int;
+    let float_value: float;
+    let error: bool;
+    let error_code: int;
+}
+
+func token_make(kind: int, source: str, start: int, finish: int) -> Token {
+    let raw: str = substr(source, start, finish - start);
+    mut text: str = raw;
+    mut iv: int = 0;
+    mut fv: float = 0.0;
+    if kind == K_INT {
+        iv = integer_value(raw);
+        text = to_str(iv);
+    } else if kind == K_FLOAT {
+        fv = str_to_f64(strip_underscores(raw));
+        text = f64_to_str(fv);
+    } else if kind == K_STR {
+        text = decode_string(source, start, finish);
+    }
+    return Token(kind, source_line_at(source, start),
+                 source_column_at(source, start), finish, text, iv, fv,
+                 false, 0);
+}
+
+func token_error(source: str, position: int, code: int) -> Token {
+    return Token(K_EOF, source_line_at(source, position),
+                 source_column_at(source, position), position, "", 0, 0.0,
+                 true, code);
+}
+
+// Return the next token beginning at position. The returned `next` field is
+// the position to pass to the following call. Trivia is consumed here.
+func lex_next(source: str, position: int) -> Token {
+    let n: int = str_len(source);
+    mut i: int = position;
+
+    if i == 0 and n >= 2 and source[0] == "#" and source[1] == "!" {
+        while i < n and source[i] != "\n" { i += 1; }
+    }
+
+    while i < n {
+        if source[i] == " " or source[i] == "\t" or
+           source[i] == "\n" or source[i] == "\r" {
+            i += 1;
+        } else if i + 1 < n and source[i] == "/" and source[i + 1] == "/" {
+            i += 2;
+            while i < n and source[i] != "\n" { i += 1; }
+        } else if i + 1 < n and source[i] == "/" and source[i + 1] == "*" {
+            mut depth: int = 1;
+            i += 2;
+            while i < n and depth > 0 {
+                if i + 1 < n and source[i] == "/" and source[i + 1] == "*" {
+                    depth += 1;
+                    i += 2;
+                } else if i + 1 < n and source[i] == "*" and source[i + 1] == "/" {
+                    depth -= 1;
+                    i += 2;
+                } else {
+                    i += 1;
+                }
+            }
+            if depth > 0 { return token_error(source, i, 104); }
+        } else {
+            break;
+        }
+    }
+
+    if i >= n { return token_make(K_EOF, source, n, n); }
+    let start: int = i;
+    let c: str = source[i];
+
+    if is_ident_start(c) {
+        i += 1;
+        while i < n and is_ident_continue(source[i]) { i += 1; }
+        let word: str = substr(source, start, i - start);
+        if str_len(word) >= 2 and word[0] == "_" and word[1] == "_" {
+            return token_error(source, start, 111);
+        }
+        return token_make(keyword_kind(word), source, start, i);
+    }
+
+    if is_digit(c) {
+        mut kind: int = K_INT;
+        if c == "0" and i + 1 < n and
+           (source[i + 1] == "x" or source[i + 1] == "X") {
+            i += 2;
+            let digits: int = i;
+            while i < n and (is_hex_digit(source[i]) or source[i] == "_") { i += 1; }
+            if i == digits { return token_error(source, start, 101); }
+        } else if c == "0" and i + 1 < n and
+                  (source[i + 1] == "b" or source[i + 1] == "B") {
+            i += 2;
+            let digits: int = i;
+            while i < n and (source[i] == "0" or source[i] == "1" or source[i] == "_") { i += 1; }
+            if i == digits { return token_error(source, start, 103); }
+        } else {
+            while i < n and (is_digit(source[i]) or source[i] == "_") { i += 1; }
+            if i + 1 < n and source[i] == "." and is_digit(source[i + 1]) {
+                kind = K_FLOAT;
+                i += 1;
+                while i < n and (is_digit(source[i]) or source[i] == "_") { i += 1; }
+            }
+            if i < n and (source[i] == "e" or source[i] == "E") {
+                let exponent: int = i;
+                i += 1;
+                if i < n and (source[i] == "+" or source[i] == "-") { i += 1; }
+                if i < n and is_digit(source[i]) {
+                    kind = K_FLOAT;
+                    while i < n and (is_digit(source[i]) or source[i] == "_") { i += 1; }
+                } else {
+                    i = exponent;
+                }
+            }
+        }
+        return token_make(kind, source, start, i);
+    }
+
+    if c == "\"" {
+        i += 1;
+        while i < n and source[i] != "\"" {
+            if source[i] == "\n" { return token_error(source, start, 104); }
+            if source[i] == "\\" {
+                if i + 1 >= n or not valid_escape(source[i + 1]) {
+                    return token_error(source, start, 105);
+                }
+                if source[i + 1] == "u" {
+                    if i + 5 >= n { return token_error(source, start, 105); }
+                    mut h: int = 0;
+                    while h < 4 {
+                        if not is_hex_digit(source[i + 2 + h]) {
+                            return token_error(source, start, 105);
+                        }
+                        h += 1;
+                    }
+                    i += 6;
+                } else {
+                    i += 2;
+                }
+            } else {
+                i += 1;
+            }
+        }
+        if i >= n { return token_error(source, start, 104); }
+        i += 1;
+        return token_make(K_STR, source, start, i);
+    }
+
+    if c == "(" { return token_make(K_LPAREN, source, start, i + 1); }
+    if c == ")" { return token_make(K_RPAREN, source, start, i + 1); }
+    if c == "{" { return token_make(K_LBRACE, source, start, i + 1); }
+    if c == "}" { return token_make(K_RBRACE, source, start, i + 1); }
+    if c == "[" { return token_make(K_LBRACKET, source, start, i + 1); }
+    if c == "]" { return token_make(K_RBRACKET, source, start, i + 1); }
+    if c == "," { return token_make(K_COMMA, source, start, i + 1); }
+    if c == ";" { return token_make(K_SEMI, source, start, i + 1); }
+    if c == "." { return token_make(K_DOT, source, start, i + 1); }
+    if c == ":" { return token_make(K_COLON, source, start, i + 1); }
+    if c == "?" { return token_make(K_QUESTION, source, start, i + 1); }
+    if c == "&" { return token_make(K_AMP, source, start, i + 1); }
+    if c == "|" { return token_make(K_PIPE, source, start, i + 1); }
+    if c == "^" { return token_make(K_CARET, source, start, i + 1); }
+    if c == "~" { return token_make(K_TILDE, source, start, i + 1); }
+    if c == "+" {
+        i += 1;
+        if i < n and source[i] == "=" { i += 1; return token_make(K_PLUS_ASSIGN, source, start, i); }
+        return token_make(K_PLUS, source, start, i);
+    }
+    if c == "-" {
+        i += 1;
+        if i < n and source[i] == ">" { i += 1; return token_make(K_ARROW, source, start, i); }
+        if i < n and source[i] == "=" { i += 1; return token_make(K_MINUS_ASSIGN, source, start, i); }
+        return token_make(K_MINUS, source, start, i);
+    }
+    if c == "*" {
+        i += 1;
+        if i < n and source[i] == "=" { i += 1; return token_make(K_STAR_ASSIGN, source, start, i); }
+        return token_make(K_STAR, source, start, i);
+    }
+    if c == "/" {
+        i += 1;
+        if i < n and source[i] == "=" { i += 1; return token_make(K_SLASH_ASSIGN, source, start, i); }
+        return token_make(K_SLASH, source, start, i);
+    }
+    if c == "%" { return token_make(K_PERCENT, source, start, i + 1); }
+    if c == "=" {
+        i += 1;
+        if i < n and source[i] == "=" { i += 1; return token_make(K_EQ, source, start, i); }
+        return token_make(K_ASSIGN, source, start, i);
+    }
+    if c == "!" {
+        i += 1;
+        if i < n and source[i] == "=" { i += 1; return token_make(K_NE, source, start, i); }
+        return token_error(source, start, 106);
+    }
+    if c == "<" {
+        i += 1;
+        if i < n and source[i] == "<" { i += 1; return token_make(K_SHL, source, start, i); }
+        if i < n and source[i] == "=" { i += 1; return token_make(K_LE, source, start, i); }
+        return token_make(K_LT, source, start, i);
+    }
+    if c == ">" {
+        i += 1;
+        if i < n and source[i] == ">" { i += 1; return token_make(K_SHR, source, start, i); }
+        if i < n and source[i] == "=" { i += 1; return token_make(K_GE, source, start, i); }
+        return token_make(K_GT, source, start, i);
+    }
+    return token_error(source, start, 107);
+}
+
+func token_dump(t: Token) {
+    mut value: str = "";
+    if t.kind == K_IDENT or t.kind == K_STR { value = escaped_value(t.text); }
+    else if t.kind == K_INT { value = to_str(t.int_value); }
+    else if t.kind == K_FLOAT { value = f64_to_str(t.float_value); }
+    println(to_str(t.kind) + "|" + to_str(t.line) + "|" +
+            to_str(t.column) + "|" + value);
+}
+
+func token_stream_dump(source: str) -> int {
+    mut position: int = 0;
+    while true {
+        let t = lex_next(source, position);
+        if t.error {
+            println("error|" + to_str(t.error_code) + "|" +
+                    to_str(t.line) + "|" + to_str(t.column));
+            return 1;
+        }
+        token_dump(t);
+        position = t.next;
+        if t.kind == K_EOF { return 0; }
+    }
+    return 1;
+}

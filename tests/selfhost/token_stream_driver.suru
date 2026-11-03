@@ -1,0 +1,5 @@
+use "../../selfhost/compiler/token_stream.suru";
+
+func main() {
+    exit(token_stream_dump(source_load(args(0))));
+}
