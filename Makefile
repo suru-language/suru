@@ -21,8 +21,8 @@ CFLAGS  ?= $(BASE) -g -O0 $(WARN) -Werror
 LDFLAGS ?=
 
 RELEASE_CFLAGS = $(BASE) -O2 -DNDEBUG $(WARN)
-ASAN_CFLAGS   = $(BASE) -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer $(WARN) -Werror
-ASAN_LDFLAGS  = -fsanitize=address,undefined
+ASAN_CFLAGS   = $(BASE) -g -O1 -fsanitize=address,undefined -fno-omit-frame-pointer -fno-pie $(WARN) -Werror
+ASAN_LDFLAGS  = -fsanitize=address,undefined -no-pie
 UBSAN_CFLAGS  = $(BASE) -g -O1 -fsanitize=undefined -fno-omit-frame-pointer $(WARN) -Werror
 UBSAN_LDFLAGS = -fsanitize=undefined
 

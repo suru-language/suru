@@ -48,27 +48,53 @@ integration: 70 tests, 0 failures
 ```
 
 The integration runner's 70 tests include bytecode compile/exec, arguments,
-module search, and four low-GC-threshold programs. Thus the repository's
-current count is 130 unit checks plus 70 integration tests; the supplied
-baseline claim of 120 unit checks is stale.
+module search, and four low-GC-threshold programs. The audit snapshot had 130
+unit checks; the Phase 0 bounded-I/O test added since then brings the current
+count to 139 unit checks plus 70 integration tests.
 
-## Tool availability
+## Tool availability and verification
 
-GCC 12.2.0 is installed. Clang and `clang --analyze` were not installed in the
-audit environment, so no Clang result is claimed. The Makefile's static
-analysis target consequently cannot provide a result until Clang is available.
-
-GCC's `-fanalyzer` was available and completed successfully with:
+GCC 12.2.0, Clang 14.0.6, and CMake 3.25.1 are available in the verification
+environment. Clang's static analyzer completed successfully with `make
+analyze`. GCC's `-fanalyzer` also completed successfully with:
 
 ```text
 gcc -std=c17 -Iinclude -Wall -Wextra -Wpedantic -Wconversion -Wshadow \
     -fanalyzer -fsyntax-only src/*.c
 ```
 
-The first sanitizer invocation using the existing `asan-test` target was
-terminated by the environment after repeated AddressSanitizer fatal-signal
-output. It is not recorded as a pass. Sanitizer verification must be repeated
-with clean, isolated build directories before a release claim.
+Clean, isolated GCC and Clang AddressSanitizer/UndefinedBehaviorSanitizer
+builds passed the full unit, integration, and self-hosted lexer suites. The
+sanitizer link flags use non-PIE executables so AddressSanitizer shadow-memory
+mapping is stable in constrained Linux environments. A GCC UBSan-only build
+also passed the same suites. Clang debug and CMake debug/ sanitizer builds
+passed their registered tests.
+
+The completion commands were:
+
+```text
+make test
+make analyze
+make BUILD=build-gcc-release CFLAGS="... -O2 -DNDEBUG ..." test
+make BUILD=build-gcc-ubsan CFLAGS="... -fsanitize=undefined ..." \
+  LDFLAGS="-fsanitize=undefined" test
+make BUILD=build-gcc-asan-nopie asan-test
+make BUILD=build-clang CC=clang test
+make BUILD=build-clang-asan-nopie CC=clang \
+  CFLAGS="... -fsanitize=address,undefined ... -fno-pie ..." \
+  LDFLAGS="-fsanitize=address,undefined -no-pie" test
+cmake -S . -B build-cmake-clang -DCMAKE_C_COMPILER=clang
+cmake --build build-cmake-clang
+ctest --test-dir build-cmake-clang --output-on-failure
+cmake -S . -B build-cmake-clang-asan -DCMAKE_C_COMPILER=clang \
+  -DSU_SANITIZE=ON
+cmake --build build-cmake-clang-asan
+ASAN_OPTIONS=detect_leaks=1 ctest --test-dir build-cmake-clang-asan \
+  --output-on-failure
+```
+
+The abbreviated flag values above are the repository's `BASE`, `WARN`,
+`RELEASE_CFLAGS`, `UBSAN_CFLAGS`, and `ASAN_CFLAGS` values from the Makefile.
 
 ## Current bootstrap capabilities
 
@@ -80,6 +106,9 @@ with clean, isolated build directories before a release claim.
   `use`, and related constructs.
 
 Natural syntax, a SURU compiler source tree, a SURU-native VM, and a native
-backend are not present at this revision. The phase-0 acceptance criteria are
-therefore not complete; the remaining design and implementation gates are
-tracked in `docs/syntax-migration.md` and `docs/self-hosting.md`.
+backend are intentionally outside Phase 0. Phase 0 is complete: the C17
+bootstrap baseline, specification audit, bounded binary I/O, reproducible
+debug/release builds, static analysis, sanitizer checks, CMake portability
+checks, and regression suites are recorded above. The remaining design and
+implementation gates are tracked in `docs/syntax-migration.md` and
+`docs/self-hosting.md`.
