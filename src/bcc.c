@@ -1012,6 +1012,8 @@ bool s_bcc_run(const s_module *ast, s_arena *arena, s_diag_ctx *diag,
         g.labels.pos = NULL;
         g.labels.pins = NULL;
         g.labels.plab = NULL;
+        g.labels.caplabels = 0;
+        g.labels.capp = 0;
     }
 
     out->ints = g.pool.ints;
