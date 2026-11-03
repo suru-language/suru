@@ -224,6 +224,7 @@ Precedence, highest to lowest:
   In a mixed `int`/`float` expression, the `int` operand is implicitly
   promoted to `float` (e.g. `1 + 2.5` is `3.5`).
 - String concatenation: `+` on two `str` values concatenates them.
+- String repetition: `str * n` (or `n * str`) repeats a string `n` times.
 - Comparison: `== != < <= > >=` yield `bool`.
 - Logical: `and or not` short-circuit.
 - Conditional: `cond ? a : b` evaluates `a` if `cond` is true, else `b`;

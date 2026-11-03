@@ -1123,6 +1123,30 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             if (!push(vm, s_val_obj(o))) return 1;
             pc++; break;
         }
+        case BC_REPEAT_S: {
+            s_value n = pop(vm);
+            s_value s = pop(vm);
+            if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR ||
+                n.tag != S_VAL_INT) {
+                vm_trap(vm, "repeat type error");
+                return 1;
+            }
+            s_i64 rep = n.u.i;
+            if (rep < 0) { vm_trap(vm, "repeat count must be non-negative"); return 1; }
+            s_size slen = s_obj_str_len(s.u.o);
+            s_size total;
+            if (!s_size_mul_ovf(slen, (s_size)rep, &total) || total > (1u << 24)) {
+                vm_trap(vm, "repeat too large");
+                return 1;
+            }
+            s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
+            if (!o) return 1;
+            char *d = s_obj_str_data(o);
+            for (s_i64 i = 0; i < rep; ++i)
+                memcpy(d + (s_size)i * slen, s_obj_str_data(s.u.o), slen);
+            if (!push(vm, s_val_obj(o))) return 1;
+            pc++; break;
+        }
         case BC_EQ_B: case BC_NE_B:
             if (!cmp_b(vm, in->op)) return 1;
             pc++; break;

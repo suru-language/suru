@@ -258,6 +258,11 @@ static s_type *check_binary(s_sema *S, s_expr *e) {
             (lt->kind == S_TYPE_FLOAT && rt->kind == S_TYPE_INT)) {
             return lt->kind == S_TYPE_FLOAT ? lt : rt; /* int promotes to float */
         }
+        if (e->u.binary.op == S_BIN_MUL &&
+            ((lt->kind == S_TYPE_STR && rt->kind == S_TYPE_INT) ||
+             (lt->kind == S_TYPE_INT && rt->kind == S_TYPE_STR))) {
+            return lt->kind == S_TYPE_STR ? lt : rt; /* string repeat */
+        }
         s_diag_error(S->diag, e->loc, 403,
                      "arithmetic operands must both be int or both float, got %s and %s",
                      type_name(lt), type_name(rt));

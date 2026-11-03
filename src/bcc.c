@@ -251,6 +251,13 @@ static bool push_bin_op(s_gen *g, const s_expr *e) {
                     (rt && rt->kind == S_TYPE_FLOAT);
     bool is_str = lt && rt && lt->kind == S_TYPE_STR &&
                   rt->kind == S_TYPE_STR;
+    if (e->u.binary.op == S_BIN_MUL &&
+        ((lt && lt->kind == S_TYPE_STR && rt && rt->kind == S_TYPE_INT) ||
+         (lt && lt->kind == S_TYPE_INT && rt && rt->kind == S_TYPE_STR))) {
+        if (lt && lt->kind == S_TYPE_INT) EM(BC_SWAP);
+        EM(BC_REPEAT_S);
+        return true;
+    }
     switch (e->u.binary.op) {
     case S_BIN_ADD: EM(is_str ? BC_CONCAT_S : is_float ? BC_ADD_F : BC_ADD_I); break;
     case S_BIN_SUB: EM(is_float ? BC_SUB_F : BC_SUB_I); break;

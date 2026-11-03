@@ -40,6 +40,7 @@ typedef enum s_bc_op {
     BC_EQ_F, BC_NE_F, BC_LT_F, BC_LE_F, BC_GT_F, BC_GE_F,
     BC_EQ_S, BC_NE_S, BC_LT_S, BC_LE_S, BC_GT_S, BC_GE_S,
     BC_CONCAT_S,           /* pop b, a (str); push a concatenated with b */
+    BC_REPEAT_S,           /* pop n (int), s (str); push s repeated n times */
     BC_EQ_B, BC_NE_B,
 
     BC_NEW_ARRAY,      /* a = element count, pops that many values, pushes array */
