@@ -99,6 +99,7 @@ types, and Boolean conditions. Full records, choices, modules, effects, and
 runtime integration remain open; the declaration/effect gate now validates
 their initial signatures, ownership, aliases, and duplicate declarations. No
 contract method compatibility, exhaustive choice matches, and relative module
-resolution/cycles are now covered by dedicated gates. Complete typed effect
-propagation and runtime integration remain open. No legacy default behavior may
-change during the port.
+resolution/cycles are now covered by dedicated gates. Typed routine-call
+propagation and compatible handler coverage now have a dedicated gate; runtime
+effect representation and cleanup replacement semantics remain open. No legacy
+default behavior may change during the port.

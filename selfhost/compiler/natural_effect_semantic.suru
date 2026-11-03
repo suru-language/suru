@@ -18,6 +18,22 @@ func nes_has_call(line: str, routine: str) -> bool {
     return str_contains(line, routine + "(");
 }
 
+func nes_future_handles(lines: [str], start: int, effect: str) -> bool {
+    mut i: int = start;
+    while i < array_len(lines) {
+        let line: str = str_trim(lines[i]);
+        if line == "end attempt" { return false; }
+        if nds_word(line) == "handle" {
+            let colon: int = nds_find(line, ":", 0);
+            if colon >= 0 and str_trim(substr(line, colon + 1, str_len(line))) == effect {
+                return true;
+            }
+        }
+        i += 1;
+    }
+    return false;
+}
+
 func nes_error(line: int, message: str) {
     println("effect-error|" + to_str(line) + "|" + message);
 }
@@ -112,7 +128,7 @@ func natural_effect_check(source: str) -> int {
                             h -= 1;
                             if nes_contains_effect(handled[h], effect) { caught = true; }
                         }
-                        if caught == false {
+                        if caught == false and nes_future_handles(lines, i, effect) == false {
                             nes_error(line, "undeclared propagation of " + effect +
                                       " from '" + routine_names[r] + "'");
                             return 1;

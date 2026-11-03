@@ -133,3 +133,5 @@ Contract method signatures are compared against record implementations, choice
 matches are checked for exhaustiveness or `_`, and
 `selfhost/compiler/natural_module_semantic.suru` resolves relative imports and
 rejects missing modules and import cycles.
+`selfhost/compiler/natural_effect_semantic.suru` now checks calls to effectful
+routines against declared `throws` effects and compatible `handle` clauses.
