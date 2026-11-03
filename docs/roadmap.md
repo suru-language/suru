@@ -45,7 +45,8 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 ## 0.5.0 — ecosystem
 
 - Package/module system (`use` for user modules).
-- Standard library expansion: file I/O, formatted output, collections.
+- Standard library expansion: file I/O (read_file/write_file/file_exists),
+  formatted output, collections.
 - Grammar and spec stabilization (freeze for 1.0).
 
 ## 1.0.0 — stable

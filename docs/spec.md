@@ -357,6 +357,10 @@ The standard library provides a small set of builtin functions (see
   `array`, `record`, `closure` (bools are represented as `int` at runtime).
 - `f64_to_str(f: float) -> str`.
 - `read_line() -> str` — read a line from stdin ("" on EOF).
+- `read_file(path: str) -> str` — read a whole file; returns `""` on error.
+- `write_file(path: str, contents: str)` — write `contents` to a file
+  (overwrites; fails silently on error).
+- `file_exists(path: str) -> bool` — whether `path` exists.
 - `make_array(n: int) -> [int]` — a zero-filled array of `n` elements.
 - `range(lo: int, hi: int) -> [int]` — the integers `lo .. hi-1`.
 - `range_step(lo: int, hi: int, step: int) -> [int]` — like `range`,
