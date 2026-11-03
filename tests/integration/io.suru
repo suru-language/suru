@@ -1,0 +1,7 @@
+func main() -> int {
+    let path = "/tmp/suru_io_test.txt";
+    write_file(path, "alpha\nbeta\n");
+    if file_exists(path) { println("exists"); } else { println("missing"); }
+    print(read_file(path));
+    return 0;
+}

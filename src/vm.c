@@ -931,7 +931,7 @@ static bool builtin_file_exists(s_vm *vm) {
     FILE *f = fopen(s_obj_str_data(p.u.o), "rb");
     bool exists = f != NULL;
     if (f) fclose(f);
-    return push(vm, s_val_bool(exists));
+    return push(vm, s_val_int(exists ? 1 : 0));
 }
 
 static bool dispatch_builtin(s_vm *vm, s_u32 id) {

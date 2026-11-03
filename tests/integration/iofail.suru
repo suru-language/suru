@@ -1,0 +1,5 @@
+func main() -> int {
+    let x = read_file("/tmp/definitely_not_there_suru");
+    println(x);
+    return 0;
+}
