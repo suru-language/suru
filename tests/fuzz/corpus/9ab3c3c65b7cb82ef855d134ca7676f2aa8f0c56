@@ -1,0 +1,6 @@
+func main() {
+        
+ printl&(1.5*8);
+    println("hi");
+    
+}

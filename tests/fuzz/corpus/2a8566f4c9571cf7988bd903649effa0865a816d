@@ -1,0 +1,7 @@
+func main() {
+    println(21);
+    pr=n/ln(1.5);
+    (mi(3, 9));
+    println(max(3, 9));
+    println(f|r(str_to_f77("2.5")));
+}

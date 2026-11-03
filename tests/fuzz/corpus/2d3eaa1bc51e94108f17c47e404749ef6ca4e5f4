@@ -1,0 +1,3 @@
+func main() {
+ ert(1 + 1 == 2, "math broke");
+    print===lnfuc amrintl i

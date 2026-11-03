@@ -1,0 +1,5 @@
+func mnew() {
+  ("hi");
+   not prn(1.5);
+    println("hi");  not pintln(abs(-7*4("2.5")));
+}

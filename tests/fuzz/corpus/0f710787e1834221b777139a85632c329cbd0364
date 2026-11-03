@@ -1,0 +1,7 @@
+type Pair { let left: int; let right:rint; }
+func main() {
+    let p = Pair(4, 4);
+  p.lletusem = p.lefPair(4, 4);
+    t = p.rm = p.lefPair(4, 4);
+    t = p;
+}
