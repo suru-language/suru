@@ -1,0 +1,5 @@
+use "../../selfhost/compiler/natural_expression.suru";
+
+func main() {
+    exit(natural_expression_check(source_load(args(0))));
+}

@@ -1,0 +1,196 @@
+// Precedence-aware Natural Syntax expression parser.
+// Results are serialized AST shapes until the full self-hosted AST is added.
+
+use "natural_token_stream.suru";
+
+type NExprResult {
+    let ok: bool;
+    let next: int;
+    let value: str;
+    let message: str;
+}
+
+func ne_ok(next: int, value: str) -> NExprResult {
+    return NExprResult(true, next, value, "");
+}
+
+func ne_fail(next: int, message: str) -> NExprResult {
+    return NExprResult(false, next, "", message);
+}
+
+func ne_skip_lines(tokens: [NToken], position: int) -> int {
+    mut p: int = position;
+    while p < array_len(tokens) and tokens[p].kind == NT_NEWLINE { p += 1; }
+    return p;
+}
+
+func ne_prec(text: str) -> int {
+    if text == "or" { return 1; }
+    if text == "and" { return 2; }
+    if text == "==" or text == "!=" or text == "<" or text == "<=" or
+       text == ">" or text == ">=" { return 3; }
+    if text == "|" { return 4; }
+    if text == "^" { return 5; }
+    if text == "&" { return 6; }
+    if text == "<<" or text == ">>" { return 7; }
+    if text == "+" or text == "-" { return 8; }
+    if text == "*" or text == "/" or text == "%" { return 9; }
+    return 0;
+}
+
+func ne_parse_expression(tokens: [NToken], position: int, minimum: int) -> NExprResult;
+
+func ne_parse_primary(tokens: [NToken], position: int) -> NExprResult {
+    let p: int = ne_skip_lines(tokens, position);
+    if p >= array_len(tokens) { return ne_fail(p, "expected expression"); }
+    let t: NToken = tokens[p];
+    if t.kind == NT_IDENT or t.kind == NT_WORD or t.kind == NT_INT or
+       t.kind == NT_FLOAT or t.kind == NT_STRING {
+        return ne_ok(p + 1, t.text);
+    }
+    if t.text == "(" {
+        let inner: NExprResult = ne_parse_expression(tokens, p + 1, 0);
+        if inner.ok == false { return inner; }
+        let close: int = ne_skip_lines(tokens, inner.next);
+        if close >= array_len(tokens) or tokens[close].text != ")" {
+            return ne_fail(close, "expected ')'");
+        }
+        return ne_ok(close + 1, "(" + inner.value + ")");
+    }
+    if t.text == "[" {
+        mut next: int = p + 1;
+        mut value: str = "[";
+        next = ne_skip_lines(tokens, next);
+        if next < array_len(tokens) and tokens[next].text == "]" {
+            return ne_ok(next + 1, "[]");
+        }
+        mut count: int = 0;
+        while true {
+            let item: NExprResult = ne_parse_expression(tokens, next, 0);
+            if item.ok == false { return item; }
+            if count > 0 { value = value + ","; }
+            value = value + item.value;
+            count += 1;
+            next = ne_skip_lines(tokens, item.next);
+            if next < array_len(tokens) and tokens[next].text == "," {
+                next += 1;
+                continue;
+            }
+            if next < array_len(tokens) and tokens[next].text == "]" {
+                return ne_ok(next + 1, value + "]");
+            }
+            return ne_fail(next, "expected ',' or ']'");
+        }
+    }
+    return ne_fail(p, "expected expression");
+}
+
+func ne_parse_postfix(tokens: [NToken], position: int) -> NExprResult {
+    mut result: NExprResult = ne_parse_primary(tokens, position);
+    if result.ok == false { return result; }
+    mut next: int = result.next;
+    mut value: str = result.value;
+    while next < array_len(tokens) {
+        let p: int = ne_skip_lines(tokens, next);
+        if p >= array_len(tokens) { break; }
+        if tokens[p].text == "." {
+            let name: int = ne_skip_lines(tokens, p + 1);
+            if name >= array_len(tokens) or tokens[name].kind != NT_IDENT {
+                return ne_fail(name, "expected field name");
+            }
+            value = value + "." + tokens[name].text;
+            next = name + 1;
+        } else if tokens[p].text == "[" {
+            let index: NExprResult = ne_parse_expression(tokens, p + 1, 0);
+            if index.ok == false { return index; }
+            let close: int = ne_skip_lines(tokens, index.next);
+            if close >= array_len(tokens) or tokens[close].text != "]" {
+                return ne_fail(close, "expected ']'");
+            }
+            value = value + "[" + index.value + "]";
+            next = close + 1;
+        } else if tokens[p].text == "(" {
+            mut argument: int = p + 1;
+            mut call: str = value + "(";
+            mut count: int = 0;
+            argument = ne_skip_lines(tokens, argument);
+            if argument < array_len(tokens) and tokens[argument].text == ")" {
+                value = call + ")";
+                next = argument + 1;
+                continue;
+            }
+            while true {
+                let arg: NExprResult = ne_parse_expression(tokens, argument, 0);
+                if arg.ok == false { return arg; }
+                if count > 0 { call = call + ","; }
+                call = call + arg.value;
+                count += 1;
+                argument = ne_skip_lines(tokens, arg.next);
+                if argument < array_len(tokens) and tokens[argument].text == "," {
+                    argument += 1;
+                    continue;
+                }
+                if argument < array_len(tokens) and tokens[argument].text == ")" {
+                    value = call + ")";
+                    next = argument + 1;
+                    break;
+                }
+                return ne_fail(argument, "expected ',' or ')' in call");
+            }
+        } else {
+            break;
+        }
+    }
+    return ne_ok(next, value);
+}
+
+func ne_parse_unary(tokens: [NToken], position: int) -> NExprResult {
+    let p: int = ne_skip_lines(tokens, position);
+    if p < array_len(tokens) and
+       (tokens[p].text == "-" or tokens[p].text == "not" or tokens[p].text == "~") {
+        let operand: NExprResult = ne_parse_unary(tokens, p + 1);
+        if operand.ok == false { return operand; }
+        return ne_ok(operand.next, "(" + tokens[p].text + " " + operand.value + ")");
+    }
+    return ne_parse_postfix(tokens, p);
+}
+
+func ne_parse_expression(tokens: [NToken], position: int, minimum: int) -> NExprResult {
+    mut left: NExprResult = ne_parse_unary(tokens, position);
+    if left.ok == false { return left; }
+    mut next: int = left.next;
+    mut value: str = left.value;
+    while true {
+        let p: int = ne_skip_lines(tokens, next);
+        if p >= array_len(tokens) { break; }
+        let operator: str = tokens[p].text;
+        let precedence: int = ne_prec(operator);
+        if precedence < minimum or precedence == 0 { break; }
+        let right: NExprResult = ne_parse_expression(tokens, p + 1, precedence + 1);
+        if right.ok == false { return right; }
+        value = "(" + value + " " + operator + " " + right.value + ")";
+        next = right.next;
+    }
+    return ne_ok(next, value);
+}
+
+func natural_expression_check(source: str) -> int {
+    let tokens: [NToken] = natural_tokenize(source);
+    if array_len(tokens) == 0 { println("expr-error|empty token stream"); return 1; }
+    if tokens[0].error {
+        println("expr-error|lexical error|" + to_str(tokens[0].error_code));
+        return 1;
+    }
+    let result: NExprResult = ne_parse_expression(tokens, 0, 0);
+    if result.ok == false {
+        println("expr-error|" + result.message);
+        return 1;
+    }
+    let end: int = ne_skip_lines(tokens, result.next);
+    if end >= array_len(tokens) or tokens[end].kind != NT_EOF {
+        println("expr-error|unexpected token|" + tokens[end].text);
+        return 1;
+    }
+    println("expr|" + result.value);
+    return 0;
+}

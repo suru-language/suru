@@ -1,0 +1,232 @@
+// Structured Natural Syntax token stream.
+// This is the parser-facing counterpart of natural_lexer.suru's trace gate.
+
+use "source.suru";
+use "natural_lexer.suru";
+
+const NT_EOF = 0;
+const NT_NEWLINE = 1;
+const NT_IDENT = 2;
+const NT_INT = 3;
+const NT_FLOAT = 4;
+const NT_STRING = 5;
+const NT_WORD = 6;
+const NT_OPERATOR = 7;
+const NT_PUNCT = 8;
+
+type NToken {
+    let kind: int;
+    let line: int;
+    let column: int;
+    let start: int;
+    let finish: int;
+    let text: str;
+    let error: bool;
+    let error_code: int;
+}
+
+func nt_make(kind: int, source: str, start: int, finish: int) -> NToken {
+    return NToken(kind, source_line_at(source, start),
+                  source_scalar_column_at(source, start), start, finish,
+                  substr(source, start, finish - start), false, 0);
+}
+
+func nt_error(source: str, position: int, code: int) -> NToken {
+    return NToken(NT_EOF, source_line_at(source, position),
+                  source_scalar_column_at(source, position), position, position,
+                  "", true, code);
+}
+
+func nt_append(tokens: [NToken], token: NToken) -> [NToken] {
+    return array_concat(tokens, [token]);
+}
+
+func nt_is_word(word: str) -> bool {
+    return n_is_keyword(word);
+}
+
+func nt_operator_end(source: str, start: int, n: int) -> int {
+    mut finish: int = start + 1;
+    if finish < n and (source[finish] == "=" or
+                       source[finish] == source[start] or
+                       (source[start] == "-" and source[finish] == ">")) {
+        finish += 1;
+    }
+    return finish;
+}
+
+func natural_tokenize(source: str) -> [NToken] {
+    let n: int = str_len(source);
+    mut tokens: [NToken] = [];
+    mut i: int = 0;
+    mut parens: int = 0;
+    mut brackets: int = 0;
+    mut line_start: bool = true;
+
+    if n > 67108864 {
+        return nt_append(tokens, nt_error(source, 0, 208));
+    }
+    if str_valid_utf8(source) == false {
+        return nt_append(tokens, nt_error(source, 0, 207));
+    }
+    if n >= 2 and source[0] == "#" and source[1] == "!" {
+        while i < n and source[i] != "\n" { i += 1; }
+    }
+
+    while i < n {
+        let c: str = source[i];
+        if c == " " or c == "\t" or c == "\r" {
+            i += 1;
+            continue;
+        }
+        if c == "\n" {
+            if parens == 0 and brackets == 0 and line_start == false {
+                tokens = nt_append(tokens, nt_make(NT_NEWLINE, source, i, i + 1));
+            }
+            i += 1;
+            line_start = true;
+            continue;
+        }
+        if i + 1 < n and c == "/" and source[i + 1] == "/" {
+            i += 2;
+            while i < n and source[i] != "\n" { i += 1; }
+            continue;
+        }
+        if i + 1 < n and c == "/" and source[i + 1] == "*" {
+            mut depth: int = 1;
+            i += 2;
+            while i < n and depth > 0 {
+                if i + 1 < n and source[i] == "/" and source[i + 1] == "*" {
+                    depth += 1;
+                    if depth > 512 { return nt_append(tokens, nt_error(source, i, 209)); }
+                    i += 2;
+                } else if i + 1 < n and source[i] == "*" and source[i + 1] == "/" {
+                    depth -= 1;
+                    i += 2;
+                } else {
+                    i += 1;
+                }
+            }
+            if depth > 0 { return nt_append(tokens, nt_error(source, i, 201)); }
+            continue;
+        }
+
+        let start: int = i;
+        if n_is_alpha(c) or c >= "\u0080" {
+            i += 1;
+            while i < n and n_is_continue(source[i]) { i += 1; }
+            let word: str = substr(source, start, i - start);
+            if str_len(word) >= 2 and word[0] == "_" and word[1] == "_" {
+                return nt_append(tokens, nt_error(source, start, 211));
+            }
+            if nt_is_word(word) {
+                tokens = nt_append(tokens, nt_make(NT_WORD, source, start, i));
+            } else {
+                tokens = nt_append(tokens, nt_make(NT_IDENT, source, start, i));
+            }
+            line_start = false;
+            continue;
+        }
+        if n_is_digit(c) {
+            mut kind: int = NT_INT;
+            i += 1;
+            while i < n and (n_is_digit(source[i]) or
+                             str_contains("abcdefABCDEFxXbB_.eE+-", source[i])) {
+                if (source[i] == "+" or source[i] == "-") and
+                   i > start and source[i - 1] != "e" and source[i - 1] != "E" {
+                    break;
+                }
+                if source[i] == "." or source[i] == "e" or source[i] == "E" {
+                    kind = NT_FLOAT;
+                }
+                i += 1;
+            }
+            tokens = nt_append(tokens, nt_make(kind, source, start, i));
+            line_start = false;
+            continue;
+        }
+        if c == "\"" {
+            i += 1;
+            mut interpolation_depth: int = 0;
+            while i < n and source[i] != "\"" {
+                if source[i] == "\n" { return nt_append(tokens, nt_error(source, start, 202)); }
+                if source[i] == "\\" {
+                    if i + 1 >= n or str_contains("ntr0\\\"'u", source[i + 1]) == false {
+                        return nt_append(tokens, nt_error(source, i, 203));
+                    }
+                    if source[i + 1] == "u" {
+                        if i + 5 >= n { return nt_append(tokens, nt_error(source, i, 203)); }
+                        mut h: int = 0;
+                        while h < 4 {
+                            if str_contains("0123456789abcdefABCDEF", source[i + 2 + h]) == false {
+                                return nt_append(tokens, nt_error(source, i, 203));
+                            }
+                            h += 1;
+                        }
+                        i += 6;
+                    } else { i += 2; }
+                } else if i + 1 < n and source[i] == "{" and source[i + 1] == "{" {
+                    i += 2;
+                } else if i + 1 < n and source[i] == "}" and source[i + 1] == "}" {
+                    i += 2;
+                } else if source[i] == "{" {
+                    interpolation_depth += 1;
+                    if interpolation_depth > 128 { return nt_append(tokens, nt_error(source, i, 210)); }
+                    i += 1;
+                } else if source[i] == "}" and interpolation_depth > 0 {
+                    interpolation_depth -= 1;
+                    i += 1;
+                } else {
+                    i += 1;
+                }
+            }
+            if i >= n { return nt_append(tokens, nt_error(source, start, 202)); }
+            if interpolation_depth != 0 { return nt_append(tokens, nt_error(source, start, 204)); }
+            i += 1;
+            tokens = nt_append(tokens, nt_make(NT_STRING, source, start, i));
+            line_start = false;
+            continue;
+        }
+
+        if c == "(" { parens += 1; }
+        if c == ")" { if parens > 0 { parens -= 1; } else { return nt_append(tokens, nt_error(source, i, 205)); } }
+        if c == "[" { brackets += 1; }
+        if c == "]" { if brackets > 0 { brackets -= 1; } else { return nt_append(tokens, nt_error(source, i, 205)); } }
+        if c == "(" or c == ")" or c == "[" or c == "]" or
+           c == "{" or c == "}" or c == "," or c == ":" or c == "." {
+            tokens = nt_append(tokens, nt_make(NT_PUNCT, source, i, i + 1));
+            i += 1;
+            line_start = false;
+            continue;
+        }
+        if str_contains("+-*/%=<>!&|^?~", c) {
+            let finish: int = nt_operator_end(source, i, n);
+            tokens = nt_append(tokens, nt_make(NT_OPERATOR, source, i, finish));
+            i = finish;
+            line_start = false;
+            continue;
+        }
+        return nt_append(tokens, nt_error(source, i, 206));
+    }
+    tokens = nt_append(tokens, nt_make(NT_EOF, source, n, n));
+    return tokens;
+}
+
+func natural_token_dump(source: str) -> int {
+    let tokens: [NToken] = natural_tokenize(source);
+    mut i: int = 0;
+    while i < array_len(tokens) {
+        let t: NToken = tokens[i];
+        if t.error {
+            println("error|" + to_str(t.error_code) + "|" + to_str(t.start) +
+                    "|" + to_str(t.line) + "|" + to_str(t.column));
+            return 1;
+        }
+        println(to_str(t.kind) + "|" + to_str(t.line) + "|" +
+                to_str(t.column) + "|" + to_str(t.start) + "|" +
+                to_str(t.finish) + "|" + t.text);
+        if t.kind == NT_EOF { return 0; }
+        i += 1;
+    }
+    return 1;
+}
