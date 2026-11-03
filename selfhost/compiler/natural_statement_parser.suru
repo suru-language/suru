@@ -1,0 +1,167 @@
+// Token-based parser for the first Natural Syntax AST statement nodes.
+
+use "natural_token_stream.suru";
+use "natural_expression.suru";
+use "natural_ast.suru";
+
+func nas_ok(next: int, node: str) -> [str] {
+    return ["ok", to_str(next), node, ""];
+}
+
+func nas_fail(position: int, message: str) -> [str] {
+    return ["error", to_str(position), "", message];
+}
+
+func nas_next(result: [str]) -> int {
+    return int_from_str(result[1]);
+}
+
+func nas_is_ok(result: [str]) -> bool {
+    return result[0] == "ok";
+}
+
+func nas_node(result: [str]) -> str {
+    return result[2];
+}
+
+func nas_message(result: [str]) -> str {
+    return result[3];
+}
+
+func nas_skip_lines(source: str, position: int) -> int {
+    mut p: int = position;
+    while true {
+        let t = natural_next(source, p);
+        if t.kind != NT_NEWLINE { return p; }
+        p = t.next;
+    }
+    return p;
+}
+
+func nas_finish(source: str, position: int, node: str) -> [str] {
+    let t = natural_next(source, position);
+    if t.kind == NT_NEWLINE or t.kind == NT_EOF {
+        return nas_ok(t.next, node);
+    }
+    return nas_fail(t.start, "expected statement terminator");
+}
+
+func nas_parse_binding(source: str, first: NToken, mode: str) -> [str] {
+    let name = natural_next(source, first.next);
+    if name.kind != NT_IDENT {
+        return nas_fail(name.start, "expected binding name");
+    }
+    mut position: int = name.next;
+    mut annotation: str = "";
+    let colon = natural_next(source, position);
+    if colon.text == ":" {
+        let type_name = natural_next(source, colon.next);
+        if type_name.kind != NT_IDENT and type_name.kind != NT_WORD {
+            return nas_fail(type_name.start, "expected binding type");
+        }
+        annotation = ":" + type_name.text;
+        position = type_name.next;
+    }
+    let equals = natural_next(source, position);
+    if equals.text != "=" {
+        return nas_fail(equals.start, "binding requires an initializer");
+    }
+    let expression = ne_parse_expression(source, equals.next, 0);
+    if ne_is_ok(expression) == false {
+        return nas_fail(equals.next, ne_message(expression));
+    }
+    let node = na_make("binding", first.line,
+                       mode + " " + name.text + annotation + " = " +
+                       ne_value(expression));
+    return nas_finish(source, ne_next(expression), na_render(node));
+}
+
+func nas_parse_assignment(source: str, first: NToken) -> [str] {
+    let target = ne_parse_expression(source, first.next, 0);
+    if ne_is_ok(target) == false {
+        return nas_fail(first.next, ne_message(target));
+    }
+    let to_word = natural_next(source, nas_skip_lines(source, ne_next(target)));
+    if to_word.text != "to" {
+        return nas_fail(to_word.start, "set requires 'to'");
+    }
+    let expression = ne_parse_expression(source, to_word.next, 0);
+    if ne_is_ok(expression) == false {
+        return nas_fail(to_word.next, ne_message(expression));
+    }
+    let node = na_make("assignment", first.line,
+                       ne_value(target) + " to " + ne_value(expression));
+    return nas_finish(source, ne_next(expression), na_render(node));
+}
+
+func nas_parse_show(source: str, first: NToken) -> [str] {
+    let open = natural_next(source, first.next);
+    if open.text != "(" { return nas_fail(open.start, "show requires '('"); }
+    let expression = ne_parse_expression(source, open.next, 0);
+    if ne_is_ok(expression) == false {
+        return nas_fail(open.next, ne_message(expression));
+    }
+    let close = natural_next(source, nas_skip_lines(source, ne_next(expression)));
+    if close.text != ")" { return nas_fail(close.start, "show requires ')'"); }
+    let node = na_make("show", first.line, ne_value(expression));
+    return nas_finish(source, close.next, na_render(node));
+}
+
+func nas_parse_give(source: str, first: NToken) -> [str] {
+    let next = natural_next(source, first.next);
+    mut value: str = "Unit";
+    mut position: int = next.next;
+    if next.kind != NT_NEWLINE and next.kind != NT_EOF {
+        let expression = ne_parse_expression(source, first.next, 0);
+        if ne_is_ok(expression) == false {
+            return nas_fail(first.next, ne_message(expression));
+        }
+        value = ne_value(expression);
+        position = ne_next(expression);
+    } else {
+        position = next.next;
+    }
+    let node = na_make("give", first.line, value);
+    return nas_finish(source, position, na_render(node));
+}
+
+func nas_statement(source: str, position: int) -> [str] {
+    let first = natural_next(source, position);
+    if first.text == "value" {
+        return nas_parse_binding(source, first, "value");
+    }
+    if first.text == "change" {
+        return nas_parse_binding(source, first, "change");
+    }
+    if first.text == "constant" {
+        return nas_parse_binding(source, first, "constant");
+    }
+    if first.text == "set" { return nas_parse_assignment(source, first); }
+    if first.text == "show" { return nas_parse_show(source, first); }
+    if first.text == "give" { return nas_parse_give(source, first); }
+    return nas_fail(first.start, "unsupported statement in AST increment");
+}
+
+func natural_ast_check(source: str) -> int {
+    mut position: int = 0;
+    while true {
+        let first = natural_next(source, position);
+        if first.error {
+            println("ast-error|" + to_str(first.error_code));
+            return 1;
+        }
+        if first.kind == NT_EOF { return 0; }
+        if first.kind == NT_NEWLINE {
+            position = first.next;
+            continue;
+        }
+        let statement = nas_statement(source, position);
+        if nas_is_ok(statement) == false {
+            println("ast-error|" + to_str(first.line) + "|" + nas_message(statement));
+            return 1;
+        }
+        println(nas_node(statement));
+        position = nas_next(statement);
+    }
+    return 0;
+}

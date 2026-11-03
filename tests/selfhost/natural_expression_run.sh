@@ -13,7 +13,14 @@ for input in expression_valid.suru expression_postfix_valid.suru; do
     grep -q '^expr|' "$tmp/$input.out"
 done
 
-grep -q '^expr|(1 + (2 * 3)) == 7 and true' "$tmp/expression_valid.suru.out"
+"$SURU" run "$DIR/natural_token_driver.suru" \
+    "$ROOT/tests/natural/expression_valid.suru" >"$tmp/tokens.out"
+grep -q '^3|1|1|0|1|1$' "$tmp/tokens.out"
+grep -q '^6|1|16|15|18|and$' "$tmp/tokens.out"
+grep -q '^1|1|24|23|24|' "$tmp/tokens.out"
+grep -q '^0|2|1|24|24|' "$tmp/tokens.out"
+
+grep -q '^expr|(((1 + (2 \* 3)) == 7) and true)' "$tmp/expression_valid.suru.out"
 grep -q '^expr|items\[0\]\.name(first,(second + 1))' \
     "$tmp/expression_postfix_valid.suru.out"
 

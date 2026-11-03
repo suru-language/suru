@@ -20,6 +20,9 @@ end routine
 show(if)
 show(in)
 show(this)
+show(and)
+show(or)
+show(not)
 when true
     show("yes")
 otherwise when false

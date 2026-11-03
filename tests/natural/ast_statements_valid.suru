@@ -1,0 +1,5 @@
+value answer: Whole = 1 + 2 * 3
+change score: Whole = 100
+set score to score + 50
+show("ready")
+give answer

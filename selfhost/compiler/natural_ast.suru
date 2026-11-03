@@ -1,0 +1,17 @@
+// Initial Natural Syntax AST node representation.
+// The compiler will replace the textual payload with typed child nodes as the
+// full self-hosted AST is ported.
+
+type NAstNode {
+    let kind: str;
+    let line: int;
+    let text: str;
+}
+
+func na_make(kind: str, line: int, text: str) -> NAstNode {
+    return NAstNode(kind, line, text);
+}
+
+func na_render(node: NAstNode) -> str {
+    return "ast|" + node.kind + "|" + to_str(node.line) + "|" + node.text;
+}

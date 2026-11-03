@@ -28,9 +28,9 @@ below.
 The Natural Syntax keyword set is:
 
 ```text
-across as attempt bring case change choose constant contract each
-end ensure exception expose false from give handle if in through until
-otherwise record repeat routine set show supports true value when while
+across and as attempt bring case change choose constant contract each
+end ensure exception expose false from give handle if in not through until
+otherwise or record repeat routine set show supports true value when while
 throws this none
 ```
 

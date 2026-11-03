@@ -1,0 +1,5 @@
+use "../../selfhost/compiler/natural_statement_parser.suru";
+
+func main() {
+    exit(natural_ast_check(source_load(args(0))));
+}

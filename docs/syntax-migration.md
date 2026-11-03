@@ -89,5 +89,8 @@ the initial structural parser gate is now in
 `selfhost/compiler/natural_parser.suru`. `--syntax=natural` is not enabled
 until expression/type parsing and semantic gates exist. The structural gate
 currently checks declarations, binding initializers, public signatures,
-constant scope, mutable assignment targets, and routine return context. No
-legacy default behavior may change during the port.
+constant scope, mutable assignment targets, and routine return context. The
+token-based expression parser and core statement AST bridge now cover
+precedence expressions, bindings, assignment, `show`, and `give`; type and
+semantic gates remain open. No legacy default behavior may change during the
+port.

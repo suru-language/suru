@@ -109,3 +109,11 @@ routine context, `otherwise`/`case` ownership, and exception clauses against
 the structural corpus. It now also validates binding initializers, explicit
 routine parameter/public return types, module-scope constants, mutable
 assignment targets, and routine `give` context.
+The parser-facing cursor and precedence expression increment are in
+`selfhost/compiler/natural_token_stream.suru` and
+`selfhost/compiler/natural_expression.suru`; they preserve token spans and
+serialize expression shapes for the AST port.
+Core statement parsing and the first AST node record are in
+`selfhost/compiler/natural_statement_parser.suru` and
+`selfhost/compiler/natural_ast.suru`, currently covering `value`, `change`,
+`constant`, `set ... to`, `show`, and `give`.
