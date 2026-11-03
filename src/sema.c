@@ -551,7 +551,6 @@ static s_type *check_call(s_sema *S, s_expr *e) {
             }
             if (!is_field) {
                 const char *mname = callee->u.field.field;
-                bool found = false;
                 for (s_size fidx = 0; fidx < S->mod->nfuncs; ++fidx) {
                     const s_func_decl *meth = &S->mod->funcs[fidx];
                     if (strcmp(meth->name, mname) != 0) continue;
@@ -562,7 +561,6 @@ static s_type *check_call(s_sema *S, s_expr *e) {
                         !meth->params[0].type->record_name ||
                         strcmp(meth->params[0].type->record_name, rt->record_name) != 0)
                         continue;
-                    found = true;
                     if (e->u.call.nargs + 1 != meth->nparams) {
                         s_diag_error(S->diag, e->loc, 413,
                                      "method '%s' expects %zu argument(s), got %zu",
@@ -593,12 +591,10 @@ static s_type *check_call(s_sema *S, s_expr *e) {
                     callee->u.var.var_index = (int)fidx;
                     return meth->ret_type;
                 }
-                if (!found) {
-                    s_diag_error(S->diag, callee->loc, 400,
-                                 "record '%s' has no field or method '%s'",
-                                 rec->name, mname);
-                    return type_unit(S);
-                }
+                s_diag_error(S->diag, callee->loc, 400,
+                             "record '%s' has no field or method '%s'",
+                             rec->name, mname);
+                return type_unit(S);
             }
         }
     }
