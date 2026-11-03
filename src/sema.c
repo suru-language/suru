@@ -590,7 +590,7 @@ static s_type *check_call(s_sema *S, s_expr *e) {
                     e->u.call.nargs++;
                     callee->kind = S_EXPR_FUNC_REF;
                     callee->u.var.name = mname;
-                    callee->u.var.var_index = (int)f;
+                    callee->u.var.var_index = (int)fidx;
                     return meth->ret_type;
                 }
                 if (!found) {
@@ -1467,7 +1467,8 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
             S.next_slot++;
         }
         if (fn->ret_type && fn->ret_type->kind == S_TYPE_RECORD) {
-            resolve_record(&S, fn->ret_type, fn->loc);
+            int idx = resolve_record(&S, fn->ret_type, fn->loc);
+            if (idx >= 0) fn->ret_type->record_index = idx;
         }
         if (!check_block(&S, fn->body)) ok = false;
         if (fn->ret_type && fn->ret_type->kind != S_TYPE_UNIT &&
