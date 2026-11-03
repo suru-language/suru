@@ -469,6 +469,32 @@ static void test_lambda_not_function(void) {
     s_arena_dispose(&arena);
 }
 
+static void test_binop_type_mismatch_note(void) {
+    const char *src =
+        "func main() -> int {\n"
+        "    return 1 + \"x\";\n"
+        "}\n";
+    s_arena arena;
+    s_diag_ctx d;
+    s_module mod;
+    bool ok = compile_str(src, &mod, &arena, &d);
+    CHECK(!ok);
+    CHECK(s_diag_has_errors(&d));
+    bool saw_error = false;
+    bool saw_note = false;
+    for (s_size i = 0; i < d.count; ++i) {
+        if (d.items[i].sev == S_DIAG_ERROR && d.items[i].code == 403)
+            saw_error = true;
+        if (d.items[i].sev == S_DIAG_NOTE &&
+            strstr(d.items[i].msg, "right operand") != NULL)
+            saw_note = true;
+    }
+    CHECK(saw_error);
+    CHECK(saw_note);
+    s_diag_dispose(&d);
+    s_arena_dispose(&arena);
+}
+
 TEST_MAIN_BEGIN()
     test_valid_program();
     test_type_mismatch();
@@ -498,4 +524,5 @@ TEST_MAIN_BEGIN()
     test_lambda_valid();
     test_lambda_dynamic_call();
     test_lambda_not_function();
+    test_binop_type_mismatch_note();
 TEST_MAIN_END()
