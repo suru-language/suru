@@ -82,8 +82,9 @@ The first transitional module now exists at
 2.0 is not yet frozen; it is not a Natural Syntax implementation. The C17 VM
 executes it through `tests/selfhost/lexer_driver.suru`.
 
-`make selfhost-check` validates the module through its driver, and
+`make selfhost-check` validates the module through its drivers, and
 `make selfhost-test` compares token kinds and source locations against the C
-lexer. Literal decoding, negative-input parity, and the remaining compiler
-modules are still open gates. The binary I/O needed by a future SURU compiler
-is explicit in `include/suru/io.h` and `src/io.c`.
+lexer while checking that both implementations reject a malformed identifier.
+Decoded literal values, complete negative-diagnostic parity, and the remaining
+compiler modules are still open gates. The binary I/O needed by a future SURU
+compiler is explicit in `include/suru/io.h` and `src/io.c`.

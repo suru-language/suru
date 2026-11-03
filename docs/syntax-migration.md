@@ -90,7 +90,9 @@ The transitional lexer in `selfhost/compiler/lexer.suru` is tested on the same
 valid corpus as the C lexer by `make selfhost-test`. The current comparison
 covers token kind and line/column location, including shebangs, nested block
 comments, keywords, literals, operators, and source boundaries. Before this
-gate can be called complete, compare decoded literal values and diagnostics on
-negative inputs. Document A must additionally define malformed UTF-8, string
-interpolation, and natural-syntax resource-limit behavior. Only after that
-expanded gate passes should a large parser replacement begin.
+gate can be called complete, compare decoded literal values and diagnostic
+locations/messages on a broader negative corpus. The current negative check
+only confirms that both lexers reject a reserved `__` identifier. Document A
+must additionally define malformed UTF-8, string interpolation, and
+natural-syntax resource-limit behavior. Only after that expanded gate passes
+should a large parser replacement begin.
