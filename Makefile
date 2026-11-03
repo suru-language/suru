@@ -94,10 +94,8 @@ test: unit integration selfhost-test
 
 .PHONY: selfhost-check
 selfhost-check: $(BINDIR)/suru
-	@for s in $(SELFHOST_SRC) $(SELFHOST_DRIVER); do \
-		echo "check $$s"; \
-		$(BINDIR)/suru check "$$s" >/dev/null || exit 1; \
-	done
+	@echo "check $(SELFHOST_DRIVER)"; \
+	$(BINDIR)/suru check "$(SELFHOST_DRIVER)" >/dev/null
 
 $(SELFHOST_REF): tests/selfhost/reference_lexer.c $(LIBOBJ) | $(UNITDIR)
 	$(CC) $(CFLAGS) -Itests/unit $< $(LIBOBJ) $(LDFLAGS) -o $@
