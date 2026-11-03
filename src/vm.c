@@ -338,7 +338,32 @@ static bool builtin_str_valid_utf8(s_vm *vm) {
         return false;
     }
     return push(vm, s_val_int(valid_utf8(s_obj_str_data(s.u.o),
-                                         s_obj_str_len(s.u.o)) ? 1 : 0));
+                                          s_obj_str_len(s.u.o)) ? 1 : 0));
+}
+
+static bool builtin_str_utf8_len(s_vm *vm) {
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "str_utf8_len expects a string");
+        return false;
+    }
+    const char *bytes = s_obj_str_data(s.u.o);
+    s_size len = s_obj_str_len(s.u.o);
+    if (!valid_utf8(bytes, len)) {
+        vm_trap(vm, "str_utf8_len received invalid UTF-8");
+        return false;
+    }
+    s_size i = 0;
+    s_i64 count = 0;
+    while (i < len) {
+        unsigned char c = (unsigned char)bytes[i++];
+        count++;
+        if (c <= 0x7fu) continue;
+        if (c <= 0xdfu) i += 1u;
+        else if (c <= 0xefu) i += 2u;
+        else i += 3u;
+    }
+    return push(vm, s_val_int(count));
 }
 
 static bool builtin_array_len(s_vm *vm) {
@@ -1192,6 +1217,7 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_ARRAY_INDEX_OF: return builtin_array_lookup(vm, true);
     case S_BUILTIN_ARRAY_SORT: return builtin_array_sort(vm);
     case S_BUILTIN_STR_VALID_UTF8: return builtin_str_valid_utf8(vm);
+    case S_BUILTIN_STR_UTF8_LEN: return builtin_str_utf8_len(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

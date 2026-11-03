@@ -105,6 +105,8 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "array_sort", 1, { S_SIG_ARRAY_INT }, S_SIG_ARRAY_INT },
     [S_BUILTIN_STR_VALID_UTF8] = {
         "str_valid_utf8", 1, { S_SIG_STR }, S_SIG_BOOL },
+    [S_BUILTIN_STR_UTF8_LEN] = {
+        "str_utf8_len", 1, { S_SIG_STR }, S_SIG_INT },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {
