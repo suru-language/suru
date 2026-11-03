@@ -14,6 +14,7 @@
 #define VM_GC_ALLOC_INTERVAL 512u
 #define VM_GC_MAX_THRESHOLD ((s_u64)1 << 40)
 #define VM_GC_HEADROOM 4u
+#define VM_GC_INCREMENTAL_BUDGET 16u
 
 typedef struct s_cont {
     s_u32 pc;

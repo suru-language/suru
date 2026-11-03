@@ -325,6 +325,8 @@ void s_heap_write_barrier(s_heap *h, s_gcobj *dst, s_value v) {
     }
 }
 
+static void free_object(s_heap *h, s_gcobj *o);
+
 static void sweep_whites(s_heap *h) {
     s_gcobj **pp = &h->all_live;
     while (*pp) {
