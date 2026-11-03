@@ -266,17 +266,23 @@ static s_type *check_binary(s_sema *S, s_expr *e) {
         s_diag_error(S->diag, e->loc, 403,
                      "arithmetic operands must both be int or both float, got %s and %s",
                      type_name(lt), type_name(rt));
+        s_diag_note(S->diag, e->u.binary.rhs->loc, 0,
+                    "right operand has type %s", type_name(rt));
         return type_unit(S);
     case S_BIN_MOD:
         if (lt->kind == S_TYPE_INT && rt->kind == S_TYPE_INT) return lt;
         s_diag_error(S->diag, e->loc, 404,
                      "'%%' requires int operands, got %s and %s",
                      type_name(lt), type_name(rt));
+        s_diag_note(S->diag, e->u.binary.rhs->loc, 0,
+                    "right operand has type %s", type_name(rt));
         return type_unit(S);
     case S_BIN_EQ: case S_BIN_NE:
         if (!type_eq(lt, rt)) {
             s_diag_error(S->diag, e->loc, 405,
                          "cannot compare %s with %s", type_name(lt), type_name(rt));
+            s_diag_note(S->diag, e->u.binary.rhs->loc, 0,
+                        "right operand has type %s", type_name(rt));
             return type_unit(S);
         }
         break; /* comparison result is bool */
@@ -290,6 +296,8 @@ static s_type *check_binary(s_sema *S, s_expr *e) {
             s_diag_error(S->diag, e->loc, 406,
                          "ordering requires comparable operands, got %s and %s",
                          type_name(lt), type_name(rt));
+            s_diag_note(S->diag, e->u.binary.rhs->loc, 0,
+                        "right operand has type %s", type_name(rt));
             return type_unit(S);
         }
         /* fallthrough */

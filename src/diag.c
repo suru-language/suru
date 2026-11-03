@@ -164,7 +164,11 @@ void s_diag_print(const s_diag_ctx *ctx) {
         const char *sevstr =
             d->sev == S_DIAG_ERROR ? "error" :
             d->sev == S_DIAG_WARN ? "warning" : "note";
-        fprintf(stderr, "%s[%d]: %s\n", sevstr, d->code, d->msg);
+        if (d->sev == S_DIAG_NOTE) {
+            fprintf(stderr, "%s: %s\n", sevstr, d->msg);
+        } else {
+            fprintf(stderr, "%s[%d]: %s\n", sevstr, d->code, d->msg);
+        }
         print_snippet(ctx, d);
     }
 }
