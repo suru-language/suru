@@ -154,3 +154,5 @@ The same emitter now lowers integer, Boolean, string, and `none` literals,
 local bindings and assignment, arithmetic/comparison expressions, `show`, and
 `give` to concrete constant-pool and VM instruction records. Handler variables
 are stored in local slots before the handler body runs.
+Builtin calls and calls to collected routine declarations are emitted as
+`BC_BUILTIN` and `BC_CALL` records, respectively.

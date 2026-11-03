@@ -109,5 +109,5 @@ emission now has a Natural Syntax lowering pass that resolves symbolic labels
 to numeric instruction indices and routes normal, handled, and `give` exits
 through cleanup. Literal, local-binding, assignment, arithmetic/comparison,
 `show`, and `give` statements now emit concrete VM records; broader expression
-and control-flow lowering remain open. No legacy default behavior may change
-during the port.
+and control-flow lowering remain open. Basic builtin and routine calls are also
+emitted. No legacy default behavior may change during the port.

@@ -1,6 +1,12 @@
+routine helper() -> Whole
+    give 9
+end routine
+
 routine values() -> Unit
     value answer: Whole = 1 + 2 * 3
     set answer to answer + 4
     show(answer)
+    show(helper())
+    show(to_str(answer))
     give
 end routine

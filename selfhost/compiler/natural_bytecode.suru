@@ -148,6 +148,69 @@ func nbc_top_operator(text: str, operators: [str]) -> [str] {
     return ["-1", ""];
 }
 
+func nbc_emit_arguments(instructions: [str], text: str) -> [str] {
+    mut result: [str] = instructions;
+    let comma = nbc_top_operator(text, [","]);
+    if int_from_str(comma[0]) >= 0 {
+        let at: int = int_from_str(comma[0]);
+        result = nbc_emit_arguments(result, substr(text, 0, at));
+        return nbc_emit_arguments(result,
+            substr(text, at + 1, str_len(text)));
+    }
+    return nbc_emit_expression(result, text);
+}
+
+func nbc_builtin_index(name: str) -> int {
+    if name == "print" { return 0; }
+    if name == "println" { return 1; }
+    if name == "str_len" { return 2; }
+    if name == "array_len" { return 3; }
+    if name == "to_str" { return 5; }
+    if name == "read_line" { return 4; }
+    if name == "args" { return 27; }
+    if name == "read_file" { return 57; }
+    if name == "exit" { return 20; }
+    return -1;
+}
+
+func nbc_func_index(instructions: [str], name: str) -> int {
+    let wanted: str = "#func|" + name + "|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], wanted) {
+            return int_from_str(substr(instructions[i], str_len(wanted),
+                                       str_len(instructions[i])));
+        }
+        i += 1;
+    }
+    return -1;
+}
+
+func nbc_collect_functions(instructions: [str], lines: [str]) -> [str] {
+    mut result: [str] = instructions;
+    mut i: int = 0;
+    while i < array_len(lines) {
+        let line: str = str_trim(lines[i]);
+        let word: str = nbc_word(line);
+        let routine: str = word == "routine" ? line :
+            (word == "expose" and nbc_word(nbc_after(line, "expose")) == "routine"
+             ? nbc_after(line, "expose") : "");
+        if routine != "" {
+            let rest: str = nbc_after(routine, "routine");
+            let open: int = nbc_find(rest, "(");
+            if open > 0 {
+                let name: str = str_trim(substr(rest, 0, open));
+                if nbc_func_index(result, name) < 0 {
+                    result = array_concat(result, ["#func|" + name + "|" +
+                        to_str(nbc_pool_count(result, "func"))]);
+                }
+            }
+        }
+        i += 1;
+    }
+    return result;
+}
+
 func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
     mut result: [str] = instructions;
     mut text: str = str_trim(nbc_outer_parens(str_trim(expression)));
@@ -209,6 +272,20 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
     if nbc_has_prefix(text, "~") {
         result = nbc_emit_expression(result, substr(text, 1, str_len(text)));
         return nbc_emit(result, "BC_BIT_NOT", "");
+    }
+    let open: int = nbc_find(text, "(");
+    if open > 0 and text[str_len(text) - 1] == ")" {
+        let callee: str = str_trim(substr(text, 0, open));
+        let argument_text: str = str_trim(substr(text, open + 1,
+                                                  str_len(text) - open - 2));
+        if argument_text != "" {
+            result = nbc_emit_arguments(result, argument_text);
+        }
+        let builtin: int = nbc_builtin_index(callee);
+        if builtin >= 0 { return nbc_emit(result, "BC_BUILTIN", to_str(builtin)); }
+        let function: int = nbc_func_index(result, callee);
+        if function >= 0 { return nbc_emit(result, "BC_CALL", to_str(function)); }
+        return nbc_emit(result, "BC_TRAP", "unknown call: " + callee);
     }
     if nbc_is_integer(text) {
         return nbc_const(result, "int", "BC_CONST_INT", text);
@@ -357,6 +434,7 @@ func nbc_render(instructions: [str]) -> int {
 func natural_emit_bytecode(source: str) -> int {
     let lines: [str] = str_split(source, "\n");
     mut instructions: [str] = [];
+    instructions = nbc_collect_functions(instructions, lines);
     mut attempts: [str] = [];
     mut labels: int = 0;
     mut i: int = 0;
