@@ -351,7 +351,8 @@ The standard library provides a small set of builtin functions (see
 - `println(v: any)` — same, with a trailing newline.
 - `str_len(s: str) -> int` — length in bytes.
 - `array_len(a: [T]) -> int` — element count (any element type).
-- `to_str(i: int) -> str`.
+- `to_str(v: any) -> str` — int/float/bool to string.
+- `str_compare(a: str, b: str) -> int` — lexicographic (-1/0/1).
 - `f64_to_str(f: float) -> str`.
 - `read_line() -> str` — read a line from stdin ("" on EOF).
 - `make_array(n: int) -> [int]` — a zero-filled array of `n` elements.

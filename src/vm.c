@@ -272,16 +272,46 @@ static bool builtin_read_line(s_vm *vm) {
 
 static bool builtin_to_str(s_vm *vm) {
     s_value v = pop(vm);
-    if (v.tag != S_VAL_INT) {
-        vm_trap(vm, "to_str expects an int");
+    char buf[64];
+    const char *data;
+    s_size len;
+    switch (v.tag) {
+    case S_VAL_INT:
+        len = s_rt_format_i64(buf, sizeof buf, v.u.i);
+        data = buf;
+        break;
+    case S_VAL_FLOAT:
+        len = s_rt_format_f64(buf, sizeof buf, v.u.f);
+        if (len >= sizeof buf) len = sizeof buf - 1;
+        data = buf;
+        break;
+    case S_VAL_BOOL:
+        data = v.u.b ? "true" : "false";
+        len = v.u.b ? 4 : 5;
+        break;
+    default:
+        vm_trap(vm, "to_str expects an int, float, or bool");
         return false;
     }
-    char buf[40];
-    s_size len = s_rt_format_i64(buf, sizeof(buf), v.u.i);
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
     if (!o) return false;
-    memcpy(s_obj_str_data(o), buf, len);
+    memcpy(s_obj_str_data(o), data, len);
     return push(vm, s_val_obj(o));
+}
+
+static bool builtin_str_compare(s_vm *vm) {
+    s_value b = pop(vm);
+    s_value a = pop(vm);
+    if (a.tag != S_VAL_OBJ || a.u.o->kind != S_OBJ_STR ||
+        b.tag != S_VAL_OBJ || b.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "str_compare expects two strings");
+        return false;
+    }
+    s_size al = s_obj_str_len(a.u.o), bl = s_obj_str_len(b.u.o);
+    s_size n = al < bl ? al : bl;
+    int c = n ? memcmp(s_obj_str_data(a.u.o), s_obj_str_data(b.u.o), n) : 0;
+    if (c == 0) c = (al > bl) - (al < bl);
+    return push(vm, s_val_int((s_i64)c));
 }
 
 static bool builtin_itof(s_vm *vm) {
@@ -832,6 +862,7 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_STR_REVERSE: return builtin_str_map(vm, 0);
     case S_BUILTIN_STR_UPPER: return builtin_str_map(vm, 1);
     case S_BUILTIN_STR_LOWER: return builtin_str_map(vm, 2);
+    case S_BUILTIN_STR_COMPARE: return builtin_str_compare(vm);
     case S_BUILTIN_LEN: return builtin_len(vm);
     case S_BUILTIN_ARRAY_REVERSE: return builtin_array_reverse(vm);
     case S_BUILTIN_ARRAY_SUM: return builtin_array_reduce(vm, 0);
