@@ -31,7 +31,9 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 - [x] Bytecode optimizer passes: dead code elimination and constant folding.
 - Nursery sizing heuristics; generational collection tuning.
 - Incremental collection groundwork.
-- Fuzz corpus expansion; coverage-guided fuzzing (libFuzzer/AFL).
+- [x] Fuzz corpus expansion; coverage-guided fuzzing (libFuzzer via
+  `make fuzz-libfuzzer`). Fuzzing found and fixed an uninitialized-read
+  free in the bytecode deserializer's failure path.
 
 ## 0.4.0 — portability
 
