@@ -29,7 +29,8 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 ## 0.3.0 — performance and robustness
 
 - [x] Bytecode optimizer passes: dead code elimination and constant folding.
-- Nursery sizing heuristics; generational collection tuning.
+- [x] Nursery sizing heuristics (adaptive live-bytes threshold with headroom
+  sizing). Generational collection tuning remains.
 - Incremental collection groundwork.
 - [x] Fuzz corpus expansion; coverage-guided fuzzing (libFuzzer via
   `make fuzz-libfuzzer`). Fuzzing found and fixed an uninitialized-read

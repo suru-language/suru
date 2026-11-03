@@ -86,9 +86,19 @@ The collector is a **non-moving, stop-the-world mark-sweep** tracer:
    chunks are returned to the appropriate free list (or freed for large
    chunks). The collector is non-moving, so object addresses are stable.
 
-The collector runs automatically in the VM when the allocation counter or the
+The collector runs automatically in the VM — the allocation counter or the
 live-bytes threshold is crossed, and can be invoked explicitly (used by
 tests). Because no object is moved, no forwarding pointers are required.
+
+The collection trigger uses an adaptive sizing heuristic (nursery sizing):
+after each collection the live-bytes threshold is resized to leave a fixed
+headroom (default 4x) over the surviving set, clamped to a floor (the initial
+threshold, overridable via `SURU_GC_THRESHOLD`) and a ceiling. When survival is
+tiny, the threshold stays at the floor and collections stay frequent and
+cheap; when the live set grows, the threshold grows with it so collection
+frequency tracks real allocation/survival instead of growing without bound.
+The threshold is never shrunk while the heap is still mostly live (to avoid
+thrashing).
 
 ## 6. Allocation failure
 
