@@ -13,7 +13,7 @@ for src in "$DIR"/*.suru; do
     name="$(basename "$src" .suru)"
     [ "$name" = "argtest" ] && continue   # handled specially with args
     [ "$name" = "pkgmain" ] && continue   # handled specially with SURU_MOD_PATH
-    [ "$name" = "gcstress" ] && continue  # handled specially with low GC threshold
+    [[ "$name" == gcstress* ]] && continue  # handled specially with low GC threshold
     tests=$((tests + 1))
     outfile="$DIR/$name.out"
     exitfile="$DIR/$name.exit"
@@ -87,17 +87,21 @@ else
 fi
 
 # GC stress: force frequent collections with a tiny threshold.
-tests=$((tests + 1))
-actual="$(SURU_GC_THRESHOLD=512 "$SURU" run "$DIR/gcstress.suru" 2>"$tmp/stderr")"
-code=$?
-if [ "$code" -eq 0 ] && [ "$actual" = "2090" ]; then
-    echo "ok: gcstress"
-else
-    echo "FAIL: gcstress (exit $code)"
-    echo "  got: $actual"
-    sed 's/^/    stderr: /' "$tmp/stderr"
-    fail=$((fail + 1))
-fi
+for src in "$DIR"/gcstress*.suru; do
+    [ -e "$src" ] || continue
+    name="$(basename "$src" .suru)"
+    tests=$((tests + 1))
+    actual="$(SURU_GC_THRESHOLD=512 "$SURU" run "$src" 2>"$tmp/stderr")"
+    code=$?
+    if [ "$code" -eq 0 ] && [ "$actual" = "$(cat "$DIR/$name.out")" ]; then
+        echo "ok: $name"
+    else
+        echo "FAIL: $name (exit $code)"
+        echo "  got: $actual"
+        sed 's/^/    stderr: /' "$tmp/stderr"
+        fail=$((fail + 1))
+    fi
+done
 
 rm -rf "$tmp"
 

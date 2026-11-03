@@ -1,0 +1,21 @@
+func main() -> int {
+    mut x = [10];
+    mut y = [20];
+    mut box = [x, y];
+    mut total = 0;
+    mut i = 0;
+    while i < 500 {
+        let junk = range(0, 90);
+        let s = "k" * 25;
+        total = total + array_len(junk) + str_len(s);
+        if i % 50 == 0 {
+            box[0] = box[1];
+            box[1] = box[0];
+            total = total + box[0][0] + box[1][0];
+        }
+        i = i + 1;
+    }
+    println(box[0][0]);
+    println(box[1][0]);
+    return 0;
+}
