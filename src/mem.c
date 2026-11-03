@@ -25,6 +25,7 @@ typedef struct s_heap {
     s_gcobj **mark_stack;        /* grey worklist */
     s_size mark_len, mark_cap;
     bool mark_active;
+    bool incremental;
 } s_heap;
 
 static s_size bucket_index(s_size rounded) {
@@ -165,6 +166,19 @@ s_gcobj *s_heap_alloc(s_heap *h, s_obj_kind kind, s_u32 count, s_size payload_by
     /* zero payload */
     char *payloadp = (char *)(o + 1);
     memset(payloadp, 0, payload);
+    /* During an active incremental marking cycle, treat the new object as
+     * live by shading it grey so it will be scanned (and its children). */
+    if (h->mark_active) {
+        o->colour = S_GC_GREY;
+        if (h->mark_len >= h->mark_cap) {
+            s_size ncap = h->mark_cap ? h->mark_cap * 2 : 256;
+            s_gcobj **n = realloc(h->mark_stack, ncap * sizeof(*n));
+            if (!n) { fprintf(stderr, "SURU GC: mark stack allocation failed\n"); abort(); }
+            h->mark_stack = n;
+            h->mark_cap = ncap;
+        }
+        h->mark_stack[h->mark_len++] = o;
+    }
     return o;
 }
 
@@ -277,9 +291,11 @@ s_size s_heap_collect_step(s_heap *h, s_size budget) {
         for (s_gcobj *o = h->all_live; o; o = o->next_all) {
             o->colour = S_GC_WHITE;
         }
-        seed_roots(h);
         h->mark_active = true;
     }
+    /* Re-seed roots every slice so objects newly referenced from the mutator
+     * stack after the previous slice are not missed. */
+    seed_roots(h);
     s_size done = 0;
     while (done < budget && h->mark_len > 0) {
         if (!mark_process_one(h)) break;
@@ -287,6 +303,50 @@ s_size s_heap_collect_step(s_heap *h, s_size budget) {
     }
     if (h->mark_len == 0) h->mark_active = false;
     return h->mark_len;
+}
+
+void s_heap_set_incremental(s_heap *h, bool on) {
+    if (h) h->incremental = on;
+}
+
+bool s_heap_is_incremental(const s_heap *h) {
+    return h ? h->incremental : false;
+}
+
+bool s_heap_marking(const s_heap *h) {
+    return h ? h->mark_active : false;
+}
+
+void s_heap_write_barrier(s_heap *h, s_gcobj *dst, s_value v) {
+    if (!h || !h->mark_active) return;
+    if (dst->colour == S_GC_BLACK &&
+        v.tag == S_VAL_OBJ && v.u.o && v.u.o->colour == S_GC_WHITE) {
+        mark_push(h, v.u.o);
+    }
+}
+
+static void sweep_whites(s_heap *h) {
+    s_gcobj **pp = &h->all_live;
+    while (*pp) {
+        s_gcobj *o = *pp;
+        if (o->colour == S_GC_WHITE) {
+            *pp = o->next_all;
+            free_object(h, o);
+        } else {
+            pp = &o->next_all;
+        }
+    }
+}
+
+bool s_heap_collect_incremental(s_heap *h, s_size budget) {
+    if (!h) return true;
+    s_size pending = s_heap_collect_step(h, budget);
+    if (pending == 0) {
+        sweep_whites(h);
+        h->collections++;
+        return true;
+    }
+    return false;
 }
 
 static void free_object(s_heap *h, s_gcobj *o) {
@@ -308,16 +368,7 @@ void s_heap_collect(s_heap *h) {
      * stop-the-world collect; collect_step may be used to interleave) */
     s_heap_collect_step(h, (s_size)-1);
     /* sweep: free everything still white */
-    s_gcobj **pp = &h->all_live;
-    while (*pp) {
-        s_gcobj *o = *pp;
-        if (o->colour == S_GC_WHITE) {
-            *pp = o->next_all;
-            free_object(h, o);
-        } else {
-            pp = &o->next_all;
-        }
-    }
+    sweep_whites(h);
     h->collections++;
 }
 

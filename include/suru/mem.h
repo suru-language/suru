@@ -77,6 +77,23 @@ void s_heap_collect(s_heap *h);
  * then sweeps. */
 s_size s_heap_collect_step(s_heap *h, s_size budget);
 
+/* Enable/disable incremental mode (default off). When enabled, collection is
+ * driven incrementally by `s_heap_collect_incremental`. */
+void s_heap_set_incremental(s_heap *h, bool on);
+bool s_heap_is_incremental(const s_heap *h);
+/* True while an incremental marking cycle is in progress. */
+bool s_heap_marking(const s_heap *h);
+
+/* Write barrier: call before storing `v` into heap object `dst`. Maintains
+ * the tri-color invariant during incremental marking (shades a white target
+ * grey when written into a black object). No-op when marking is inactive. */
+void s_heap_write_barrier(s_heap *h, s_gcobj *dst, s_value v);
+
+/* Run one incremental marking slice of up to `budget` grey objects; if that
+ * completes the current cycle, sweep and return true. Returns false while
+ * marking is still in progress (call again with more budget). */
+bool s_heap_collect_incremental(s_heap *h, s_size budget);
+
 s_u64 s_heap_live_bytes(const s_heap *h);
 s_u64 s_heap_total_bytes(const s_heap *h);
 s_u32 s_heap_live_objects(const s_heap *h);

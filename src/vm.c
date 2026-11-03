@@ -1492,6 +1492,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 vm_trap(vm, "index out of bounds (%lld of %u)", (long long)i, arr.u.o->count);
                 return 1;
             }
+            s_heap_write_barrier(vm->heap, arr.u.o, val);
             s_obj_array_data(arr.u.o)[i] = val;
             pc++; break;
         }
@@ -1522,6 +1523,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 return 1;
             }
             if (in->b >= rec.u.o->count) { vm_trap(vm, "field out of bounds"); return 1; }
+            s_heap_write_barrier(vm->heap, rec.u.o, val);
             s_obj_record_fields(rec.u.o)[in->b] = val;
             pc++; break;
         }
