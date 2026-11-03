@@ -100,6 +100,17 @@ frequency tracks real allocation/survival instead of growing without bound.
 The threshold is never shrunk while the heap is still mostly live (to avoid
 thrashing).
 
+### 5.1 Tri-color marking and incremental groundwork
+
+The collector marks with the standard tri-color scheme: white (unreached),
+grey (discovered, on the worklist), black (scanned). A budgeted primitive
+`s_heap_collect_step(heap, budget)` scans up to `budget` grey objects and
+returns the number still queued, so marking can be performed incrementally and
+interleaved with allocation. `s_heap_collect` is a full collection that drains
+marking to completion and then sweeps the remaining white objects. Write
+barriers and automatic incremental triggering are future work on top of this
+mechanism.
+
 ## 6. Allocation failure
 
 All allocation goes through `s_heap_alloc`. On failure it returns `NULL`; the
