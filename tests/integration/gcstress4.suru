@@ -1,0 +1,23 @@
+func main() -> int {
+    mut p0 = [10];
+    mut p1 = [20];
+    mut p2 = [30];
+    mut p3 = [40];
+    mut p4 = [50];
+    mut pool = [p0, p1, p2, p3, p4];
+    mut total = 0;
+    mut k = 0;
+    while k < 2000 {
+        pool[0] = pool[1];
+        pool[1] = pool[2];
+        pool[2] = pool[3];
+        pool[3] = pool[4];
+        pool[4] = pool[0];
+        total = total + pool[0][0] + pool[4][0];
+        let junk = range(0, 80);
+        total = total + array_len(junk);
+        k = k + 1;
+    }
+    println(total);
+    return 0;
+}
