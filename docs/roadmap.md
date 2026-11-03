@@ -51,7 +51,25 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 - Grammar and spec stabilization (freeze for 1.0). In progress: reconciled the
   keyword list across grammar/spec/implementation (`enum`, `do`, `and`,
   `or`, `not`); grammar now includes `do_stmt`; the spec's reserved `__`
-  identifier rule is now enforced by the lexer (error 111).
+  identifier rule is now enforced by the lexer (error 111). Found and fixed a
+  latent bytecode bug: the `or` operator generated unbalanced stack depths
+  (true-branch dropped its operand), so every `or` expression failed to
+  compile; it now mirrors `and` with a consistent single-value result on both
+  paths, and short-circuit behavior is covered by a new `logical` test.
+  Added a missing-return check: a function with a non-unit return type must
+  have a `return` on every control path (error 462), replacing a silent
+  runtime trap; spec section 6 corrected to state that a value is produced
+  only by an explicit `return` (no trailing-expression return). Found and
+  fixed a `for`-loop bug: `continue` jumped to the condition check instead of
+  the iterator increment, so `continue` in a `for` loop never advanced the
+  index and hung forever; it now targets the increment step (covered by a new
+  `forcont` test). Found and fixed broken compound assignment on indexed
+  targets: `BC_IDX_LD` pops `(idx, obj)` and `BC_IDX_ST` pops
+  `(val, idx, obj)`, but the compiler emitted the store operands in the wrong
+  order, so `a[i] += x` (and the captured-variable form `n += x` inside
+  closures) failed at runtime with an "index store/type error". Both paths
+  now stage obj/index/result in temp frame slots (covered by a new `cmpassign`
+  test).
 
 ## 1.0.0 — stable
 

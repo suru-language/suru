@@ -1,0 +1,12 @@
+func pick(c: bool) -> int {
+    if c {
+        return 1;
+    } else {
+        return 2;
+    }
+}
+func main() -> int {
+    println(pick(true));
+    println(pick(false));
+    return 0;
+}

@@ -338,12 +338,25 @@ static bool gen_assign(s_gen *g, const s_expr *e, bool compound) {
         if (lhs->u.var.is_capture) {
             int cap = lhs->u.var.capture_index;
             if (compound) {
+                /* Same IDX_LD (pops idx,obj) / IDX_ST (pops val,idx,obj)
+                 * ordering as the array case: keep env, cap and result in
+                 * temp slots. */
+                s_u32 base_slot = g->frame_max++;
+                s_u32 idx_slot = g->frame_max++;
+                s_u32 r_slot = g->frame_max++;
                 EM3(BC_LD_LOCAL, 0, 0, 0);
+                EM3(BC_ST_LOCAL, base_slot, 0, 0);
                 if (!em_const_int(g, cap)) return false;
-                EM(BC_DUP);
+                EM3(BC_ST_LOCAL, idx_slot, 0, 0);
+                EM3(BC_LD_LOCAL, base_slot, 0, 0);
+                EM3(BC_LD_LOCAL, idx_slot, 0, 0);
                 EM(BC_IDX_LD);
                 if (!gen_expr(g, rhs)) return false;
                 if (!push_bin_op(g, e)) return false;
+                EM3(BC_ST_LOCAL, r_slot, 0, 0);
+                EM3(BC_LD_LOCAL, base_slot, 0, 0);
+                EM3(BC_LD_LOCAL, idx_slot, 0, 0);
+                EM3(BC_LD_LOCAL, r_slot, 0, 0);
                 EM(BC_IDX_ST);
             } else {
                 EM3(BC_LD_LOCAL, 0, 0, 0);
@@ -367,13 +380,25 @@ static bool gen_assign(s_gen *g, const s_expr *e, bool compound) {
     }
     case S_EXPR_INDEX: {
         if (compound) {
+            /* IDX_LD pops (idx, obj); IDX_ST pops (val, idx, obj). Keep all
+             * three in temp slots so the load and store each see their own
+             * operands in the right order. */
+            s_u32 base_slot = g->frame_max++;
+            s_u32 idx_slot = g->frame_max++;
+            s_u32 r_slot = g->frame_max++;
             if (!gen_expr(g, lhs->u.index.obj)) return false;
-            EM(BC_DUP);
+            EM3(BC_ST_LOCAL, base_slot, 0, 0);
             if (!gen_expr(g, lhs->u.index.index)) return false;
-            EM(BC_DUP);
+            EM3(BC_ST_LOCAL, idx_slot, 0, 0);
+            EM3(BC_LD_LOCAL, base_slot, 0, 0);
+            EM3(BC_LD_LOCAL, idx_slot, 0, 0);
             EM(BC_IDX_LD);
             if (!gen_expr(g, rhs)) return false;
             if (!push_bin_op(g, e)) return false;
+            EM3(BC_ST_LOCAL, r_slot, 0, 0);
+            EM3(BC_LD_LOCAL, base_slot, 0, 0);
+            EM3(BC_LD_LOCAL, idx_slot, 0, 0);
+            EM3(BC_LD_LOCAL, r_slot, 0, 0);
             EM(BC_IDX_ST);
             return true;
         }
@@ -643,8 +668,11 @@ static bool gen_stmt(s_gen *g, const s_stmt *s, const s_loopctx *loop) {
         s_u32 idx_slot = g->frame_max++;
         s_u32 arr_slot = g->frame_max++;
         s_u32 lloop = new_label(&g->labels);
+        s_u32 ladvance = new_label(&g->labels);
         s_u32 lend = new_label(&g->labels);
-        s_loopctx inner = { lend, lloop };
+        /* `continue` must jump past the body to the iterator-increment step,
+         * not to the condition check (which would never advance the index). */
+        s_loopctx inner = { lend, ladvance };
         bool iter_is_str = s->u.forstmt.iter->type &&
                            s->u.forstmt.iter->type->kind == S_TYPE_STR;
         if (!gen_expr(g, s->u.forstmt.iter)) return false;
@@ -663,6 +691,7 @@ static bool gen_stmt(s_gen *g, const s_stmt *s, const s_loopctx *loop) {
         EM(BC_IDX_LD);
         EM3(BC_ST_LOCAL, (s_u32)s->u.forstmt.var_index, 0, 0);
         if (!gen_stmt(g, s->u.forstmt.body, &inner)) return false;
+        place_label(&g->e, &g->labels, ladvance);
         EM3(BC_LD_LOCAL, idx_slot, 0, 0);
         if (!em_const_int(g, 1)) return false;
         EM(BC_ADD_I);

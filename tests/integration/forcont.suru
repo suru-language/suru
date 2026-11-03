@@ -1,0 +1,19 @@
+func main() -> int {
+    mut sum = 0;
+    for i in range(0, 5) {
+        if i == 2 { continue; }
+        sum = sum + i;
+    }
+    println(sum);
+    for c in "abc" {
+        if c == "b" { continue; }
+        print(c);
+    }
+    println("");
+    for i in range(0, 4) {
+        if i == 2 { break; }
+        print(i);
+    }
+    println("");
+    return 0;
+}

@@ -719,6 +719,26 @@ static s_type *lambda_type(s_sema *S, const s_func_decl *f) {
 
 static bool check_block(s_sema *S, s_stmt *blk);
 
+/* Whether control is guaranteed not to fall off the end of `s` (i.e. the
+ * statement always transfers control via a return). Used to require an
+ * explicit return path in non-unit functions. */
+static bool stmt_returns(const s_stmt *s) {
+    if (!s) return false;
+    switch (s->kind) {
+    case S_STMT_RETURN:
+        return true;
+    case S_STMT_BLOCK:
+        return s->u.block.count > 0 &&
+               stmt_returns(s->u.block.items[s->u.block.count - 1]);
+    case S_STMT_IF:
+        return s->u.ifstmt.else_block != NULL &&
+               stmt_returns(s->u.ifstmt.then_block) &&
+               stmt_returns(s->u.ifstmt.else_block);
+    default:
+        return false;
+    }
+}
+
 static s_type *check_lambda(s_sema *S, s_expr *e) {
     int fidx = e->u.lambda.func_index;
     if (fidx < 0 || fidx >= (int)S->mod->nfuncs) return type_unit(S);
@@ -751,6 +771,13 @@ static s_type *check_lambda(s_sema *S, s_expr *e) {
     S->next_slot = (int)f->nparams;
 
     check_block(S, f->body);
+
+    if (f->ret_type && f->ret_type->kind != S_TYPE_UNIT &&
+        !stmt_returns(f->body)) {
+        s_diag_error(S->diag, e->loc, 462,
+                     "function can fall off end without returning a value "
+                     "(return type is %s)", type_name(f->ret_type));
+    }
 
     S->scope = saved_scope;
     S->fn = saved_fn;
@@ -1375,6 +1402,13 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
             resolve_record(&S, fn->ret_type, fn->loc);
         }
         if (!check_block(&S, fn->body)) ok = false;
+        if (fn->ret_type && fn->ret_type->kind != S_TYPE_UNIT &&
+            !stmt_returns(fn->body)) {
+            s_diag_error(diag, fn->loc, 462,
+                         "function can fall off end without returning a value "
+                         "(return type is %s)", type_name(fn->ret_type));
+            ok = false;
+        }
         scope_pop(&sc);
     }
 

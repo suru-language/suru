@@ -65,6 +65,9 @@ if     in     let      mut  none  not   or     return  true
 type   use    while    new  as
 ```
 
+`new` and `as` are reserved for future use and currently have no syntax; using
+them as identifiers is an error.
+
 ### 2.4 Literals
 
 | Kind | Example | Type |
@@ -270,10 +273,12 @@ param = identifier ":" type
 block = "{" statement* "}"
 ```
 
-A function body is a block. The final expression or an explicit `return`
-provides the result. A `return` with no operand is legal only in a function
-whose return type is `unit`. `main` is the program entry point and must return
-`unit` or `int` (an `int` result becomes the process exit code).
+A function body is a block. A value is produced only by an explicit `return`
+statement. A `return` with no operand is legal only in a function whose return
+type is `unit`. A function with a non-`unit` return type must have a `return`
+on every control path; a body that can fall off the end is a compile-time
+error. `main` is the program entry point and must return `unit` or `int` (an
+`int` result becomes the process exit code).
 
 Function declarations are hoisted within a module, so calls may appear before
 their textual definition.

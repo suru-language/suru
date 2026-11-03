@@ -1,0 +1,9 @@
+func pick(c: bool) -> int {
+    if c {
+        return 1;
+    }
+}
+func main() -> int {
+    println(pick(true));
+    return 0;
+}

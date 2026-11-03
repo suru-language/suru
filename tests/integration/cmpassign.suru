@@ -1,0 +1,20 @@
+func main() -> int {
+    mut a = [1, 2, 3];
+    a[1] += 10;
+    println(a[1]);
+    let i = 0;
+    a[i] += 5;
+    println(a[0]);
+    a[2] -= 1;
+    println(a[2]);
+    a[0] *= 4;
+    println(a[0]);
+    a[1] /= 2;
+    println(a[1]);
+    mut n = 0;
+    let f = fn(x: int) -> int { n += x; return n; };
+    println(f(5));
+    println(f(2));
+    println(n);
+    return 0;
+}
