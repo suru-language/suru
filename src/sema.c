@@ -179,6 +179,12 @@ static int resolve_record(s_sema *S, s_type *t, s_source_loc loc) {
         }
     }
     s_diag_error(S->diag, loc, 400, "unknown type '%s'", t->record_name);
+    int best = INT_MAX;
+    const char *bestc = NULL;
+    for (s_size i = 0; i < S->mod->nrecords; ++i)
+        update_suggestion(t->record_name, S->mod->records[i].name,
+                          &best, &bestc);
+    maybe_note_suggestion(S, loc, t->record_name, best, bestc);
     return -1;
 }
 
@@ -554,6 +560,13 @@ static s_type *check_call(s_sema *S, s_expr *e) {
     s_diag_error(S->diag, e->loc, 411,
                  fname ? "unknown function '%s'" : "callee is not a function",
                  fname ? fname : "");
+    if (fname) {
+        int best = INT_MAX;
+        const char *bestc = NULL;
+        for (s_size i = 0; i < S->mod->nfuncs; ++i)
+            update_suggestion(fname, S->mod->funcs[i].name, &best, &bestc);
+        maybe_note_suggestion(S, e->loc, fname, best, bestc);
+    }
     return type_unit(S);
 }
 
@@ -605,6 +618,12 @@ static s_type *check_record_init(s_sema *S, s_expr *e) {
     if (ridx < 0) {
         s_diag_error(S->diag, e->loc, 471, "unknown record type '%s'",
                      e->u.rec.name);
+        int best = INT_MAX;
+        const char *bestc = NULL;
+        for (s_size i = 0; i < S->mod->nrecords; ++i)
+            update_suggestion(e->u.rec.name, S->mod->records[i].name,
+                              &best, &bestc);
+        maybe_note_suggestion(S, e->loc, e->u.rec.name, best, bestc);
         return type_unit(S);
     }
     s_record_decl *rec = &S->mod->records[ridx];
