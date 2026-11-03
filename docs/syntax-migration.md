@@ -85,5 +85,7 @@ The Natural Syntax lexer is implemented in
 through `make selfhost-test`, including Unicode scalar locations, malformed
 UTF-8, interpolation, nested comments, keyword coverage, resource limits, and
 stable lexical diagnostic messages. The parser port is the next phase;
-`--syntax=natural` is not enabled until that parser and its semantic gates
-exist. No legacy default behavior may change during the port.
+the initial structural parser gate is now in
+`selfhost/compiler/natural_parser.suru`. `--syntax=natural` is not enabled
+until expression/type parsing and semantic gates exist. No legacy default
+behavior may change during the port.

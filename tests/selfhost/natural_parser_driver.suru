@@ -1,0 +1,6 @@
+use "../../selfhost/compiler/natural_parser.suru";
+use "../../selfhost/compiler/source.suru";
+
+func main() {
+    exit(natural_parse_check(source_load(args(0))));
+}

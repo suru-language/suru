@@ -103,4 +103,7 @@ parity and the remaining compiler modules are still open gates. The binary I/O
 needed by a future SURU compiler is explicit in `include/suru/io.h` and
 `src/io.c`. The Natural Syntax lexer gate also passes the approved corpus in
 `tests/natural/`; the parser, semantic analyzer, and natural CLI mode remain
-next-phase work.
+next-phase work. The first parser increment is
+`selfhost/compiler/natural_parser.suru`, which validates block terminators,
+routine context, `otherwise`/`case` ownership, and exception clauses against
+the structural corpus.
