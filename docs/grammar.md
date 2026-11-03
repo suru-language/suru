@@ -1,10 +1,10 @@
-# SURU Formal Grammar
+# SURU Formal Grammar — Legacy Edition
 
 > **Status:** This file describes the implemented legacy grammar (the grammar
 > accepted by the C17 bootstrap at commit `b467901`). The Natural Syntax Edition
-> named by the self-hosting plan is not present as a complete Document A in this
-> repository yet. Its keywords are therefore recorded as migration questions in
-> `docs/syntax-migration.md`, not silently added to this normative grammar.
+> named by the self-hosting plan is defined separately by the approved
+> `docs/document-a-2.0.md`. Natural keywords are not silently added to this
+> legacy grammar.
 
 This is the normative grammar for SURU, written in EBNF. In the productions
 below, terminal symbols are quoted or shown in `monospace`; nonterminals are

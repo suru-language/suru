@@ -1,0 +1,16 @@
+contract Describable
+    routine describe() -> Text
+end contract
+
+record Student supports Describable
+    name: Text
+
+    routine describe() -> Text
+        give "Student: {this.name}"
+    end routine
+end record
+
+choice NetworkState
+    Connected(address: Text)
+    Disconnected(reason: Text)
+end choice

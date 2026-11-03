@@ -1,0 +1,13 @@
+routine main() -> Unit
+    change attempts: Whole = 0
+    repeat while attempts < 3
+        set attempts to attempts + 1
+    end repeat
+    when attempts == 3
+        show("done")
+    otherwise when attempts > 3
+        show("too many")
+    otherwise
+        show("not finished")
+    end when
+end routine

@@ -1,0 +1,5 @@
+bring "mathematics.suru" as mathematics
+
+expose routine calculate(first: Whole, second: Whole) -> Whole
+    give first + second
+end routine

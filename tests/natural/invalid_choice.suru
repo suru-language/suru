@@ -1,0 +1,4 @@
+choose state
+    case Connected(address)
+        show(address)
+end choose

@@ -2,100 +2,75 @@
 
 ## Reconciliation status
 
-The repository contains `docs/spec.md` and `docs/grammar.md` for the legacy
-syntax accepted by the C17 bootstrap. It does not contain a complete approved
-Document A 2.0 defining the Natural Syntax Edition's grammar, lexical rules,
-type/effect rules, or block-termination rules. The feature-name list in the
-self-hosting request is not sufficient to derive those rules without inventing
-language behavior.
+The legacy language accepted by the C17 bootstrap remains specified by
+`docs/spec.md` and `docs/grammar.md`. The approved Natural Syntax Edition is
+defined by `docs/document-a-2.0.md`.
 
-Consequently, natural syntax is a design gate, not an implemented feature at
-the audited revision. The legacy compiler and tests remain the compatibility
-baseline.
+Document A 2.0 records the approved decisions for matching block terminators,
+`value`/`change`/`set`, explicit routine types, `across`/`from`/`until`/
+`through` iteration, records and contracts, choices, modules, interpolation,
+typed exceptions, and UTF-8/newline behavior. Natural syntax is now specified,
+but remains an implementation gate until its lexer and parser conformance
+tests pass. Legacy remains the compatibility baseline.
 
-## Questions requiring Document A decisions
+## Decisions recorded in Document A 2.0
 
-| requested form | legacy analogue | decision required before implementation |
-|---|---|---|
-| `value` | `let` | binding grammar, type ascription, and initializer terminator |
-| `change` | `mut` | reassignment and capture semantics |
-| `constant` | `const` | module-only or local scope and constant-expression rules |
-| `set` | assignment | whether it is a statement keyword or expression operator |
-| `routine` / `give` | `func` / `return` | parameter, return, and implicit-unit rules |
-| `when` / `otherwise` | `if` / `else` | nesting and block terminators |
-| `each` / `repeat` | `for` / `while` | iteration protocol and loop result semantics |
-| `record` | `type` | fields, methods, mutability, and construction syntax |
-| `contract` / `supports` | no exact analogue | declaration, generic constraints, and dispatch semantics |
-| `choice` / `choose` | `enum` / no exact analogue | patterns, exhaustiveness, and payload layout |
-| `bring` / `expose` | `use` / no export system | module paths, visibility, and cycles |
-| interpolation | ordinary strings | escape/interpolation boundaries and evaluation order |
-| typed exceptions | runtime traps | effect typing, propagation, and bytecode representation |
+| natural form | decision |
+|---|---|
+| `value` / `change` / `constant` / `set ... to` | Immutable/mutable bindings, module-scope compile-time constants, and statement-only assignment. |
+| `routine` / `give` | Explicit public API types, Unit default, path-complete non-Unit returns, and typed `throws`. |
+| `when` / `otherwise` | Explicit `end when`; nearest unmatched owner; one final `otherwise`. |
+| `each` / `repeat` | Ordered `across`, exclusive `until`, inclusive `through`, and `repeat while`. |
+| `record` / `contract` | Record-owned methods, `this`, explicit mutable fields, and static `supports`. |
+| `choice` / `choose` | Typed payload variants, exhaustive statement matching, and explicit `_` wildcard. |
+| `bring` / `expose` | Relative-then-`SURU_MOD_PATH` resolution, private-by-default visibility, and cycle diagnostics. |
+| interpolation | Normal expressions in braces, escaped braces, left-to-right exactly-once evaluation. |
+| typed exceptions | Declared propagation, typed handlers, and `ensure` on return/normal/exception paths. |
 
-The coordination rule is strict: these choices must be settled in Document A,
-then reflected together in `docs/grammar.md`, the lexer/parser, and positive
-and negative conformance tests.
-
-## Proposed decisions for Document A review
-
-The following is a design proposal, not implemented behavior:
-
-- Natural syntax uses one statement per physical line; multiline expressions
-  continue inside balanced delimiters or after an explicit continuation marker.
-- `routine`, `record`, `contract`, `choice`, `when`, `each`, and `repeat` use
-  `end` as their explicit terminator. `otherwise` belongs to the nearest open
-  `when`; an `otherwise when` chain is permitted.
-- `value` declares an immutable binding, `change` declares a mutable binding,
-  `constant` declares a compile-time binding, and `set target = expression`
-  is the only assignment statement.
-- `routine name(parameters) -> result` is the declaration form and `give`
-  supplies its result. A routine with no result type has unit result and may
-  use `give` without an expression.
-- `each item in iterable` is the array/string iteration form. `repeat
-  condition` is a pre-test loop. Neither form has an implicit value.
-- `record` replaces `type` for user records; methods are declarations whose
-  first parameter is the receiver. `supports` is a declared contract
-  constraint checked during semantic analysis, not dynamic inheritance.
-- `choice` cases are named variants with optional payloads; `choose` must be
-  exhaustive unless it contains an explicit wildcard case.
-- `bring` imports a module and `expose` marks a public declaration. Imports
-  are resolved relative to the importing file, then through `SURU_MOD_PATH`,
-  and cycles are diagnosed.
-- `Result<T, E>` and `Option<T>` are ordinary compiler-known choice types;
-  pattern matching is the only implicit unwrapping operation.
-- Exceptions are typed effects on routines. A routine either handles an
-  effect locally or declares it in its signature; an undeclared propagation
-  is a compile-time error.
-
-Document A must accept, revise, or reject these proposals before the natural
-lexer is implemented. They are intentionally not added to the legacy grammar.
+The complete lexical grammar, EBNF, precedence table, static type rules, effect
+rules, resource limits, diagnostics, and migration policy are in
+`docs/document-a-2.0.md`. They are intentionally not added to the legacy
+grammar.
 
 ## Migration strategy
 
-1. Freeze and publish the Natural Syntax EBNF and precedence table.
-2. Add lexer token kinds and source-location tests without changing legacy
-   token meanings.
-3. Add an explicit syntax selection option to `check`, `run`, and `compile`.
-   Legacy remains the default during migration.
-4. Port parser productions in small feature groups, with both positive and
-   negative tests and reference-output comparisons.
+1. Freeze and publish the Natural Syntax EBNF and precedence table. **Done in
+   Document A 2.0.**
+2. Add natural lexer token kinds and source-location tests without changing
+   legacy token meanings.
+3. Add `--syntax=legacy|natural` to `check`, `run`, and `compile`; legacy stays
+   the default.
+4. Port parser productions in small feature groups with positive and negative
+   tests and reference-output comparisons.
 5. Port semantic and bytecode behavior only after each production is specified.
-6. Keep the old syntax tests until the deprecation/removal policy is approved.
+6. Keep legacy tests until the deprecation/removal policy is approved.
 
-The proposed CLI spelling is `--syntax=legacy|natural`; it is not implemented
-until the existing command-line conventions and Document A approve it.
+The CLI spelling is approved by Document A but is not implemented yet.
+
+## Natural Syntax conformance corpus
+
+`tests/natural/` contains approved positive and negative fixtures for lexical,
+statement, record/choice, module, interpolation, UTF-8, terminator,
+exhaustiveness, and mutability behavior. New syntax expectations are
+conformance expectations rather than legacy differential cases. The corpus must
+be extended whenever a new production or diagnostic is implemented.
 
 ## Lexer compatibility gate
 
-The transitional source manager, diagnostics, lexer, and structured token
-stream in `selfhost/compiler/` are tested on the same valid corpus as the C
-lexer by `make selfhost-test`. The current comparison
-covers token kind and line/column location, including shebangs, nested block
-comments, keywords, literals, operators, source boundaries, and decoded
-literal payloads. The negative corpus currently checks a reserved `__`
-identifier, missing hexadecimal/binary digits, invalid escapes, an
-unterminated string, and unexpected punctuation, including diagnostic codes
-and locations. Before this gate can be called complete, compare full
-diagnostic messages on a broader corpus. Document A must additionally define
-malformed UTF-8, string interpolation, and natural-syntax resource limit
-behavior. Only after that expanded gate passes should a large parser
-replacement begin.
+The transitional source manager, diagnostics, lexer, and structured legacy
+token stream in `selfhost/compiler/` continue to be tested against the C lexer
+by `make selfhost-test`. That comparison covers token kind and line/column
+location, shebangs, nested comments, keywords, literals, operators, source
+boundaries, decoded literal payloads, and classified legacy diagnostics.
+
+The Natural Syntax gate must additionally compare token kind, token text,
+decoded literal payload, start/end offsets, line/column, diagnostic code,
+complete message, and diagnostic location. It covers all natural keywords,
+identifiers, numeric and interpolated strings, Unicode and malformed UTF-8,
+escapes, nested comments, shebangs, operators, statement boundaries, resource
+limits, and invalid input. The C17 compiler remains the reference where
+semantics overlap; new syntax uses the approved expectations in
+`tests/natural/`.
+
+Only after this expanded lexer gate passes may the Natural Syntax parser port
+begin. No legacy default behavior may change during the port.

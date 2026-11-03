@@ -1,0 +1,6 @@
+#!/usr/bin/env suru
+// Unicode, nested comments, logical lines, and interpolation.
+/* outer /* nested */ comment */
+value name: Text = "Amina"
+value age = 20
+show("Hello, {name}! Next year: {age + 1}")
