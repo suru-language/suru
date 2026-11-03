@@ -33,6 +33,17 @@ static void run_source(const char *src, size_t len) {
     s_arena_dispose(&arena);
 }
 
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+int LLVMFuzzerTestOneInput(const unsigned char *data, size_t size) {
+    static char buf[1 << 16];
+    size_t n = size;
+    if (n >= sizeof(buf)) n = sizeof(buf) - 1;
+    memcpy(buf, data, n);
+    buf[n] = '\0';
+    run_source(buf, n);
+    return 0;
+}
+#else
 int main(void) {
     size_t cap = 1 << 14;
     char *buf = malloc(cap + 1);
@@ -46,3 +57,4 @@ int main(void) {
     free(buf);
     return 0;
 }
+#endif

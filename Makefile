@@ -89,6 +89,21 @@ fuzz: $(BINDIR)/suru | $(UNITDIR)
 	$(UNITDIR)/verify_fuzz < /dev/urandom
 	$(UNITDIR)/frontend_fuzz < /dev/urandom
 
+# Coverage-guided fuzzing via libFuzzer (clang). `-fsanitize=fuzzer`
+# provides the harness main and sets FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION,
+# which selects the LLVMFuzzerTestOneInput entry point in the fuzz targets.
+.PHONY: fuzz-libfuzzer
+fuzz-libfuzzer: | $(BINDIR)
+	@command -v clang >/dev/null 2>&1 || { echo "clang not found; skipping"; exit 0; }
+	clang $(BASE) -g -O1 -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer $(WARN) -Werror \
+		$(LIBSRC) tests/fuzz/frontend_fuzz.c -o $(BINDIR)/frontend_ffz
+	clang $(BASE) -g -O1 -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer $(WARN) -Werror \
+		$(LIBSRC) tests/fuzz/verify_fuzz.c -o $(BINDIR)/verify_ffz
+	$(BINDIR)/frontend_ffz -max_total_time=20 -rss_limit_mb=1024 \
+		tests/fuzz/corpus -print_final_stats=1
+	$(BINDIR)/verify_ffz -max_total_time=20 -rss_limit_mb=1024 \
+		tests/fuzz/corpus -print_final_stats=1
+
 .PHONY: asan-test
 asan-test:
 	$(MAKE) CFLAGS="$(ASAN_CFLAGS)" LDFLAGS="$(ASAN_LDFLAGS)" \

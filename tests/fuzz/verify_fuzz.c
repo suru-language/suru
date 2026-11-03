@@ -16,6 +16,12 @@ static void run_buffer(const unsigned char *buf, size_t n) {
     }
 }
 
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+int LLVMFuzzerTestOneInput(const unsigned char *data, size_t size) {
+    run_buffer(data, size);
+    return 0;
+}
+#else
 int main(void) {
     size_t cap = 1 << 16;
     unsigned char *buf = malloc(cap);
@@ -30,3 +36,4 @@ int main(void) {
     free(buf);
     return 0;
 }
+#endif
