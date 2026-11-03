@@ -96,8 +96,10 @@ fuzz: $(BINDIR)/suru | $(UNITDIR)
 fuzz-libfuzzer: | $(BINDIR)
 	@command -v clang >/dev/null 2>&1 || { echo "clang not found; skipping"; exit 0; }
 	clang $(BASE) -g -O1 -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer $(WARN) -Werror \
+		-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION \
 		$(LIBSRC) tests/fuzz/frontend_fuzz.c -o $(BINDIR)/frontend_ffz
 	clang $(BASE) -g -O1 -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer $(WARN) -Werror \
+		-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION \
 		$(LIBSRC) tests/fuzz/verify_fuzz.c -o $(BINDIR)/verify_ffz
 	$(BINDIR)/frontend_ffz -max_total_time=20 -rss_limit_mb=1024 \
 		tests/fuzz/corpus -print_final_stats=1
