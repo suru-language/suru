@@ -1,0 +1,20 @@
+# Build output
+build/
+build-asan/
+build-release/
+build-ubsan/
+
+# Compiler-generated dependency files
+*.d
+*.o
+
+# Compiler-generated plist files
+*.plist
+
+# Test runner stderr/stdout scratch files
+tests/integration/.stderr.*
+tests/integration/.stdout.*
+
+# Editor / tool configs that shouldn't be shared
+opencode.jsonc
+.kilo/
