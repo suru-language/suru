@@ -10,6 +10,9 @@
 #define VM_INIT_STACK 4096u
 #define VM_MAX_STACK (1u << 22)
 #define VM_GC_INIT_THRESHOLD (1u << 20)
+#define VM_GC_ALLOC_INTERVAL 512u
+#define VM_GC_MAX_THRESHOLD ((s_u64)1 << 40)
+#define VM_GC_HEADROOM 4u
 
 typedef struct s_cont {
     s_u32 pc;
@@ -33,6 +36,7 @@ struct s_vm {
     s_size ncalls, capcalls;
     s_u32 alloc_counter;
     s_u64 gc_threshold;
+    s_u64 gc_min_threshold;
     bool trapped;
     char err[512];
     int exit_code;
@@ -52,6 +56,7 @@ s_vm *s_vm_create(const s_bc_module *m) {
         unsigned long v = strtoul(gs, &end, 10);
         if (end != gs && v > 0) vm->gc_threshold = (s_u64)v;
     }
+    vm->gc_min_threshold = vm->gc_threshold;
     return vm;
 }
 
@@ -106,14 +111,35 @@ static bool grow_calls(s_vm *vm) {
 
 static void maybe_collect(s_vm *vm) {
     vm->alloc_counter++;
-    bool should = vm->alloc_counter >= 512 ||
+    bool should = vm->alloc_counter >= VM_GC_ALLOC_INTERVAL ||
                   s_heap_live_bytes(vm->heap) > vm->gc_threshold;
-    if (should) {
-        s_heap_set_stack_root(vm->heap, vm->st, vm->sp);
-        s_heap_collect(vm->heap);
-        if (vm->gc_threshold < (s_u64)1 << 40)
-            vm->gc_threshold *= 2;
-        vm->alloc_counter = 0;
+    if (!should) return;
+    s_heap_set_stack_root(vm->heap, vm->st, vm->sp);
+    s_u64 before = s_heap_live_bytes(vm->heap);
+    s_heap_collect(vm->heap);
+    s_u64 after = s_heap_live_bytes(vm->heap);
+    /* Nursery sizing heuristic: size the next trigger to leave HEADROOM
+     * over the surviving set, so collection frequency tracks actual
+     * allocation/survival instead of growing without bound. Clamp to
+     * [min, max], and do not shrink while the heap is still mostly live
+     * (would thrash). */
+    s_u64 target;
+    if (after > VM_GC_MAX_THRESHOLD / VM_GC_HEADROOM) {
+        target = VM_GC_MAX_THRESHOLD;
+    } else {
+        target = after * VM_GC_HEADROOM;
+        if (target < vm->gc_min_threshold) target = vm->gc_min_threshold;
+        if (target > VM_GC_MAX_THRESHOLD) target = VM_GC_MAX_THRESHOLD;
+    }
+    if (target < vm->gc_threshold && before <= after * 2)
+        target = vm->gc_threshold;
+    vm->gc_threshold = target;
+    vm->alloc_counter = 0;
+    if (getenv("SURU_GC_DEBUG")) {
+        fprintf(stderr, "GC[%llu] live %llu -> %llu, threshold %llu\n",
+                (unsigned long long)s_heap_collections(vm->heap),
+                (unsigned long long)before, (unsigned long long)after,
+                (unsigned long long)vm->gc_threshold);
     }
 }
 
