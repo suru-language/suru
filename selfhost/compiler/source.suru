@@ -24,3 +24,7 @@ func source_column_at(source: str, position: int) -> int {
     }
     return column;
 }
+
+func source_scalar_column_at(source: str, position: int) -> int {
+    return str_utf8_len(substr(source, 0, position)) + 1;
+}

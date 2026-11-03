@@ -33,14 +33,14 @@ func n_is_keyword(word: str) -> bool {
 
 func n_emit(kind: str, source: str, start: int, finish: int) {
     println(kind + "|" + to_str(source_line_at(source, start)) + "|" +
-            to_str(source_column_at(source, start)) + "|" +
+            to_str(source_scalar_column_at(source, start)) + "|" +
             substr(source, start, finish - start));
 }
 
 func n_error(source: str, position: int, code: int) {
     println("error|" + to_str(code) + "|" +
             to_str(source_line_at(source, position)) + "|" +
-            to_str(source_column_at(source, position)));
+            to_str(source_scalar_column_at(source, position)));
 }
 
 func natural_lex_dump(source: str) -> int {
