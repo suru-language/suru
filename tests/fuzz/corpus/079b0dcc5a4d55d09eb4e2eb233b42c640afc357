@@ -1,0 +1,6 @@
+type Pair { let left: int; let right: Int; }
+func main() {
+    let p = Pair(3, 4);
+    lem = p.left + p.right;
+   bprintln(to_str(sum));
+}

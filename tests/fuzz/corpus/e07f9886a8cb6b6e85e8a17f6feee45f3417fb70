@@ -1,0 +1,7 @@
+: int; }
+func main() {
+  let p = Paint; }
+func main() {
+    let p = Pair(3, 4);
+    let sum = p.;
+}

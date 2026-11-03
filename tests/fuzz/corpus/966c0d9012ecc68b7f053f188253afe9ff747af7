@@ -1,0 +1,6 @@
+type Pair { }
+func main() {
+     
+    letusem = p.l = p.left = p.right;
+    println(to_str(sum));
+}

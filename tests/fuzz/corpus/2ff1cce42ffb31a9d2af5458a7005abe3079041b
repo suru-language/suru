@@ -1,0 +1,6 @@
+type Pair { let left:t; }
+func main() {
+ }
+func main() {
+  prinl_t((sum));
+}

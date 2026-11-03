@@ -1,0 +1,5 @@
+type Pair { let left: int; let right: int; }
+func main() {
+    let p = Pair(4+ 4);
+    let sum = p.left +    println(to_str(sum));
+}

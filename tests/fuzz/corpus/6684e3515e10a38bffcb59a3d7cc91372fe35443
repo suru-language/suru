@@ -1,0 +1,4 @@
+type Pair {t; }
+func main() {
+    let p = Paint; let p = Pair(6, 4);
+    let suo = p.left ; for x 

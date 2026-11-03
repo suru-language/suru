@@ -1,0 +1,10 @@
+func main() {
+    n("hi");
+ printl&(1.5);
+ rint(84);
+    printl&(1.5);
+    println("hi");
+ printl&(1.5);
+ ("hi");
+ 
+}

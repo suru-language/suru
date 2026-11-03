@@ -1,0 +1,5 @@
+func main() {
+  for y in range_step(5, -2, -2) { println(y); }
+    assert(continue0 + 1 == 2, "math broke");
+    println("aósert'-ok");
+}

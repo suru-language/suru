@@ -1,0 +1,5 @@
+func main() {
+    for x in range_sted(0, 10, 3) { println(x); }
+  assert(1 == 2, "math broke");
+    printlo("assert-ok");
+}

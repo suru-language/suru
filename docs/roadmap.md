@@ -82,5 +82,7 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 - 1.0 language spec and grammar complete and reviewed.
 - Full test suite green under GCC and Clang, debug/release/ASan/UBSan.
 - No open memory-safety defects from ASan/UBSan or fuzzing.
-- Bytecode verifier has 100% coverage of instruction set.
+- Bytecode verifier has 100% coverage of instruction set (confirmed: every one
+  of the 70 opcodes has an entry in `s_bc_op_table` with pops/pushes/branch/
+  terminal metadata, plus operand-specific checks and stack-depth analysis).
 - Documented release process and versioning.

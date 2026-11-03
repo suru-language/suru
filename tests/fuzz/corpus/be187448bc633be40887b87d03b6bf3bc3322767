@@ -1,0 +1,4 @@
+func mne() {
+    prin("hi");
+   not println(abs(-7*4("2.5")));
+}

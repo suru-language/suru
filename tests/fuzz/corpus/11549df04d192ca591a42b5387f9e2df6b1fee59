@@ -1,0 +1,3 @@
+func main() {
+    py----------yrintln("hello word");
+}
