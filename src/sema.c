@@ -1,6 +1,7 @@
 #include "suru/sema.h"
 #include "suru/stdlib.h"
 
+#include <limits.h>
 #include <string.h>
 
 /* ------------------------------------------------------------------ */
@@ -55,6 +56,52 @@ static bool scope_push_sym(s_scope *sc, s_sym sym) {
 
 static void scope_pop(s_scope *sc) {
     free(sc->syms);
+}
+
+/* ------------------------------------------------------------------ */
+/* Name suggestions (did-you-mean)                                     */
+/* ------------------------------------------------------------------ */
+
+static int s_edit_dist(const char *a, const char *b) {
+    size_t n = strlen(a);
+    size_t m = strlen(b);
+    if (n > 48 || m > 48) return INT_MAX;
+    int row[49];
+    for (size_t j = 0; j <= m; ++j) row[j] = (int)j;
+    for (size_t i = 1; i <= n; ++i) {
+        int prev = row[0];
+        row[0] = (int)i;
+        for (size_t j = 1; j <= m; ++j) {
+            int cur = row[j];
+            int mn = row[j - 1] + 1;
+            int ins = row[j] + 1;
+            int rep = prev + (a[i - 1] == b[j - 1] ? 0 : 1);
+            if (ins < mn) mn = ins;
+            if (rep < mn) mn = rep;
+            row[j] = mn;
+            prev = cur;
+        }
+    }
+    return row[m];
+}
+
+static void update_suggestion(const char *name, const char *cand,
+                              int *best, const char **bestc) {
+    if (!cand || strcmp(cand, name) == 0) return;
+    int d = s_edit_dist(name, cand);
+    if (d < *best) { *best = d; *bestc = cand; }
+}
+
+static void maybe_note_suggestion(s_sema *S, s_source_loc loc,
+                                  const char *name, int best, const char *bestc) {
+    if (!bestc) return;
+    size_t nlen = strlen(name);
+    size_t clen = strlen(bestc);
+    size_t ml = nlen < clen ? clen : nlen;
+    int thresh = (int)(ml / 3 + 1);
+    if (thresh < 2) thresh = 2;
+    if (best > thresh) return;
+    s_diag_note(S->diag, loc, 0, "did you mean '%s'?", bestc);
 }
 
 /* ------------------------------------------------------------------ */
