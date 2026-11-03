@@ -487,6 +487,7 @@ static bool builtin_int_from_str(s_vm *vm) {
         i++;
     }
     if (!any) return push(vm, s_val_int(0));
+    if (i != n) return push(vm, s_val_int(0)); /* trailing garbage: not an integer */
     if (neg) {
         if (v > (s_u64)INT64_MAX + 1) {
             vm_trap(vm, "int_from_str overflow");
