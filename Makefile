@@ -13,9 +13,10 @@
 CC      ?= cc
 BUILD   ?= build
 
-WARN     = -Wall -Wextra -Wpedantic -Wconversion -Wshadow
+ WARN     = -Wall -Wextra -Wpedantic -Wconversion -Wshadow
 # -MMD -MP generates header dependency files for reliable incremental rebuilds.
-BASE     = -std=c17 -Iinclude -MMD -MP
+# -fstack-protector-strong and -D_FORTIFY_SOURCE=2 are default build-time defenses.
+BASE     = -std=c17 -Iinclude -MMD -MP -fstack-protector-strong -D_FORTIFY_SOURCE=2
 CFLAGS  ?= $(BASE) -g -O0 $(WARN) -Werror
 LDFLAGS ?=
 
