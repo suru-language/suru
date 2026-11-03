@@ -20,6 +20,7 @@ typedef struct s_source_loc {
 typedef enum s_diag_sev {
     S_DIAG_WARN = 0,
     S_DIAG_ERROR = 1,
+    S_DIAG_NOTE = 2,
 } s_diag_sev;
 
 /* A single diagnostic. */
@@ -55,6 +56,11 @@ void s_diag_report(s_diag_ctx *ctx, s_diag_sev sev,
 void s_diag_warn(s_diag_ctx *ctx, s_source_loc loc, int code, const char *fmt, ...)
     SU_PRINTF(4, 5);
 void s_diag_error(s_diag_ctx *ctx, s_source_loc loc, int code, const char *fmt, ...)
+    SU_PRINTF(4, 5);
+
+/* A secondary diagnostic attached to a primary one. Notes never count as
+ * errors and are printed with a `note:` label. */
+void s_diag_note(s_diag_ctx *ctx, s_source_loc loc, int code, const char *fmt, ...)
     SU_PRINTF(4, 5);
 
 bool s_diag_has_errors(const s_diag_ctx *ctx);

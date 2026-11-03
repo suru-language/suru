@@ -85,6 +85,14 @@ void s_diag_error(s_diag_ctx *ctx, s_source_loc loc, int code,
     va_end(ap);
 }
 
+void s_diag_note(s_diag_ctx *ctx, s_source_loc loc, int code,
+                 const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    diag_vreport(ctx, S_DIAG_NOTE, loc, code, fmt, ap);
+    va_end(ap);
+}
+
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
@@ -153,9 +161,10 @@ void s_diag_print(const s_diag_ctx *ctx) {
         } else {
             fprintf(stderr, "suru: ");
         }
-        fprintf(stderr, "%s[%d]: %s\n",
-                d->sev == S_DIAG_ERROR ? "error" : "warning",
-                d->code, d->msg);
+        const char *sevstr =
+            d->sev == S_DIAG_ERROR ? "error" :
+            d->sev == S_DIAG_WARN ? "warning" : "note";
+        fprintf(stderr, "%s[%d]: %s\n", sevstr, d->code, d->msg);
         print_snippet(ctx, d);
     }
 }
