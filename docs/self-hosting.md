@@ -150,3 +150,7 @@ operations as the bridge to native instruction-index emission.
 Its second pass removes symbolic labels and emits numeric instruction indices;
 normal completion, handled exceptions, and `give` paths converge on the
 cleanup label before the final return label.
+The same emitter now lowers integer, Boolean, string, and `none` literals,
+local bindings and assignment, arithmetic/comparison expressions, `show`, and
+`give` to concrete constant-pool and VM instruction records. Handler variables
+are stored in local slots before the handler body runs.
