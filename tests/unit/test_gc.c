@@ -89,6 +89,41 @@ static void test_alloc_fail_after(void) {
     s_heap_destroy(h);
 }
 
+static void test_incremental_step(void) {
+    s_heap *h = s_heap_create();
+    s_value st[1];
+    s_gcobj *kept = s_heap_new_str(h, "keep", 4);
+    st[0] = s_val_obj(kept);
+    s_heap_set_stack_root(h, st, 1);
+    /* garbage allocated between marking steps */
+    for (int i = 0; i < 40; i++) (void)s_heap_new_str(h, "g", 1);
+    /* run marking incrementally with a small budget, then sweep */
+    int pending = 1;
+    while ((pending = (int)s_heap_collect_step(h, 3)) > 0) { }
+    CHECK_EQ_INT(pending, 0);
+    s_heap_collect(h);
+    CHECK_EQ_INT((int)s_heap_live_objects(h), 1);
+    CHECK(memcmp(s_obj_str_data(kept), "keep", 4) == 0);
+    s_heap_destroy(h);
+}
+
+static void test_incremental_graph(void) {
+    s_heap *h = s_heap_create();
+    s_gcobj *a = s_heap_new_record(h, 1);
+    s_gcobj *b = s_heap_new_record(h, 1);
+    s_obj_record_fields(a)[0] = s_val_obj(b);
+    s_value st[1];
+    st[0] = s_val_obj(a);
+    s_heap_set_stack_root(h, st, 1);
+    for (int i = 0; i < 25; i++) (void)s_heap_new_str(h, "junk", 4);
+    /* incremental marking with tiny budgets must keep the whole graph */
+    while (s_heap_collect_step(h, 2) > 0) { /* keep stepping */ }
+    s_heap_collect(h);
+    CHECK_EQ_INT((int)s_heap_live_objects(h), 2);
+    CHECK(s_obj_record_fields(a)[0].u.o == b);
+    s_heap_destroy(h);
+}
+
 TEST_MAIN_BEGIN()
     test_alloc_free();
     test_collect_garbage();
@@ -96,4 +131,6 @@ TEST_MAIN_BEGIN()
     test_stack_root();
     test_allocation_failure();
     test_alloc_fail_after();
+    test_incremental_step();
+    test_incremental_graph();
 TEST_MAIN_END()
