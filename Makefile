@@ -93,7 +93,7 @@ integration-incremental: $(BINDIR)/suru
 test: unit integration selfhost-test
 
 .PHONY: selfhost-check
-selfhost-check: $(BINDIR)/suru
+selfhost-check: $(BINDIR)/suru $(SELFHOST_SRC) $(SELFHOST_DRIVER)
 	@echo "check $(SELFHOST_DRIVER)"; \
 	$(BINDIR)/suru check "$(SELFHOST_DRIVER)" >/dev/null
 
