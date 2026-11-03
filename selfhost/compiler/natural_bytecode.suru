@@ -67,6 +67,11 @@ func nbc_const(instructions: [str], kind: str, op: str, value: str) -> [str] {
     return nbc_emit(result, op, to_str(index));
 }
 
+func nbc_intern(instructions: [str], kind: str, value: str) -> [str] {
+    if nbc_pool_index(instructions, kind, value) >= 0 { return instructions; }
+    return array_concat(instructions, ["#" + kind + "|" + value]);
+}
+
 func nbc_slot(instructions: [str], name: str) -> int {
     let wanted: str = "#slot|" + name + "|";
     mut i: int = 0;
@@ -233,6 +238,23 @@ func nbc_expression_statement(instructions: [str], line: str) -> [str] {
     return nbc_emit_expression(result, line);
 }
 
+func nbc_next_handler_type(lines: [str], start: int) -> str {
+    mut i: int = start;
+    while i < array_len(lines) {
+        let candidate: str = str_trim(lines[i]);
+        if nbc_word(candidate) == "handle" {
+            let rest: str = nbc_after(candidate, "handle");
+            let colon: int = nbc_find(rest, ":");
+            if colon >= 0 {
+                return str_trim(substr(rest, colon + 1, str_len(rest)));
+            }
+        }
+        if candidate == "end attempt" { return ""; }
+        i += 1;
+    }
+    return "";
+}
+
 func nbc_label(instructions: [str], name: str) -> [str] {
     return array_concat(instructions, ["@" + name]);
 }
@@ -358,7 +380,14 @@ func natural_emit_bytecode(source: str) -> int {
             labels += 1;
             // handler|cleanup|finish|phase (0=body, 1=handler, 2=cleanup)
             attempts = array_concat(attempts, [handler + "|" + cleanup + "|" + finish + "|0"]);
-            instructions = nbc_emit(instructions, "BC_PUSH_HANDLER", "@" + handler + "|*");
+            let handler_type: str = nbc_next_handler_type(lines, i);
+            mut handler_operand: str = "4294967295";
+            if handler_type != "" {
+                instructions = nbc_intern(instructions, "str", handler_type);
+                handler_operand = to_str(nbc_pool_index(instructions, "str", handler_type));
+            }
+            instructions = nbc_emit(instructions, "BC_PUSH_HANDLER",
+                                    "@" + handler + "|" + handler_operand);
             continue;
         }
         if nbc_word(line) == "handle" {
