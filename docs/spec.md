@@ -197,6 +197,17 @@ let p = Pair { right = 4, left = 3 };   // same as Pair(3, 4)
 
 All fields must be present exactly once.
 
+A function whose first parameter type is a record can be called in **method**
+syntax: `obj.method(a, b)` desugars to `method(obj, a, b)`. The method name
+must name such a function, and the named is evaluated once. If the name names a
+record field instead, the field is called (so a field holding a closure may be
+invoked with the same syntax):
+
+```
+func translate(p: Point, dx: int) -> Point { ... }
+let q = p.translate(1);      // same as translate(p, 1)
+```
+
 ## 4. Type Ascription
 
 The binding operator `:` ascribes a type:

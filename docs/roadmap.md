@@ -20,8 +20,12 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 
 - [x] Closures with full capture and higher-order functions.
 - [x] `for` loops over arrays with bounds guarantees.
-- Records with methods (via module-associated functions). Module-associated
-  functions are supported; a `obj.method()` call syntax is not yet implemented.
+- [x] Records with methods: `obj.method(args)` desugars to a call to a module
+  function whose first parameter type matches the record type (receiver
+  prepended). Also fixed a pre-existing bug where record values could not
+  cross function boundaries (function return/parameter record types never had
+  their `record_index` resolved), which broke returning records and field
+  access on their results.
 - [x] Error reporting improvements: multi-line snippets, notes (secondary
   diagnostics with their own caret), and suggestions (did-you-mean) for
   misspelled names.
