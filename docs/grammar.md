@@ -30,6 +30,7 @@ escape        = "\\" ("n" | "t" | "r" | "0" | "\\" | '"' | "'" | "u" hex_digit{4
 keyword       = "break" | "continue" | "const" | "else" | "false" | "for"
               | "func" | "if" | "in" | "let" | "mut" | "none" | "return"
               | "true" | "type" | "use" | "while" | "new" | "as"
+              | "enum" | "do" | "and" | "or" | "not"
 ```
 
 ## 2. Program structure
@@ -55,7 +56,8 @@ block         = "{" { statement } "}"
 
 ```
 statement     = let_stmt | expr_stmt | return_stmt | if_stmt
-              | while_stmt | for_stmt | break_stmt | continue_stmt | block
+              | while_stmt | do_stmt | for_stmt | break_stmt | continue_stmt
+              | block
 let_stmt      = ("let" | "mut") identifier [ ":" type ] "=" expression ";"
 expr_stmt     = expression ";"
 return_stmt   = "return" [ expression ] ";"

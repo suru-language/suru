@@ -432,10 +432,16 @@ bool s_lexer_next(s_lexer *lx, s_token *out) {
     if (is_alpha(c)) {
         s_size start = lx->pos;
         while (is_alnum(cur(lx))) advance(lx);
-        out->kind = keyword_kind(lx->src + start, lx->pos - start);
+        const char *text = lx->src + start;
+        s_size len = lx->pos - start;
+        if (len >= 2 && text[0] == '_' && text[1] == '_') {
+            return lex_error(lx, out->loc, 111,
+                             "identifiers may not begin with '__'");
+        }
+        out->kind = keyword_kind(text, len);
         if (out->kind == S_TOK_IDENT) {
-            out->v.s.text = lx->src + start;
-            out->v.s.len = lx->pos - start;
+            out->v.s.text = text;
+            out->v.s.len = len;
         }
         return true;
     }

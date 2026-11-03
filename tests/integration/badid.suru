@@ -1,0 +1,5 @@
+func main() -> int {
+    let __x = 5;
+    println(__x);
+    return 0;
+}

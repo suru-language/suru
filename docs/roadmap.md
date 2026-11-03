@@ -46,7 +46,8 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 
 - Package/module system (`use` for user modules).
 - Standard library expansion: file I/O (read_file/write_file/file_exists),
-  formatted output (int_to_str_base/str_pad), collections.
+  formatted output (int_to_str_base/str_pad), collections
+  (array_concat/array_contains/array_index_of/array_sort).
 - Grammar and spec stabilization (freeze for 1.0).
 
 ## 1.0.0 — stable

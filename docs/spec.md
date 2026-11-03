@@ -60,9 +60,9 @@ digit      = "0".."9"
 The following words are reserved and may not be used as identifiers:
 
 ```
-and    break  continue  else  false  for  func
-if     in     let      mut   none   not  or
-return true   type     use   while  new  as
+and    break  continue  do  else  enum  false  for  func
+if     in     let      mut  none  not   or     return  true
+type   use    while    new  as
 ```
 
 ### 2.4 Literals
@@ -366,6 +366,12 @@ The standard library provides a small set of builtin functions (see
 - `str_pad(s: str, width: int, fill: str) -> str` — right-pad `s` to at
   least `width` bytes using the first character of `fill`; unchanged if `s`
   is already `width` bytes or longer.
+- `array_concat(a: [T], b: [T]) -> [T]` — a new array with `a` followed by
+  `b` (any element type).
+- `array_contains(a: [int], v: int) -> bool` — whether `v` appears in `a`.
+- `array_index_of(a: [int], v: int) -> int` — the index of the first `v`
+  in `a`, or `-1` if absent.
+- `array_sort(a: [int]) -> [int]` — a new ascending-sorted copy of `a`.
 - `make_array(n: int) -> [int]` — a zero-filled array of `n` elements.
 - `range(lo: int, hi: int) -> [int]` — the integers `lo .. hi-1`.
 - `range_step(lo: int, hi: int, step: int) -> [int]` — like `range`,
