@@ -54,6 +54,9 @@ typedef enum s_builtin_id {
     S_BUILTIN_ARRAY_SUM,
     S_BUILTIN_ARRAY_MIN,
     S_BUILTIN_ARRAY_MAX,
+    S_BUILTIN_READ_FILE,
+    S_BUILTIN_WRITE_FILE,
+    S_BUILTIN_FILE_EXISTS,
     S_BUILTIN_COUNT
 } s_builtin_id;
 

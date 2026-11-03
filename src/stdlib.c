@@ -85,6 +85,12 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "array_min", 1, { S_SIG_ARRAY_INT }, S_SIG_INT },
     [S_BUILTIN_ARRAY_MAX] = {
         "array_max", 1, { S_SIG_ARRAY_INT }, S_SIG_INT },
+    [S_BUILTIN_READ_FILE] = {
+        "read_file", 1, { S_SIG_STR }, S_SIG_STR },
+    [S_BUILTIN_WRITE_FILE] = {
+        "write_file", 2, { S_SIG_STR, S_SIG_STR }, S_SIG_UNIT },
+    [S_BUILTIN_FILE_EXISTS] = {
+        "file_exists", 1, { S_SIG_STR }, S_SIG_BOOL },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {
