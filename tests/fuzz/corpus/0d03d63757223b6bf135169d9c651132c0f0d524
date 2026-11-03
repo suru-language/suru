@@ -1,0 +1,5 @@
+type Pair { let left: int; let right: int; }
+func main() {
+    let p = P = p.left + p.raght;
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~println();
+}

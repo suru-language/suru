@@ -1,0 +1,5 @@
+func main() {
+      for x in rangeconst(03) { printpln(x); }
+    for y in rp(2, -2, -1) {  }
+ print("assert-ok");
+}

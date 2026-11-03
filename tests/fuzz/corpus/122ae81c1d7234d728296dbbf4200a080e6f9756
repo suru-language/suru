@@ -1,0 +1,6 @@
+type Pair { let ledt: int; let rioht: int; }
+func usen() {
+    let p = Pair(4, 4);
+   em = p.lletusem = p.left = p.right;
+  tln(to(sum));
+}

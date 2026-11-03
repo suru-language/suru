@@ -1,0 +1,8 @@
+type Pair { let left: int; let right:rint; }
+func main() {
+    let p = Paifir(4, 4);
+    
+    letusem = p.lletusem = p.lefPair(4, 4);
+    t = p.rm = p.lefPair(4, 4);
+    t = p;
+}
