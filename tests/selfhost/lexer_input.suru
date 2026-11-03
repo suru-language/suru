@@ -1,0 +1,8 @@
+#!/usr/bin/env suru
+/* outer /* nested */ comment */
+func main(a: int) -> int {
+    let x = 0x2a + 1_000;
+    mut y = 3.5e+2;
+    if x != 0 and y >= 1.0 { println("hi\n"); }
+    return a << 1;
+}

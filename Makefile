@@ -48,6 +48,9 @@ LIBSRC = \
 
 LIBOBJ = $(LIBSRC:src/%.c=$(OBJDIR)/%.o)
 UNIT_SRC = $(wildcard tests/unit/test_*.c)
+SELFHOST_SRC = $(wildcard selfhost/compiler/*.suru)
+SELFHOST_DRIVER = tests/selfhost/lexer_driver.suru
+SELFHOST_REF = $(UNITDIR)/selfhost_reference_lexer
 
 all: $(BINDIR)/suru
 
@@ -87,7 +90,21 @@ integration-incremental: $(BINDIR)/suru
 	@SURU_GC_INCREMENTAL=1 tests/integration/run.sh $(BINDIR)/suru
 
 .PHONY: test
-test: unit integration
+test: unit integration selfhost-test
+
+.PHONY: selfhost-check
+selfhost-check: $(BINDIR)/suru
+	@for s in $(SELFHOST_SRC) $(SELFHOST_DRIVER); do \
+		echo "check $$s"; \
+		$(BINDIR)/suru check "$$s" >/dev/null || exit 1; \
+	done
+
+$(SELFHOST_REF): tests/selfhost/reference_lexer.c $(LIBOBJ) | $(UNITDIR)
+	$(CC) $(CFLAGS) -Itests/unit $< $(LIBOBJ) $(LDFLAGS) -o $@
+
+.PHONY: selfhost-test
+selfhost-test: selfhost-check $(SELFHOST_REF)
+	@tests/selfhost/run.sh $(BINDIR)/suru $(SELFHOST_REF)
 
 .PHONY: fuzz
 fuzz: $(BINDIR)/suru | $(UNITDIR)

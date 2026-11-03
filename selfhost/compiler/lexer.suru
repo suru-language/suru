@@ -1,0 +1,349 @@
+// Transitional Stage-1 lexer. It mirrors the legacy bootstrap lexer until
+// Document A 2.0 freezes the Natural Syntax Edition.
+
+const K_EOF = 0;
+const K_IDENT = 1;
+const K_INT = 2;
+const K_FLOAT = 3;
+const K_STR = 4;
+const K_TRUE = 5;
+const K_FALSE = 6;
+const K_NONE = 7;
+const K_BREAK = 8;
+const K_CONTINUE = 9;
+const K_ELSE = 10;
+const K_FOR = 11;
+const K_FUNC = 12;
+const K_IF = 13;
+const K_IN = 14;
+const K_LET = 15;
+const K_MUT = 16;
+const K_RETURN = 17;
+const K_TYPE = 18;
+const K_USE = 19;
+const K_WHILE = 20;
+const K_NEW = 21;
+const K_AS = 22;
+const K_CONST = 23;
+const K_ENUM = 24;
+const K_DO = 25;
+const K_LPAREN = 26;
+const K_RPAREN = 27;
+const K_LBRACE = 28;
+const K_RBRACE = 29;
+const K_LBRACKET = 30;
+const K_RBRACKET = 31;
+const K_COMMA = 32;
+const K_SEMI = 33;
+const K_DOT = 34;
+const K_COLON = 35;
+const K_ARROW = 36;
+const K_QUESTION = 37;
+const K_ASSIGN = 38;
+const K_PLUS = 39;
+const K_MINUS = 40;
+const K_STAR = 41;
+const K_SLASH = 42;
+const K_PERCENT = 43;
+const K_AMP = 44;
+const K_PIPE = 45;
+const K_CARET = 46;
+const K_SHL = 47;
+const K_SHR = 48;
+const K_TILDE = 49;
+const K_EQ = 50;
+const K_NE = 51;
+const K_LT = 52;
+const K_LE = 53;
+const K_GT = 54;
+const K_GE = 55;
+const K_AND = 56;
+const K_OR = 57;
+const K_NOT = 58;
+const K_PLUS_ASSIGN = 59;
+const K_MINUS_ASSIGN = 60;
+const K_STAR_ASSIGN = 61;
+const K_SLASH_ASSIGN = 62;
+
+func is_digit(c: str) -> bool {
+    return str_contains("0123456789", c);
+}
+
+func is_hex_digit(c: str) -> bool {
+    return str_contains("0123456789abcdefABCDEF", c);
+}
+
+func is_ident_start(c: str) -> bool {
+    return str_contains("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_", c);
+}
+
+func is_ident_continue(c: str) -> bool {
+    return is_ident_start(c) or is_digit(c);
+}
+
+func valid_escape(c: str) -> bool {
+    return str_contains("ntr0\\\"'", c) or c == "u";
+}
+
+func keyword_kind(word: str) -> int {
+    if word == "break" { return K_BREAK; }
+    if word == "continue" { return K_CONTINUE; }
+    if word == "else" { return K_ELSE; }
+    if word == "for" { return K_FOR; }
+    if word == "func" or word == "fn" { return K_FUNC; }
+    if word == "if" { return K_IF; }
+    if word == "in" { return K_IN; }
+    if word == "let" { return K_LET; }
+    if word == "mut" { return K_MUT; }
+    if word == "return" { return K_RETURN; }
+    if word == "type" { return K_TYPE; }
+    if word == "use" { return K_USE; }
+    if word == "while" { return K_WHILE; }
+    if word == "new" { return K_NEW; }
+    if word == "as" { return K_AS; }
+    if word == "const" { return K_CONST; }
+    if word == "enum" { return K_ENUM; }
+    if word == "do" { return K_DO; }
+    if word == "and" { return K_AND; }
+    if word == "or" { return K_OR; }
+    if word == "not" { return K_NOT; }
+    if word == "true" { return K_TRUE; }
+    if word == "false" { return K_FALSE; }
+    if word == "none" { return K_NONE; }
+    return K_IDENT;
+}
+
+func line_at(source: str, position: int) -> int {
+    mut line: int = 1;
+    let i: int = 0;
+    while i < position {
+        if source[i] == "\n" { line += 1; }
+        i += 1;
+    }
+    return line;
+}
+
+func column_at(source: str, position: int) -> int {
+    mut column: int = 1;
+    mut i: int = position;
+    while i > 0 {
+        i -= 1;
+        if source[i] == "\n" { return column; }
+        column += 1;
+    }
+    return column;
+}
+
+func emit(kind: int, source: str, start: int, finish: int) {
+    let line: int = line_at(source, start);
+    let column: int = column_at(source, start);
+    // The reference comparison intentionally uses token identity and source
+    // location first. Literal decoding is tested separately.
+    println(to_str(kind) + "|" + to_str(line) + "|" + to_str(column));
+}
+
+func emit_error(source: str, position: int) {
+    let line: int = line_at(source, position);
+    let column: int = column_at(source, position);
+    println("error|" + to_str(line) + "|" + to_str(column));
+}
+
+func lex_dump(source: str) {
+    let n: int = str_len(source);
+    mut i: int = 0;
+
+    // The C lexer ignores a first-line shebang before ordinary trivia.
+    if n >= 2 and source[0] == "#" and source[1] == "!" {
+        while i < n and source[i] != "\n" { i += 1; }
+    }
+
+    while i < n {
+        // Whitespace and comments are trivia. Block comments nest.
+        while i < n {
+            if source[i] == " " or source[i] == "\t" or
+               source[i] == "\n" or source[i] == "\r" {
+                i += 1;
+            } else if i + 1 < n and source[i] == "/" and source[i + 1] == "/" {
+                i += 2;
+                while i < n and source[i] != "\n" { i += 1; }
+            } else if i + 1 < n and source[i] == "/" and source[i + 1] == "*" {
+                mut depth: int = 1;
+                i += 2;
+                while i < n and depth > 0 {
+                    if i + 1 < n and source[i] == "/" and source[i + 1] == "*" {
+                        depth += 1;
+                        i += 2;
+                    } else if i + 1 < n and source[i] == "*" and source[i + 1] == "/" {
+                        depth -= 1;
+                        i += 2;
+                    } else {
+                        i += 1;
+                    }
+                }
+                if depth > 0 {
+                    emit_error(source, i);
+                    return;
+                }
+            } else {
+                break;
+            }
+        }
+        if i >= n { break; }
+
+        let start: int = i;
+        let c: str = source[i];
+        if is_ident_start(c) {
+            i += 1;
+            while i < n and is_ident_continue(source[i]) { i += 1; }
+            let word: str = substr(source, start, i - start);
+            if str_len(word) >= 2 and word[0] == "_" and word[1] == "_" {
+                emit_error(source, start);
+                return;
+            }
+            emit(keyword_kind(word), source, start, i);
+            continue;
+        }
+
+        if is_digit(c) {
+            mut kind: int = K_INT;
+            if c == "0" and i + 1 < n and
+               (source[i + 1] == "x" or source[i + 1] == "X") {
+                i += 2;
+                let digits: int = i;
+                while i < n and (is_hex_digit(source[i]) or source[i] == "_") { i += 1; }
+                if i == digits { emit_error(source, start); return; }
+            } else if c == "0" and i + 1 < n and
+                      (source[i + 1] == "b" or source[i + 1] == "B") {
+                i += 2;
+                let digits: int = i;
+                while i < n and (source[i] == "0" or source[i] == "1" or source[i] == "_") { i += 1; }
+                if i == digits { emit_error(source, start); return; }
+            } else {
+                while i < n and (is_digit(source[i]) or source[i] == "_") { i += 1; }
+                if i + 1 < n and source[i] == "." and is_digit(source[i + 1]) {
+                    kind = K_FLOAT;
+                    i += 1;
+                    while i < n and (is_digit(source[i]) or source[i] == "_") { i += 1; }
+                }
+                if i < n and (source[i] == "e" or source[i] == "E") {
+                    let exponent: int = i;
+                    i += 1;
+                    if i < n and (source[i] == "+" or source[i] == "-") { i += 1; }
+                    if i < n and is_digit(source[i]) {
+                        kind = K_FLOAT;
+                        while i < n and (is_digit(source[i]) or source[i] == "_") { i += 1; }
+                    } else {
+                        i = exponent;
+                    }
+                }
+            }
+            emit(kind, source, start, i);
+            continue;
+        }
+
+        if c == "\"" {
+            i += 1;
+            while i < n and source[i] != "\"" {
+                if source[i] == "\n" {
+                    emit_error(source, start);
+                    return;
+                }
+                if source[i] == "\\" {
+                    if i + 1 >= n or not valid_escape(source[i + 1]) {
+                        emit_error(source, start);
+                        return;
+                    }
+                    if source[i + 1] == "u" {
+                        if i + 5 >= n { emit_error(source, start); return; }
+                        mut h: int = 0;
+                        while h < 4 {
+                            if not is_hex_digit(source[i + 2 + h]) { emit_error(source, start); return; }
+                            h += 1;
+                        }
+                        i += 6;
+                    } else {
+                        i += 2;
+                    }
+                } else {
+                    i += 1;
+                }
+            }
+            if i >= n { emit_error(source, start); return; }
+            i += 1;
+            emit(K_STR, source, start, i);
+            continue;
+        }
+
+        if c == "(" { i += 1; emit(K_LPAREN, source, start, i); continue; }
+        if c == ")" { i += 1; emit(K_RPAREN, source, start, i); continue; }
+        if c == "{" { i += 1; emit(K_LBRACE, source, start, i); continue; }
+        if c == "}" { i += 1; emit(K_RBRACE, source, start, i); continue; }
+        if c == "[" { i += 1; emit(K_LBRACKET, source, start, i); continue; }
+        if c == "]" { i += 1; emit(K_RBRACKET, source, start, i); continue; }
+        if c == "," { i += 1; emit(K_COMMA, source, start, i); continue; }
+        if c == ";" { i += 1; emit(K_SEMI, source, start, i); continue; }
+        if c == "." { i += 1; emit(K_DOT, source, start, i); continue; }
+        if c == ":" { i += 1; emit(K_COLON, source, start, i); continue; }
+        if c == "?" { i += 1; emit(K_QUESTION, source, start, i); continue; }
+        if c == "&" { i += 1; emit(K_AMP, source, start, i); continue; }
+        if c == "|" { i += 1; emit(K_PIPE, source, start, i); continue; }
+        if c == "^" { i += 1; emit(K_CARET, source, start, i); continue; }
+        if c == "~" { i += 1; emit(K_TILDE, source, start, i); continue; }
+        if c == "+" {
+            i += 1;
+            if i < n and source[i] == "=" { i += 1; emit(K_PLUS_ASSIGN, source, start, i); }
+            else { emit(K_PLUS, source, start, i); }
+            continue;
+        }
+        if c == "-" {
+            i += 1;
+            if i < n and source[i] == ">" { i += 1; emit(K_ARROW, source, start, i); }
+            else if i < n and source[i] == "=" { i += 1; emit(K_MINUS_ASSIGN, source, start, i); }
+            else { emit(K_MINUS, source, start, i); }
+            continue;
+        }
+        if c == "*" {
+            i += 1;
+            if i < n and source[i] == "=" { i += 1; emit(K_STAR_ASSIGN, source, start, i); }
+            else { emit(K_STAR, source, start, i); }
+            continue;
+        }
+        if c == "/" {
+            i += 1;
+            if i < n and source[i] == "=" { i += 1; emit(K_SLASH_ASSIGN, source, start, i); }
+            else { emit(K_SLASH, source, start, i); }
+            continue;
+        }
+        if c == "%" { i += 1; emit(K_PERCENT, source, start, i); continue; }
+        if c == "=" {
+            i += 1;
+            if i < n and source[i] == "=" { i += 1; emit(K_EQ, source, start, i); }
+            else { emit(K_ASSIGN, source, start, i); }
+            continue;
+        }
+        if c == "!" {
+            i += 1;
+            if i < n and source[i] == "=" { i += 1; emit(K_NE, source, start, i); continue; }
+            emit_error(source, start);
+            return;
+        }
+        if c == "<" {
+            i += 1;
+            if i < n and source[i] == "<" { i += 1; emit(K_SHL, source, start, i); }
+            else if i < n and source[i] == "=" { i += 1; emit(K_LE, source, start, i); }
+            else { emit(K_LT, source, start, i); }
+            continue;
+        }
+        if c == ">" {
+            i += 1;
+            if i < n and source[i] == ">" { i += 1; emit(K_SHR, source, start, i); }
+            else if i < n and source[i] == "=" { i += 1; emit(K_GE, source, start, i); }
+            else { emit(K_GT, source, start, i); }
+            continue;
+        }
+
+        emit_error(source, start);
+        return;
+    }
+    emit(K_EOF, source, n, n);
+}
