@@ -836,6 +836,23 @@ static s_type *check_expr(s_sema *S, s_expr *e) {
             }
             s_diag_error(S->diag, e->loc, 431,
                          "unknown variable '%s'", e->u.var.name);
+            {
+                int best = INT_MAX;
+                const char *bestc = NULL;
+                for (s_scope *sc = S->scope; sc; sc = sc->parent)
+                    for (s_size k = 0; k < sc->count; ++k)
+                        update_suggestion(e->u.var.name, sc->syms[k].name,
+                                          &best, &bestc);
+                for (s_size ci = 0; ci < S->mod->nconsts; ++ci)
+                    update_suggestion(e->u.var.name,
+                                      S->mod->consts[ci].name,
+                                      &best, &bestc);
+                for (s_size k = 0; k < S->mod->nfuncs; ++k)
+                    update_suggestion(e->u.var.name,
+                                      S->mod->funcs[k].name,
+                                      &best, &bestc);
+                maybe_note_suggestion(S, e->loc, e->u.var.name, best, bestc);
+            }
             t = type_unit(S);
             break;
         }
@@ -1112,6 +1129,14 @@ static bool eval_expr_const(s_sema *S, s_expr *e, s_const_decl *out) {
         s_diag_error(S->diag, e->loc, 480,
                      "unknown or forward-referenced constant '%s'",
                      e->u.var.name);
+        {
+            int best = INT_MAX;
+            const char *bestc = NULL;
+            for (s_size i = 0; i < S->mod->nconsts; ++i)
+                update_suggestion(e->u.var.name, S->mod->consts[i].name,
+                                  &best, &bestc);
+            maybe_note_suggestion(S, e->loc, e->u.var.name, best, bestc);
+        }
         return false;
     }
     case S_EXPR_UNARY: {
