@@ -56,7 +56,8 @@ SELFHOST_DRIVERS = tests/selfhost/lexer_driver.suru \
 	tests/selfhost/natural_token_driver.suru \
 	tests/selfhost/natural_expression_driver.suru \
 	tests/selfhost/natural_ast_driver.suru \
-	tests/selfhost/natural_control_driver.suru
+	tests/selfhost/natural_control_driver.suru \
+	tests/selfhost/natural_semantic_driver.suru
 SELFHOST_REF = $(UNITDIR)/selfhost_reference_lexer
 
 all: $(BINDIR)/suru
@@ -116,6 +117,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_expression_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_ast_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_control_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_semantic_run.sh $(BINDIR)/suru
 
 .PHONY: fuzz
 fuzz: $(BINDIR)/suru | $(UNITDIR)

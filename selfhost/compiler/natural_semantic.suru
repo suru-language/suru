@@ -1,0 +1,280 @@
+// Initial Natural Syntax semantic/type pass.
+// Symbols are kept in parallel arrays until the full typed AST is available.
+
+use "natural_statement_parser.suru";
+
+func nss_lookup(names: [str], types: [str], name: str) -> str {
+    mut i: int = 0;
+    while i < array_len(names) {
+        if names[i] == name { return types[i]; }
+        i += 1;
+    }
+    return "";
+}
+
+func nss_mutable(names: [str], mutable: [bool], name: str) -> bool {
+    mut i: int = 0;
+    while i < array_len(names) {
+        if names[i] == name { return mutable[i]; }
+        i += 1;
+    }
+    return false;
+}
+
+func nss_has(names: [str], name: str) -> bool {
+    mut i: int = 0;
+    while i < array_len(names) {
+        if names[i] == name { return true; }
+        i += 1;
+    }
+    return false;
+}
+
+func nss_outer_wrapped(expression: str) -> bool {
+    if str_len(expression) < 2 or expression[0] != "(" {
+        return false;
+    }
+    mut depth: int = 0;
+    mut i: int = 0;
+    while i < str_len(expression) {
+        if expression[i] == "(" { depth += 1; }
+        if expression[i] == ")" {
+            depth -= 1;
+            if depth == 0 and i != str_len(expression) - 1 { return false; }
+        }
+        i += 1;
+    }
+    return depth == 0;
+}
+
+func nss_find_top(expression: str, needle: str) -> int {
+    mut depth: int = 0;
+    mut i: int = 0;
+    while i + str_len(needle) <= str_len(expression) {
+        if expression[i] == "(" { depth += 1; }
+        if expression[i] == ")" { depth -= 1; }
+        if depth == 0 and substr(expression, i, str_len(needle)) == needle {
+            return i;
+        }
+        i += 1;
+    }
+    return -1;
+}
+
+func nss_split(expression: str) -> [str] {
+    let wrapped: bool = nss_outer_wrapped(expression);
+    mut inner: str = expression;
+    if wrapped { inner = substr(expression, 1, str_len(expression) - 2); }
+
+    let words: [str] = [" or ", " and "];
+    mut w: int = 0;
+    while w < array_len(words) {
+        let at: int = nss_find_top(inner, words[w]);
+        if at >= 0 {
+            return ["binary", words[w], str_trim(substr(inner, 0, at)),
+                    str_trim(substr(inner, at + str_len(words[w]), str_len(inner)))];
+        }
+        w += 1;
+    }
+    let operators: [str] = [" == ", " != ", " <= ", " >= ", " < ", " > ",
+                             " << ", " >> ", " + ", " - ", " * ", " / ",
+                             " % ", " | ", " ^ ", " & "];
+    mut i: int = 0;
+    while i < array_len(operators) {
+        let at: int = nss_find_top(inner, operators[i]);
+        if at >= 0 {
+            return ["binary", str_trim(operators[i]), str_trim(substr(inner, 0, at)),
+                    str_trim(substr(inner, at + str_len(operators[i]), str_len(inner)))];
+        }
+        i += 1;
+    }
+    if str_len(inner) >= 2 and inner[0] == "-" and inner[1] == " " {
+        return ["unary", "-", str_trim(substr(inner, 2, str_len(inner)))];
+    }
+    if str_len(inner) >= 4 and substr(inner, 0, 4) == "not " {
+        return ["unary", "not", str_trim(substr(inner, 4, str_len(inner)))];
+    }
+    if str_len(inner) >= 2 and inner[0] == "~" and inner[1] == " " {
+        return ["unary", "~", str_trim(substr(inner, 2, str_len(inner)))];
+    }
+    return ["atom", inner];
+}
+
+func nss_expr_type(expression: str, names: [str], types: [str]) -> [str] {
+    let parts: [str] = nss_split(expression);
+    if parts[0] == "unary" {
+        let operand: [str] = nss_expr_type(parts[2], names, types);
+        if operand[0] == "error" { return operand; }
+        if parts[1] == "not" {
+            if operand[1] != "Bool" { return ["error", "not requires Bool"]; }
+            return ["ok", "Bool"];
+        }
+        if parts[1] == "~" {
+            if operand[1] != "Whole" { return ["error", "~ requires Whole"]; }
+            return ["ok", "Whole"];
+        }
+        if operand[1] != "Whole" and operand[1] != "Real" {
+            return ["error", "unary '-' requires a numeric value"];
+        }
+        return ["ok", operand[1]];
+    }
+    if parts[0] == "binary" {
+        let left: [str] = nss_expr_type(parts[2], names, types);
+        let right: [str] = nss_expr_type(parts[3], names, types);
+        if left[0] == "error" { return left; }
+        if right[0] == "error" { return right; }
+        let op: str = parts[1];
+        if op == " and " or op == " or " {
+            if left[1] != "Bool" or right[1] != "Bool" {
+                return ["error", "logical operators require Bool operands"];
+            }
+            return ["ok", "Bool"];
+        }
+        if op == "==" or op == "!=" or op == "<" or op == "<=" or
+           op == ">" or op == ">=" {
+            if left[1] != right[1] { return ["error", "comparison types do not match"]; }
+            return ["ok", "Bool"];
+        }
+        if op == "+" and left[1] == "Text" and right[1] == "Text" {
+            return ["ok", "Text"];
+        }
+        if (left[1] != "Whole" and left[1] != "Real") or
+           (right[1] != "Whole" and right[1] != "Real") {
+            return ["error", "arithmetic requires numeric operands"];
+        }
+        if left[1] == "Real" or right[1] == "Real" { return ["ok", "Real"]; }
+        return ["ok", "Whole"];
+    }
+    let atom: str = parts[1];
+    if atom == "true" or atom == "false" { return ["ok", "Bool"]; }
+    if atom == "none" { return ["ok", "None"]; }
+    if str_len(atom) > 0 and atom[0] == "\"" { return ["ok", "Text"]; }
+    if str_contains(atom, ".") or str_contains(atom, "e") or str_contains(atom, "E") {
+        if str_len(atom) > 0 and atom[0] >= "0" and atom[0] <= "9" {
+            return ["ok", "Real"];
+        }
+    }
+    if str_len(atom) > 0 and atom[0] >= "0" and atom[0] <= "9" {
+        return ["ok", "Whole"];
+    }
+    let known: str = nss_lookup(names, types, atom);
+    if known == "" { return ["error", "unknown name '" + atom + "'"]; }
+    return ["ok", known];
+}
+
+func nss_error(line: int, message: str) {
+    println("semantic-error|" + to_str(line) + "|" + message);
+}
+
+func nss_finish(source: str, position: int) -> int {
+    let t = natural_next(source, position);
+    if t.kind == NT_NEWLINE or t.kind == NT_EOF { return t.next; }
+    return -1;
+}
+
+func nss_skip_statement(source: str, position: int) -> int {
+    mut p: int = position;
+    while true {
+        let t = natural_next(source, p);
+        if t.kind == NT_NEWLINE or t.kind == NT_EOF { return t.next; }
+        p = t.next;
+    }
+    return p;
+}
+
+func natural_semantic_check(source: str) -> int {
+    mut names: [str] = [];
+    mut types: [str] = [];
+    mut mutable: [bool] = [];
+    mut position: int = 0;
+    while true {
+        let first = natural_next(source, position);
+        if first.error { nss_error(first.line, "lexical error"); return 1; }
+        if first.kind == NT_EOF { return 0; }
+        if first.kind == NT_NEWLINE { position = first.next; continue; }
+
+        if first.text == "value" or first.text == "change" or first.text == "constant" {
+            let name = natural_next(source, first.next);
+            if name.kind != NT_IDENT { nss_error(first.line, "expected binding name"); return 1; }
+            if nss_has(names, name.text) { nss_error(first.line, "duplicate binding '" + name.text + "'"); return 1; }
+            mut declared: str = "";
+            mut after_name: int = name.next;
+            let colon = natural_next(source, after_name);
+            if colon.text == ":" {
+                let type_name = natural_next(source, colon.next);
+                declared = type_name.text;
+                after_name = type_name.next;
+            }
+            let equals = natural_next(source, after_name);
+            if equals.text != "=" { nss_error(first.line, "binding requires an initializer"); return 1; }
+            let expression = ne_parse_expression(source, equals.next, 0);
+            if ne_is_ok(expression) == false { nss_error(first.line, ne_message(expression)); return 1; }
+            let inferred = nss_expr_type(ne_value(expression), names, types);
+            if inferred[0] == "error" { nss_error(first.line, inferred[1]); return 1; }
+            if declared != "" and declared != inferred[1] {
+                nss_error(first.line, "initializer type " + inferred[1] + " does not match " + declared);
+                return 1;
+            }
+            let final_type: str = declared == "" ? inferred[1] : declared;
+            names = array_concat(names, [name.text]);
+            types = array_concat(types, [final_type]);
+            mutable = array_concat(mutable, [first.text == "change"]);
+            position = nss_finish(source, ne_next(expression));
+            if position < 0 { nss_error(first.line, "expected statement terminator"); return 1; }
+            continue;
+        }
+
+        if first.text == "set" {
+            let target = ne_parse_expression(source, first.next, 0);
+            if ne_is_ok(target) == false { nss_error(first.line, ne_message(target)); return 1; }
+            let target_name: str = ne_value(target);
+            let to_word = natural_next(source, ne_next(target));
+            if to_word.text != "to" { nss_error(first.line, "set requires 'to'"); return 1; }
+            let target_type: str = nss_lookup(names, types, target_name);
+            if target_type == "" { nss_error(first.line, "unknown assignment target '" + target_name + "'"); return 1; }
+            if nss_mutable(names, mutable, target_name) == false {
+                nss_error(first.line, "assignment target is immutable"); return 1;
+            }
+            let expression = ne_parse_expression(source, to_word.next, 0);
+            if ne_is_ok(expression) == false { nss_error(first.line, ne_message(expression)); return 1; }
+            let value_type = nss_expr_type(ne_value(expression), names, types);
+            if value_type[0] == "error" { nss_error(first.line, value_type[1]); return 1; }
+            if value_type[1] != target_type { nss_error(first.line, "assignment type does not match target"); return 1; }
+            position = nss_finish(source, ne_next(expression));
+            if position < 0 { nss_error(first.line, "expected statement terminator"); return 1; }
+            continue;
+        }
+
+        if first.text == "when" or first.text == "repeat" {
+            mut expression_position: int = first.next;
+            if first.text == "repeat" {
+                let while_word = natural_next(source, expression_position);
+                if while_word.text != "while" { nss_error(first.line, "repeat requires 'while'"); return 1; }
+                expression_position = while_word.next;
+            }
+            let expression = ne_parse_expression(source, expression_position, 0);
+            if ne_is_ok(expression) == false { nss_error(first.line, ne_message(expression)); return 1; }
+            let condition = nss_expr_type(ne_value(expression), names, types);
+            if condition[0] == "error" { nss_error(first.line, condition[1]); return 1; }
+            if condition[1] != "Bool" { nss_error(first.line, "condition requires Bool"); return 1; }
+            position = nss_finish(source, ne_next(expression));
+            if position < 0 { nss_error(first.line, "expected statement terminator"); return 1; }
+            continue;
+        }
+
+        if first.text == "end" or first.text == "otherwise" or
+           first.text == "case" or first.text == "each" or
+           first.text == "choose" {
+            position = nss_skip_statement(source, first.next);
+            continue;
+        }
+
+        let statement = nas_statement(source, position);
+        if nas_is_ok(statement) == false {
+            nss_error(first.line, nas_message(statement));
+            return 1;
+        }
+        position = nas_next(statement);
+    }
+    return 0;
+}

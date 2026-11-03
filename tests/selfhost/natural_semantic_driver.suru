@@ -1,0 +1,5 @@
+use "../../selfhost/compiler/natural_semantic.suru";
+
+func main() {
+    exit(natural_semantic_check(source_load(args(0))));
+}
