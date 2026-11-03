@@ -38,7 +38,7 @@ idempotent and recursion is bounded.
 
 ```
 include/suru/      public interfaces (one header per subsystem)
-src/               implementation
+src/               implementation, including the bounded bootstrap I/O layer
 tests/unit/        unit tests (run on the host)
 tests/integration/ end-to-end tests (compile + run SURU programs)
 tests/fuzz/        fuzz harness
@@ -122,6 +122,15 @@ standard library and does not depend on the compiler frontend headers.
 ### 3.11 Managed heap + GC (`mem.h`, `mem.c`, `gc.c`)
 
 See `docs/memory.md`.
+
+### 3.12 Bootstrap I/O (`io.h`, `io.c`)
+
+The compiler-facing file layer reads exact byte buffers with an explicit
+256 MiB limit and writes by retrying short `fwrite` operations. It does not
+use NUL termination for binary payloads; callers that need source text add a
+terminator after the exact byte length has been checked. The VM's language
+file builtins remain a separate runtime interface and are documented in
+`docs/builtins.md`.
 
 ## 4. Ownership and lifetime rules
 

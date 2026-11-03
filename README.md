@@ -3,7 +3,9 @@
 SURU is an independent, statically typed, compiled general-purpose programming
 language implemented from scratch in ISO C17. It has its own syntax, its own
 bytecode, its own verifier, its own virtual machine, and its own runtime with a
-custom managed heap and tracing garbage collector.
+custom managed heap and tracing garbage collector. The C17 implementation is
+the current bootstrap and reference implementation; SURU self-hosting is the
+next development phase.
 
 ## Highlights
 
@@ -42,7 +44,9 @@ cmake --build build-asan
 ctest --test-dir build-asan
 ```
 
-See `docs/architecture.md` for details.
+See `docs/architecture.md` for details. The builtin contract is in
+`docs/builtins.md`; the self-hosting status is in `docs/bootstrap.md` and
+`docs/self-hosting.md`.
 
 ## Usage
 
@@ -80,10 +84,9 @@ constant folding.
 
 ## Status
 
-All 0.1.0 through 0.3.0 roadmap items are implemented and tested: independent
-lexer/parser, semantic analysis (including generics), bytecode compiler with
-optimizer passes, bytecode verifier, stack-based VM, custom managed heap with
-tracing GC (tunable threshold), standard library, CLI, and automated tests
-(unit, integration, fuzz, ASan/UBSan, leak). Remaining roadmap items are host
-portability (Windows/macOS/big-endian) and a fuller package system. See
-`docs/roadmap.md`.
+The legacy bootstrap has a working lexer/parser, semantic analysis (including
+generics), bytecode compiler with optimizer passes, bytecode verifier,
+stack-based VM, managed heap, standard library, CLI, and automated unit and
+integration tests. Natural syntax and the SURU-native compiler/runtime are not
+implemented yet. See `docs/bootstrap.md` and `docs/self-hosting.md` for the
+audited baseline and acceptance gates.
