@@ -31,11 +31,15 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 - [x] Bytecode optimizer passes: dead code elimination and constant folding.
 - [x] Nursery sizing heuristics (adaptive live-bytes threshold with headroom
   sizing). Generational collection tuning remains.
-- Incremental collection groundwork. In progress: the collector now uses
-  tri-color marking (white/grey/black) with a persistent grey worklist, and a
-  budgeted `s_heap_collect_step` primitive exposes incremental marking; the
-  existing stop-the-world collect drives it to completion, so behavior is
-  unchanged. Write barriers and true incremental triggering remain pending.
+- Incremental collection groundwork. The collector uses tri-color marking
+  (white/grey/black) with a persistent grey worklist and a write barrier at
+  array/record stores that shades white targets written into black objects.
+  `SURU_GC_INCREMENTAL=1` enables incremental collection: marking runs in
+  slices interleaved with allocation (budgeted `s_heap_collect_step`), new
+  objects are shaded grey during a cycle, roots are re-seeded per slice, and
+  the sweep runs when marking completes. Default (unset) is the full
+  stop-the-world collect; `make integration-incremental` runs the suite in
+  incremental mode.
 - [x] Fuzz corpus expansion; coverage-guided fuzzing (libFuzzer via
   `make fuzz-libfuzzer`). Fuzzing found and fixed an uninitialized-read
   free in the bytecode deserializer's failure path.

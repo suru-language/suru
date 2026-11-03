@@ -79,6 +79,11 @@ unit: $(LIBOBJ) | $(UNITDIR)
 integration: $(BINDIR)/suru
 	@tests/integration/run.sh $(BINDIR)/suru
 
+# Run the integration suite with incremental GC enabled (SURU_GC_INCREMENTAL=1).
+.PHONY: integration-incremental
+integration-incremental: $(BINDIR)/suru
+	@SURU_GC_INCREMENTAL=1 tests/integration/run.sh $(BINDIR)/suru
+
 .PHONY: test
 test: unit integration
 

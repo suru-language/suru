@@ -100,16 +100,28 @@ frequency tracks real allocation/survival instead of growing without bound.
 The threshold is never shrunk while the heap is still mostly live (to avoid
 thrashing).
 
-### 5.1 Tri-color marking and incremental groundwork
+### 5.1 Tri-color marking and incremental collection
 
 The collector marks with the standard tri-color scheme: white (unreached),
 grey (discovered, on the worklist), black (scanned). A budgeted primitive
 `s_heap_collect_step(heap, budget)` scans up to `budget` grey objects and
 returns the number still queued, so marking can be performed incrementally and
-interleaved with allocation. `s_heap_collect` is a full collection that drains
-marking to completion and then sweeps the remaining white objects. Write
-barriers and automatic incremental triggering are future work on top of this
-mechanism.
+interleaved with allocation.
+
+Incremental mode (`SURU_GC_INCREMENTAL=1`) drives collection this way:
+
+- When the trigger fires, a marking cycle starts and runs in slices of
+  `VM_GC_INCREMENTAL_BUDGET` grey objects per allocation interval.
+- A **write barrier** at array/record stores shades a white target grey when
+  it is written into a black object, preserving the tri-color invariant.
+- Objects allocated while a cycle is active are shaded grey immediately so
+  they are scanned, and roots are re-seeded each slice so values newly
+  referenced from the stack are not missed.
+- When marking completes, the remaining white objects are swept.
+
+The default (unset) behavior is a full stop-the-world collect that drains
+marking and sweeps in one call; the two are equivalent in the objects they
+retain.
 
 ## 6. Allocation failure
 
