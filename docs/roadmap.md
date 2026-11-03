@@ -31,7 +31,11 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 - [x] Bytecode optimizer passes: dead code elimination and constant folding.
 - [x] Nursery sizing heuristics (adaptive live-bytes threshold with headroom
   sizing). Generational collection tuning remains.
-- Incremental collection groundwork.
+- Incremental collection groundwork. In progress: the collector now uses
+  tri-color marking (white/grey/black) with a persistent grey worklist, and a
+  budgeted `s_heap_collect_step` primitive exposes incremental marking; the
+  existing stop-the-world collect drives it to completion, so behavior is
+  unchanged. Write barriers and true incremental triggering remain pending.
 - [x] Fuzz corpus expansion; coverage-guided fuzzing (libFuzzer via
   `make fuzz-libfuzzer`). Fuzzing found and fixed an uninitialized-read
   free in the bytecode deserializer's failure path.
