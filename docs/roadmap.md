@@ -55,7 +55,11 @@ Version scheme: `0.<minor>.<patch>` until 1.0.
 - Package/module system (`use` for user modules).
 - Standard library expansion: file I/O (read_file/write_file/file_exists),
   formatted output (int_to_str_base/str_pad), collections
-  (array_concat/array_contains/array_index_of/array_sort).
+  (array_concat/array_contains/array_index_of/array_sort). `int_from_str`
+  documented and made strict (rejects trailing garbage).
+- Build-time hardening: default builds (Makefile and CMake) now enable
+  `-fstack-protector-strong` and `-D_FORTIFY_SOURCE=2`; security assessment
+  corrected to match the actual fuzz targets (frontend + verifier).
 - Grammar and spec stabilization (freeze for 1.0). In progress: reconciled the
   keyword list across grammar/spec/implementation (`enum`, `do`, `and`,
   `or`, `not`); grammar now includes `do_stmt`; the spec's reserved `__`
