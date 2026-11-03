@@ -21,6 +21,10 @@ typedef struct s_heap {
     bool fail_alloc;
     s_u32 fail_after;
     s_u32 alloc_count;
+    /* incremental marking state */
+    s_gcobj **mark_stack;        /* grey worklist */
+    s_size mark_len, mark_cap;
+    bool mark_active;
 } s_heap;
 
 static s_size bucket_index(s_size rounded) {
@@ -93,6 +97,7 @@ void s_heap_destroy(s_heap *h) {
     }
     free_live_list(h);
     free_free_lists(h);
+    free(h->mark_stack);
     raw_free(h);
 }
 
@@ -149,7 +154,7 @@ s_gcobj *s_heap_alloc(s_heap *h, s_obj_kind kind, s_u32 count, s_size payload_by
     o->count = count;
     o->magic = S_OBJ_MAGIC;
     o->kind = (s_u8)kind;
-    o->marked = 0;
+    o->colour = S_GC_WHITE;
     o->flags = 0;
     o->next_all = h->all_live;
     h->all_live = o;
@@ -205,59 +210,83 @@ void s_heap_remove_root(s_heap *h, s_value *slot) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Marking                                                             */
+/* Tri-color marking                                                    */
 /* ------------------------------------------------------------------ */
 
-static void mark_obj(s_gcobj *o, s_gcobj ***workp, s_size *wlen, s_size *wcap) {
+/* Queue a white object onto the grey worklist, turning it grey. */
+static void mark_push(s_heap *h, s_gcobj *o) {
     if (o->magic != S_OBJ_MAGIC) {
         /* Corrupted object pointer; abort to surface the bug. */
         fprintf(stderr, "SURU GC: corrupt object pointer\n");
         abort();
     }
-    if (o->marked) return;
-    o->marked = 1;
-    if (*wlen >= *wcap) {
-        s_size ncap = *wcap ? *wcap * 2 : 256;
-        s_gcobj **n = realloc(*workp, ncap * sizeof(*n));
-        if (!n) return;
-        *workp = n;
-        *wcap = ncap;
+    if (o->colour != S_GC_WHITE) return;
+    o->colour = S_GC_GREY;
+    if (h->mark_len >= h->mark_cap) {
+        s_size ncap = h->mark_cap ? h->mark_cap * 2 : 256;
+        s_gcobj **n = realloc(h->mark_stack, ncap * sizeof(*n));
+        if (!n) {
+            /* Cannot grow the mark stack: we can no longer guarantee we will
+             * scan every live object, so abort rather than free live memory. */
+            fprintf(stderr, "SURU GC: mark stack allocation failed\n");
+            abort();
+        }
+        h->mark_stack = n;
+        h->mark_cap = ncap;
     }
-    (*workp)[(*wlen)++] = o;
+    h->mark_stack[h->mark_len++] = o;
 }
 
-static void mark_from_value(s_value v, s_gcobj ***workp, s_size *wlen, s_size *wcap) {
+static void mark_from_value(s_heap *h, s_value v) {
     if (v.tag == S_VAL_OBJ && v.u.o) {
-        mark_obj(v.u.o, workp, wlen, wcap);
+        mark_push(h, v.u.o);
     }
 }
 
-static void collect_mark(s_heap *h) {
-    s_size wcap = 0, wlen = 0;
-    s_gcobj **work = NULL;
-    s_gcobj ***workp = &work;
+/* Scan one grey object: mark its children grey, then blacken it. Returns
+ * false when the worklist is empty (marking complete). */
+static bool mark_process_one(s_heap *h) {
+    if (h->mark_len == 0) return false;
+    s_gcobj *o = h->mark_stack[--h->mark_len];
+    if (o->kind == S_OBJ_ARRAY || o->kind == S_OBJ_RECORD ||
+        o->kind == S_OBJ_CLOSURE) {
+        s_value *vals = s_obj_array_data(o);
+        for (s_u32 i = 0; i < o->count; ++i) {
+            mark_from_value(h, vals[i]);
+        }
+    }
+    o->colour = S_GC_BLACK;
+    return true;
+}
 
-    /* roots: stack range */
+static void seed_roots(s_heap *h) {
     if (h->stack_base) {
         for (s_size i = 0; i < h->stack_len; ++i) {
-            mark_from_value(h->stack_base[i], workp, &wlen, &wcap);
+            mark_from_value(h, h->stack_base[i]);
         }
     }
     for (s_root_slot *r = h->roots; r; r = r->next) {
-        if (r->slot) mark_from_value(*r->slot, workp, &wlen, &wcap);
+        if (r->slot) mark_from_value(h, *r->slot);
     }
+}
 
-    while (wlen > 0) {
-        s_gcobj *o = work[--wlen];
-        if (o->kind == S_OBJ_ARRAY || o->kind == S_OBJ_RECORD ||
-            o->kind == S_OBJ_CLOSURE) {
-            s_value *vals = s_obj_array_data(o);
-            for (s_u32 i = 0; i < o->count; ++i) {
-                mark_from_value(vals[i], workp, &wlen, &wcap);
-            }
+s_size s_heap_collect_step(s_heap *h, s_size budget) {
+    if (!h) return 0;
+    if (!h->mark_active) {
+        /* start a new marking cycle: everything is white, then root it */
+        for (s_gcobj *o = h->all_live; o; o = o->next_all) {
+            o->colour = S_GC_WHITE;
         }
+        seed_roots(h);
+        h->mark_active = true;
     }
-    free(work);
+    s_size done = 0;
+    while (done < budget && h->mark_len > 0) {
+        if (!mark_process_one(h)) break;
+        done++;
+    }
+    if (h->mark_len == 0) h->mark_active = false;
+    return h->mark_len;
 }
 
 static void free_object(s_heap *h, s_gcobj *o) {
@@ -275,21 +304,17 @@ static void free_object(s_heap *h, s_gcobj *o) {
 
 void s_heap_collect(s_heap *h) {
     if (!h) return;
-    /* phase 1: unmark all */
-    for (s_gcobj *o = h->all_live; o; o = o->next_all) {
-        o->marked = 0;
-    }
-    /* phase 2: mark */
-    collect_mark(h);
-    /* phase 3: sweep */
+    /* drain marking to completion (incremental groundwork: this is a full
+     * stop-the-world collect; collect_step may be used to interleave) */
+    s_heap_collect_step(h, (s_size)-1);
+    /* sweep: free everything still white */
     s_gcobj **pp = &h->all_live;
     while (*pp) {
         s_gcobj *o = *pp;
-        if (!o->marked) {
+        if (o->colour == S_GC_WHITE) {
             *pp = o->next_all;
             free_object(h, o);
         } else {
-            o->marked = 0;
             pp = &o->next_all;
         }
     }

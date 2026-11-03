@@ -25,11 +25,16 @@ struct s_gcobj {
     s_u32 count;               /* str: byte length; array/record/closure: child Value count */
     s_u32 magic;               /* sanity tag */
     s_u8 kind;
-    s_u8 marked;
+    s_u8 colour;               /* tri-color mark state (white/grey/black) */
     s_u16 flags;
 };
 
 #define S_OBJ_MAGIC 0x5355524Fu  /* "SURU" */
+
+/* Tri-color marking states (the collect of an incremental collector). */
+#define S_GC_WHITE 0u  /* not reached this cycle */
+#define S_GC_GREY 1u   /* discovered; queued on the mark worklist */
+#define S_GC_BLACK 2u  /* fully scanned */
 
 /* Payload accessors (memory follows the header, 8-aligned). */
 static inline char *s_obj_str_data(s_gcobj *o) { return (char *)(o + 1); }
@@ -64,6 +69,13 @@ void s_heap_add_root(s_heap *h, s_value *slot);
 void s_heap_remove_root(s_heap *h, s_value *slot);
 
 void s_heap_collect(s_heap *h);
+
+/* Incremental-marking primitive: make marking progress by scanning up to
+ * `budget` grey objects (seeding roots on the first call of a cycle).
+ * Returns the number of grey objects still queued (0 when marking is done).
+ * `s_heap_collect` is a full collection that drains marking to completion and
+ * then sweeps. */
+s_size s_heap_collect_step(s_heap *h, s_size budget);
 
 s_u64 s_heap_live_bytes(const s_heap *h);
 s_u64 s_heap_total_bytes(const s_heap *h);
