@@ -110,4 +110,6 @@ to numeric instruction indices and routes normal, handled, and `give` exits
 through cleanup. Literal, local-binding, assignment, arithmetic/comparison,
 `show`, and `give` statements now emit concrete VM records; broader expression
 and control-flow lowering remain open. Basic builtin and routine calls are also
-emitted. No legacy default behavior may change during the port.
+emitted, and `repeat while`/`when` branches now lower to numeric conditional
+jumps. `each`, `choose`, and broader control-flow lowering remain open. No
+legacy default behavior may change during the port.

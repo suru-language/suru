@@ -156,3 +156,5 @@ local bindings and assignment, arithmetic/comparison expressions, `show`, and
 are stored in local slots before the handler body runs.
 Builtin calls and calls to collected routine declarations are emitted as
 `BC_BUILTIN` and `BC_CALL` records, respectively.
+`repeat while`, `when`, `otherwise when`, and `otherwise` now emit concrete
+`BC_JZ`/`BC_JMP` control flow with resolved numeric targets.

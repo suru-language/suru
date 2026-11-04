@@ -436,6 +436,7 @@ func natural_emit_bytecode(source: str) -> int {
     mut instructions: [str] = [];
     instructions = nbc_collect_functions(instructions, lines);
     mut attempts: [str] = [];
+    mut controls: [str] = [];
     mut labels: int = 0;
     mut i: int = 0;
     while i < array_len(lines) {
@@ -449,6 +450,86 @@ func natural_emit_bytecode(source: str) -> int {
 
         if nbc_word(line) == "routine" or
            (nbc_word(line) == "expose" and nbc_word(nbc_after(line, "expose")) == "routine") {
+            continue;
+        }
+        if nbc_word(line) == "repeat" {
+            let repeat_rest: str = nbc_after(line, "repeat");
+            if nbc_word(repeat_rest) != "while" {
+                println("bytecode-error|repeat requires 'while'");
+                return 1;
+            }
+            let body: str = "repeat-body" + to_str(labels);
+            let finish: str = "repeat-end" + to_str(labels);
+            labels += 1;
+            controls = array_concat(controls, ["repeat|" + body + "|" + finish]);
+            instructions = nbc_label(instructions, body);
+            instructions = nbc_emit_expression(instructions,
+                nbc_after(repeat_rest, "while"));
+            instructions = nbc_emit(instructions, "BC_JZ", "@" + finish);
+            continue;
+        }
+        if nbc_word(line) == "when" {
+            let finish: str = "when-end" + to_str(labels);
+            let next: str = "when-next" + to_str(labels);
+            labels += 1;
+            controls = array_concat(controls, ["when|" + finish + "|" + next + "|0"]);
+            instructions = nbc_emit_expression(instructions, nbc_after(line, "when"));
+            instructions = nbc_emit(instructions, "BC_JZ", "@" + next);
+            continue;
+        }
+        if line == "otherwise" or nbc_has_prefix(line, "otherwise when ") {
+            if array_len(controls) == 0 {
+                println("bytecode-error|otherwise outside when");
+                return 1;
+            }
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if current[0] != "when" {
+                println("bytecode-error|otherwise outside when");
+                return 1;
+            }
+            instructions = nbc_emit(instructions, "BC_JMP", "@" + current[1]);
+            instructions = nbc_label(instructions, current[2]);
+            if line == "otherwise" {
+                controls[array_len(controls) - 1] = current[0] + "|" +
+                    current[1] + "||2";
+            } else {
+                let next: str = "when-next" + to_str(labels);
+                labels += 1;
+                instructions = nbc_emit_expression(instructions,
+                    nbc_after(nbc_after(line, "otherwise"), "when"));
+                instructions = nbc_emit(instructions, "BC_JZ", "@" + next);
+                controls[array_len(controls) - 1] = current[0] + "|" +
+                    current[1] + "|" + next + "|1";
+            }
+            continue;
+        }
+        if line == "end repeat" {
+            if array_len(controls) == 0 {
+                println("bytecode-error|end repeat without repeat");
+                return 1;
+            }
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if current[0] != "repeat" {
+                println("bytecode-error|mismatched repeat terminator");
+                return 1;
+            }
+            instructions = nbc_emit(instructions, "BC_JMP", "@" + current[1]);
+            instructions = nbc_label(instructions, current[2]);
+            controls = slice(controls, 0, array_len(controls) - 1);
+            continue;
+        }
+        if line == "end when" {
+            if array_len(controls) == 0 {
+                println("bytecode-error|end when without when");
+                return 1;
+            }
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if current[0] != "when" {
+                println("bytecode-error|mismatched when terminator");
+                return 1;
+            }
+            instructions = nbc_label(instructions, current[1]);
+            controls = slice(controls, 0, array_len(controls) - 1);
             continue;
         }
         if line == "attempt" {
@@ -581,5 +662,6 @@ func natural_emit_bytecode(source: str) -> int {
         if not nbc_has_prefix(line, "show(") { instructions = nbc_emit(instructions, "BC_POP", ""); }
     }
     if array_len(attempts) != 0 { println("bytecode-error|unterminated attempt"); return 1; }
+    if array_len(controls) != 0 { println("bytecode-error|unterminated control block"); return 1; }
     return nbc_render(instructions);
 }

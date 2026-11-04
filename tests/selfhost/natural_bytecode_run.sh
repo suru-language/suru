@@ -45,4 +45,16 @@ if grep -q 'BC_NOP|value\|BC_NOP|set\|BC_NOP|show\|BC_NOP|give' "$tmp/values.out
     exit 1
 fi
 
+"$SURU" run "$DIR/natural_bytecode_driver.suru" \
+    "$ROOT/tests/natural/control_valid.suru" >"$tmp/control.out"
+grep -q '^bc|5|BC_JZ|11$' "$tmp/control.out"
+grep -q '^bc|10|BC_JMP|2$' "$tmp/control.out"
+grep -q '^bc|14|BC_JZ|19$' "$tmp/control.out"
+grep -q '^bc|22|BC_JZ|27$' "$tmp/control.out"
+grep -q '^bc|30|BC_RET_UNIT|$' "$tmp/control.out"
+if grep -q 'BC_NOP|repeat\|BC_NOP|when\|BC_NOP|otherwise' "$tmp/control.out"; then
+    echo "natural bytecode lowering: control placeholder emitted" >&2
+    exit 1
+fi
+
 echo "natural bytecode lowering: effect handler corpus passed"
