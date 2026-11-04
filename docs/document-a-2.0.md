@@ -2,7 +2,7 @@
 
 **Status:** Approved language contract  
 **Edition:** Natural Syntax 2.0  
-**Date:** 2026-11-03  
+**Date:** 2026-11-03, revised 2026-11-04  
 **Bootstrap:** C17 legacy syntax remains the default during migration
 
 This document defines the Natural Syntax Edition of SURU. Implementations must
@@ -10,6 +10,19 @@ follow this document; implementation convenience must not add alternate
 spellings or silently assign meaning to unspecified constructs. The legacy
 language described by `docs/spec.md` and `docs/grammar.md` remains supported
 through the explicit `legacy` syntax mode.
+
+The 2026-11-04 revision re-approves the revised design decisions — explicit
+matching block terminators, `value`/`change`/`constant` with `set ... to` as
+the only assignment statement, explicit public routine types,
+`across`/`from`/`until`/`through` iteration, records with immutable-by-default
+fields and statically checked contracts, exhaustive choice matching with
+`Result`/`Option` compiler-known types, relative-then-`SURU_MOD_PATH` module
+resolution, interpolation with `{{`/`}}` escaping, declared typed exceptions
+with `attempt`/`handle`/`ensure`, UTF-8 lexical rules, `--syntax` CLI
+selection, and the expanded lexer compatibility gate — as the language
+contract for all subsequent documentation and implementation steps. The
+compiler implements this approved specification; it does not invent the
+language during implementation.
 
 ## 1. Source and lexical rules
 
@@ -65,8 +78,9 @@ is invalid unless represented by an escape.
 
 One logical statement normally occupies one physical line. A newline terminates
 a statement unless it occurs inside balanced parentheses or brackets, or after
-an explicit continuation marker defined by the implementation as `\\` followed
-by the newline. Newlines inside braces belonging to a block are still logical
+an explicit continuation marker `\\` followed by the newline. The continuation
+marker is valid anywhere a statement may continue, including outside balanced
+delimiters. Newlines inside braces belonging to a block are still logical
 statement boundaries. Blank lines are ignored. A lexer must retain byte offset,
 line, and Unicode scalar column for every token and diagnostic.
 
@@ -235,7 +249,10 @@ requires `to`; `=` is not an assignment token in Natural Syntax.
 
 `Whole` is signed 64-bit integer, `Real` is IEEE-754 binary64, `Bool` is a
 boolean, `Text` is valid UTF-8 text, and `Unit` has one value. Arrays preserve
-element order. String iteration yields Unicode scalar values, not UTF-8 bytes.
+element order, and `each` iterates a list in element order. Iteration order is
+deterministic; because arrays are fixed-length, a `set` of an element during
+iteration is visible to subsequent iterations. String iteration yields Unicode
+scalar values, not UTF-8 bytes, in code-point order.
 
 `value` creates an immutable binding. `change` creates a mutable binding.
 Fields are immutable unless declared with `change`. `constant` is module-scope
@@ -262,9 +279,10 @@ diagnostics. Declarations are private unless marked `expose`.
 
 ## 4. Effects and exceptions
 
-Expected failures use `Result<T,E>`; optional values use `Option<T>`. A routine
-that may propagate an exceptional failure lists its typed exceptions after
-`throws`. Propagation of an undeclared exception is a compile-time error.
+Expected failures use `Result<T,E>`; optional values use `Option<T>`. Expected
+errors should generally be modeled with `Result` rather than exceptions. A
+routine that may propagate an exceptional failure lists its typed exceptions
+after `throws`. Propagation of an undeclared exception is a compile-time error.
 `handle name: Type` catches only compatible exceptions. `ensure` executes on
 normal completion, return, and exception propagation. If cleanup raises while
 another exception is active, the cleanup exception replaces the active

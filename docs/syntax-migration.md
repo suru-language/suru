@@ -21,6 +21,17 @@ positive and negative conformance fixtures exist, and the Natural Syntax lexer
 passes its expanded gate. Parser, semantic, and CLI integration are the next
 phase and are not represented as complete here.
 
+On 2026-11-04 the revised design decisions (explicit matching block
+terminators, `value`/`change`/`constant` with `set ... to` as the only
+assignment statement, explicit public routine types, `across`/`from`/
+`until`/`through` iteration, records and contracts, exhaustive choice
+matching, module visibility, interpolation, typed exceptions with
+`attempt`/`handle`/`ensure`, UTF-8 lexical rules, `--syntax` CLI selection,
+and the expanded lexer compatibility gate) were re-approved and recorded in
+`docs/document-a-2.0.md` as the revised 2.0 contract. The conformance and
+compatibility gates follow that document; the legacy default and all existing
+tests are unchanged.
+
 ## Decisions recorded in Document A 2.0
 
 | natural form | decision |
