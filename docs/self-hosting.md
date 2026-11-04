@@ -103,7 +103,12 @@ parity and the remaining compiler modules are still open gates. The binary I/O
 needed by a future SURU compiler is explicit in `include/suru/io.h` and
 `src/io.c`. The Natural Syntax lexer gate also passes the approved corpus in
 `tests/natural/`; the parser, semantic analyzer, and natural CLI mode remain
-next-phase work. The first parser increment is
+next-phase work. The revised 2.0 design decisions (re-approval recorded in
+`docs/document-a-2.0.md` and `docs/syntax-migration.md` on 2026-11-04) are
+the binding contract for every remaining module: explicit matching block
+terminators, `set ... to` as the only assignment statement, explicit public
+routine types, `across`/`from`/`until`/`through` iteration, records,
+contracts, choices, modules, interpolation, and typed exceptions. The first parser increment is
 `selfhost/compiler/natural_parser.suru`, which validates block terminators,
 routine context, `otherwise`/`case` ownership, and exception clauses against
 the structural corpus. It now also validates binding initializers, explicit
