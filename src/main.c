@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 static char *read_file(const char *path, s_size *len) {
     s_u8 *bytes = NULL;
@@ -47,10 +48,33 @@ static int cmd_run(const char *path, int argc, char **argv, int natural) {
     return rc;
 }
 
-static int cmd_check(const char *path, int natural) {
+static int natural_frontend_path(char *out, size_t n, const char *argv0) {
+    const char *slash = strrchr(argv0, '/');
+    char dir[1024];
+    if (slash && slash != argv0) {
+        size_t len = (size_t)(slash - argv0);
+        snprintf(dir, sizeof dir, "%.*s", (int)len, argv0);
+    } else {
+        snprintf(dir, sizeof dir, ".");
+    }
+    snprintf(out, n, "%s/../../tests/selfhost/natural_frontend_driver.suru", dir);
+    if (access(out, R_OK) == 0) return 0;
+    snprintf(out, n, "tests/selfhost/natural_frontend_driver.suru");
+    if (access(out, R_OK) == 0) return 0;
+    return -1;
+}
+
+static int cmd_check(const char *path, int natural, const char *argv0) {
     if (natural) {
-        fprintf(stderr, "suru: --syntax=natural is not yet implemented for 'check'\n");
-        return 1;
+        char driver[2048];
+        if (natural_frontend_path(driver, sizeof driver, argv0) != 0) {
+            fprintf(stderr, "suru: --syntax=natural frontend driver not found\n");
+            return 1;
+        }
+        char cmd[4096];
+        snprintf(cmd, sizeof cmd, "\"%s\" run \"%s\" \"%s\" >/dev/null 2>&1",
+                 argv0, driver, path);
+        return system(cmd) == 0 ? 0 : 1;
     }
     s_size len;
     char *src = read_file(path, &len);
@@ -169,7 +193,7 @@ int main(int argc, char **argv) {
         return cmd_run(path, argc - 3, argv + 3, natural);
     }
     if (strcmp(cmd, "check") == 0) {
-        return cmd_check(path, natural);
+        return cmd_check(path, natural, argv[0]);
     }
     if (strcmp(cmd, "compile") == 0) {
         if (argc < 4) {

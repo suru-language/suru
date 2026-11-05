@@ -59,9 +59,10 @@ grammar.
    legacy token meanings.
  3. Add `--syntax=legacy|natural` to `check`, `run`, and `compile`; legacy stays
     the default. **Done:** the flag is accepted (default `legacy`), and the
-    `legacy` path is unchanged. Natural-mode `check`/`run`/`compile` report
-    "not yet implemented" until the natural frontend is integrated into the
-    compiler driver.
+    `legacy` path is unchanged. Natural-mode `check` runs the unified selfhost
+    frontend gate (lex/parse/semantic/declaration/effect); `run` and `compile`
+    remain "not yet implemented" until the natural frontend emits executable
+    bytecode modules within the compiler driver.
 4. Port parser productions in small feature groups with positive and negative
    tests and reference-output comparisons.
 5. Port semantic and bytecode behavior only after each production is specified.
@@ -105,7 +106,8 @@ code points rejected) and the resource-limit diagnostics for oversized source
 verified by dedicated fixtures. The parser port is the next phase;
 the initial structural parser gate is now in
 `selfhost/compiler/natural_parser.suru`. The `--syntax` flag is accepted with
-`legacy` as the default; natural-mode commands report "not yet implemented"
+`legacy` as the default; natural-mode `check` runs the unified frontend gate,
+while `run`/`compile` report "not yet implemented"
 until the natural frontend is integrated into the compiler driver. The structural gate
 currently checks declarations, binding initializers, public signatures,
 constant scope, mutable assignment targets, and routine return context. The

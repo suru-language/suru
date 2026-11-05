@@ -5,6 +5,7 @@ set -u
 
 SURU="${1:-build/bin/suru}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$DIR/../.." && pwd)"
 fail=0
 tests=0
 
@@ -47,12 +48,21 @@ else
     echo "FAIL: syntax-legacy"
     fail=$((fail + 1))
 fi
-if ! "$SURU" --syntax=natural check "$DIR/hello.suru" >/dev/null 2>&1; then
-    echo "ok: syntax-natural-pending"
+if "$SURU" --syntax=natural check "$ROOT/tests/natural/control_valid.suru" >/dev/null 2>&1; then
+    echo "ok: syntax-natural-check"
 else
-    echo "FAIL: syntax-natural-pending"
+    echo "FAIL: syntax-natural-check"
     fail=$((fail + 1))
 fi
+badnat="$(mktemp)"
+printf 'routine f() -> Whole\n    give 1 + "x"\nend routine\n' > "$badnat"
+if ! "$SURU" --syntax=natural check "$badnat" >/dev/null 2>&1; then
+    echo "ok: syntax-natural-reject"
+else
+    echo "FAIL: syntax-natural-reject"
+    fail=$((fail + 1))
+fi
+rm -f "$badnat"
 "$SURU" --syntax=foo check "$DIR/hello.suru" >/dev/null 2>&1
 code=$?
 if [ "$code" -eq 2 ]; then

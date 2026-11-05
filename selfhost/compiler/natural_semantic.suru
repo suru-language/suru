@@ -380,7 +380,33 @@ func natural_semantic_check(source: str) -> int {
             continue;
         }
         if first.text == "routine" {
-            position = nss_skip_statement(source, first.next);
+            let rname = natural_next(source, first.next);
+            if rname.kind != NT_IDENT { nss_error(first.line, "expected routine name"); return 1; }
+            let lp = natural_next(source, rname.next);
+            if lp.text != "(" { nss_error(first.line, "expected '(' in routine"); return 1; }
+            mut p: int = lp.next;
+            let rp = natural_next(source, p);
+            if rp.text != ")" {
+                while true {
+                    let pname = natural_next(source, p);
+                    if pname.kind != NT_IDENT { nss_error(first.line, "expected parameter name"); return 1; }
+                    let colon = natural_next(source, pname.next);
+                    if colon.text != ":" { nss_error(first.line, "parameter requires explicit type"); return 1; }
+                    let typ = nas_parse_type(source, colon.next);
+                    if typ[0] != "ok" { nss_error(first.line, typ[2]); return 1; }
+                    names = array_concat(names, [pname.text]);
+                    types = array_concat(types, [typ[2]]);
+                    mutable = array_concat(mutable, [false]);
+                    p = int_from_str(typ[1]);
+                    let sep = natural_next(source, p);
+                    if sep.text == "," { p = sep.next; continue; }
+                    if sep.text == ")" { p = sep.next; break; }
+                    nss_error(first.line, "expected ',' or ')' in parameters"); return 1;
+                }
+            } else {
+                p = rp.next;
+            }
+            position = nss_skip_statement(source, p);
             if position < 0 { nss_error(first.line, "expected routine body"); return 1; }
             continue;
         }
@@ -468,6 +494,21 @@ func natural_semantic_check(source: str) -> int {
             if value_type[0] == "error" { nss_error(first.line, value_type[1]); return 1; }
             if value_type[1] != target_type { nss_error(first.line, "assignment type does not match target"); return 1; }
             position = nss_finish(source, ne_next(expression));
+            if position < 0 { nss_error(first.line, "expected statement terminator"); return 1; }
+            continue;
+        }
+
+        if first.text == "give" {
+            let nxt = natural_next(source, first.next);
+            if nxt.kind != NT_NEWLINE and nxt.kind != NT_EOF {
+                let e = ne_parse_expression(source, first.next, 0);
+                if ne_is_ok(e) == false { nss_error(first.line, ne_message(e)); return 1; }
+                let et = nss_expr_type(ne_value(e), names, types);
+                if et[0] == "error" { nss_error(first.line, et[1]); return 1; }
+                position = nss_finish(source, ne_next(e));
+            } else {
+                position = nss_finish(source, first.next);
+            }
             if position < 0 { nss_error(first.line, "expected statement terminator"); return 1; }
             continue;
         }

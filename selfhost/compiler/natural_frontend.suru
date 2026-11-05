@@ -1,19 +1,18 @@
-// Unified Natural Syntax frontend gate: runs the structural parser, semantic
-// pass, declaration/effect semantic checks, and bytecode lowering in sequence.
-// This wires the individually-passing gate modules into a single pipeline
-// entrypoint that the CLI and conformance suite can invoke.
+// Unified Natural Syntax frontend gate: runs the structural parser and the
+// semantic/declaration/effect validation passes in sequence. This wires the
+// individually-passing gate modules into a single entrypoint that the CLI and
+// conformance suite can invoke. Bytecode lowering is deliberately excluded:
+// it is a partial codegen gate, not a full-program checker.
 
 use "natural_parser.suru";
 use "natural_semantic.suru";
 use "natural_declaration_semantic.suru";
 use "natural_effect_semantic.suru";
-use "natural_bytecode.suru";
 
 func natural_frontend_check(source: str) -> int {
     if natural_parse_check(source) != 0 { return 1; }
     if natural_semantic_check(source) != 0 { return 2; }
     if natural_declaration_check(source) != 0 { return 3; }
     if natural_effect_check(source) != 0 { return 4; }
-    if natural_emit_bytecode(source) != 0 { return 5; }
     return 0;
 }
