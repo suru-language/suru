@@ -88,7 +88,7 @@ func nw_print_routine() -> str {
 }
 
 func nw_exit_syscall() -> str {
-    let code: str = "";
+    mut code: str = "";
     code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC0);
     code = code + str_chr_byte(0x3C) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
     code = code + str_chr_byte(0x48) + str_chr_byte(0x31) + str_chr_byte(0xFF);
@@ -122,11 +122,11 @@ func nw_emit_elf_int_expr(ops: [int], avs: [int]) -> str {
             code = code + nw_u32(avs[j]);
             code = code + str_chr_byte(0x50);
         } else if op == 5 {
-            let disp: int = 256 - 8 * (avs[j] + 1);
+            mut disp: int = 256 - 8 * (avs[j] + 1);
             code = code + str_chr_byte(0x48) + str_chr_byte(0x8B) + str_chr_byte(0x45) + str_chr_byte(disp);
             code = code + str_chr_byte(0x50);
         } else if op == 6 {
-            let disp: int = 256 - 8 * (avs[j] + 1);
+            mut disp: int = 256 - 8 * (avs[j] + 1);
             code = code + str_chr_byte(0x58);
             code = code + str_chr_byte(0x48) + str_chr_byte(0x89) + str_chr_byte(0x45) + str_chr_byte(disp);
         } else if op == 11 {
@@ -170,7 +170,7 @@ func nw_emit_elf_message(msg: str) -> str {
     code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC7);
     code = code + str_chr_byte(0x01) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
     code = code + str_chr_byte(0x48) + str_chr_byte(0x8D) + str_chr_byte(0x35);
-    let disp: int = (base + msg_off) - (base + code_off + 21);
+    mut disp: int = (base + msg_off) - (base + code_off + 21);
     code = code + nw_u32(disp);
     code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC2);
     code = code + nw_u32(str_len(msg));
@@ -218,14 +218,14 @@ func nw_emit_elf_repeat() -> str {
 
     // jz exit: pop rax; test rax,rax; jz rel32
     buf = array_concat(buf, [0x58, 0x48,0x85,0xC0, 0x0F,0x84]);
-    let d0: int = array_len(buf);
+    mut d0: int = array_len(buf);
     buf = array_concat(buf, [0,0,0,0]);
     fx = array_concat(fx, [to_str(d0) + "|exit"]);
 
     // builtin println: pop rax (int); print digits; push dummy
     buf = array_concat(buf, [0x58]);
     let pr: str = nw_print_routine();
-    let k: int = 0;
+    mut k: int = 0;
     while k < str_len(pr) {
         buf = array_concat(buf, [str_byte_at(pr, k)]);
         k += 1;
@@ -243,7 +243,7 @@ func nw_emit_elf_repeat() -> str {
 
     // jmp loop
     buf = array_concat(buf, [0xE9]);
-    let d1: int = array_len(buf);
+    mut d1: int = array_len(buf);
     buf = array_concat(buf, [0,0,0,0]);
     fx = array_concat(fx, [to_str(d1) + "|loop"]);
 
@@ -255,18 +255,18 @@ func nw_emit_elf_repeat() -> str {
     buf = array_concat(buf, [0x48,0xC7,0xC0,0x3C,0,0,0, 0x48,0x31,0xFF, 0x0F,0x05]);
 
     // resolve fixups
-    let fi: int = 0;
+    mut fi: int = 0;
     while fi < array_len(fx) {
         let entry: [str] = str_split(fx[fi], "|");
         let d: int = int_from_str(entry[0]);
         let tname: str = entry[1];
-        let tpos: int = -1;
-        let li: int = 0;
+        mut tpos: int = -1;
+        mut li: int = 0;
         while li < array_len(lab_names) {
             if lab_names[li] == tname { tpos = lab_pos[li]; }
             li += 1;
         }
-        let disp: int = tpos - (d + 4);
+        mut disp: int = tpos - (d + 4);
         buf[d] = disp & 255;
         buf[d + 1] = (disp >> 8) & 255;
         buf[d + 2] = (disp >> 16) & 255;
@@ -274,8 +274,8 @@ func nw_emit_elf_repeat() -> str {
         fi += 1;
     }
 
-    let s: str = "";
-    let bi: int = 0;
+    mut s: str = "";
+    mut bi: int = 0;
     while bi < array_len(buf) {
         s = s + str_chr_byte(buf[bi]);
         bi += 1;
