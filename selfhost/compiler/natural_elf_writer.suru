@@ -314,6 +314,22 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_entry: int) -> s
                 buf = array_concat(buf, [0x50]);
             } else if op == 7 {
                 buf = array_concat(buf, [0x58]);
+            } else if op == 51 {
+                // new_array: pop a elements into heap at bump, advance bump, push ptr
+                buf = array_concat(buf, [0x48,0x8B,0x14,0x25, 0x00,0x20,0x40,0x00]);
+                let ei: int = a - 1;
+                while ei >= 0 {
+                    buf = array_concat(buf, [0x58]);
+                    let off: int = ei * 8;
+                    buf = array_concat(buf, [0x48,0x89,0x42, off]);
+                    ei -= 1;
+                }
+                buf = array_concat(buf, [0x48,0x81,0xC2]);
+                buf = array_concat(buf, [(a * 8) & 255, ((a * 8) >> 8) & 255, ((a * 8) >> 16) & 255, ((a * 8) >> 24) & 255]);
+                buf = array_concat(buf, [0x48,0x89,0x14,0x25, 0x00,0x20,0x40,0x00]);
+                buf = array_concat(buf, [0x52]);
+            } else if op == 54 {
+                buf = array_concat(buf, [0x5B, 0x58, 0x48,0x8B,0x04,0xD8, 0x50]);
             } else if op == 59 {
                 buf = array_concat(buf, [0xE8]);
                 mut d: int = array_len(buf);
