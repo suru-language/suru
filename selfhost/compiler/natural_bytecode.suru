@@ -287,13 +287,45 @@ func nbc_variant_nargs(instructions: [str], choice: str, variant: str) -> int {
                                           str_len(item));
             let bar: int = nbc_find(after_name, "|");
             if bar >= 0 {
-                return int_from_str(str_trim(substr(after_name, bar + 1,
-                                                    str_len(after_name))));
+                let after_tag: str = substr(after_name, bar + 1,
+                                             str_len(after_name));
+                let bar2: int = nbc_find(after_tag, "|");
+                let nargstext: str = bar2 < 0 ? after_tag :
+                    substr(after_tag, 0, bar2);
+                return int_from_str(str_trim(nargstext));
             }
         }
         i += 1;
     }
     return 0;
+}
+
+func nbc_variant_argtype(instructions: [str], choice: str, variant: str,
+                         idx: int) -> str {
+    let prefix: str = "#variant|" + choice + "|";
+    let suffix: str = "|" + variant + "|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        let item: str = instructions[i];
+        if nbc_has_prefix(item, prefix) and str_contains(item, suffix) {
+            let rest: str = substr(item, str_len(prefix) + str_len(variant) + 1,
+                                    str_len(item));
+            let bar1: int = nbc_find(rest, "|");
+            let rest2: str = bar1 < 0 ? "" :
+                substr(rest, bar1 + 1, str_len(rest));
+            let bar2: int = nbc_find(rest2, "|");
+            let types: str = bar2 < 0 ? "" :
+                substr(rest2, bar2 + 1, str_len(rest2));
+            if types == "" { return "Whole"; }
+            let tlist: [str] = str_split(types, ",");
+            if idx >= 0 and idx < array_len(tlist) {
+                return str_trim(tlist[idx]);
+            }
+            return "Whole";
+        }
+        i += 1;
+    }
+    return "Whole";
 }
 
 func nbc_variant_tag(instructions: [str], choice: str, variant: str) -> int {
@@ -337,14 +369,28 @@ func nbc_collect_choices(instructions: [str], lines: [str]) -> [str] {
             let vname: str = vopen < 0 ? vl : str_trim(substr(vl, 0, vopen));
             let vclose: int = nbc_find(vl, ")");
             mut vnargs: int = 0;
+            mut vtypes: str = "";
             if vopen >= 0 and vclose > vopen {
                 let vparams: str = str_trim(substr(vl, vopen + 1,
                                                     vclose - vopen - 1));
-                if vparams != "" { vnargs = array_len(str_split(vparams, ",")); }
+                if vparams != "" {
+                    let ptags: [str] = str_split(vparams, ",");
+                    vnargs = array_len(ptags);
+                    mut ti: int = 0;
+                    while ti < array_len(ptags) {
+                        let pt: str = str_trim(ptags[ti]);
+                        let pcolon: int = nbc_find(pt, ":");
+                        let ptype: str = pcolon < 0 ? "Whole" :
+                            str_trim(substr(pt, pcolon + 1, str_len(pt)));
+                        vtypes = vtypes + ptype;
+                        if ti + 1 < array_len(ptags) { vtypes = vtypes + ","; }
+                        ti += 1;
+                    }
+                }
             }
             result = array_concat(result,
                 ["#variant|" + cname + "|" + vname + "|" + to_str(tag) +
-                 "|" + to_str(vnargs)]);
+                 "|" + to_str(vnargs) + "|" + vtypes]);
             tag += 1;
             i += 1;
         }
@@ -982,6 +1028,8 @@ func natural_emit_bytecode(source: str) -> int {
             instructions = nbc_emit(instructions, "BC_JZ", "@" + next);
             if vbind != "" and vnargs > 0 {
                 instructions = nbc_bind(instructions, vbind);
+                instructions = nbc_note_type(instructions, vbind,
+                    nbc_variant_argtype(instructions, choice, variant, 0));
                 instructions = nbc_emit(instructions, "BC_LD_LOCAL",
                                         to_str(sel_slot));
                 instructions = nbc_const(instructions, "int", "BC_CONST_INT", "1");

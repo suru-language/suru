@@ -297,6 +297,22 @@ else
 fi
 rm -f "$natprog"
 
+# Natural run: choice payload bound to a record value, with field access.
+tests=$((tests + 1))
+natprog="$(mktemp)"
+printf 'record Vec\n    change x: Whole\n    change y: Whole\nend record\nchoice Kind\n    Point(v: Vec)\n    Ruler(length: Whole)\nend choice\nroutine magnitude(k: Kind) -> Whole\n    choose k\n    case Point(v)\n        give v.x + v.y\n    case Ruler(length)\n        give length\n    end choose\nend routine\nroutine main() -> Unit\n    value v: Vec = none\n    set v.x to 3\n    set v.y to 4\n    value p: Kind = Point(v)\n    show(magnitude(p))\n    value r: Kind = Ruler(20)\n    show(magnitude(r))\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "7
+20" ]; then
+    echo "ok: nat-run-choose-record-payload"
+else
+    echo "FAIL: nat-run-choose-record-payload (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
 # Program arguments: run argtest.suru with two args.
 tests=$((tests + 1))
 actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"
