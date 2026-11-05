@@ -192,7 +192,7 @@ func nw_emit_minimal_elf() -> str {
     return nw_emit_elf_message("hi\n");
 }
 
-func nw_emit_elf_program(ops: [int], as: [int], bs: [int], cs: [int]) -> str {
+func nw_emit_elf_program(ops: [int], avs: [int], bs: [int], cs: [int]) -> str {
     let nins: int = array_len(ops);
     mut nlocals: int = 0;
     let i0: int = 0;
@@ -215,7 +215,7 @@ func nw_emit_elf_program(ops: [int], as: [int], bs: [int], cs: [int]) -> str {
     while pc < nins {
         pc_pos = array_concat(pc_pos, [array_len(buf)]);
         let op: int = ops[pc];
-        let a: int = as[pc];
+        let a: int = avs[pc];
         let b: int = bs[pc];
         if op == 1 {
             buf = array_concat(buf, [0x48,0xC7,0xC0]);
