@@ -95,14 +95,19 @@ The Natural Syntax lexer is implemented in
 `selfhost/compiler/natural_lexer.suru` and its approved lexical corpus passes
 through `make selfhost-test`, including Unicode scalar locations, malformed
 UTF-8, interpolation, nested comments, keyword coverage, resource limits, and
-stable lexical diagnostic messages. The parser port is the next phase;
+stable lexical diagnostic messages. The token trace carries a decoded literal
+payload (numeric and string values, including `\uXXXX` escapes, with surrogate
+code points rejected) and the resource-limit diagnostics for oversized source
+(208), comment nesting (209), and interpolation nesting (210) are each
+verified by dedicated fixtures. The parser port is the next phase;
 the initial structural parser gate is now in
 `selfhost/compiler/natural_parser.suru`. `--syntax=natural` is not enabled
 until expression/type parsing and semantic gates exist. The structural gate
 currently checks declarations, binding initializers, public signatures,
 constant scope, mutable assignment targets, and routine return context. The
 token-based expression parser and core statement AST bridge now cover
-precedence expressions, bindings, assignment, `show`, and `give`; type and
+precedence expressions (including the conditional `? :` form), bindings,
+assignment, `show`, and `give`; type and
 semantic gates remain open. Control-flow AST nodes and nested block ownership
 are covered by the Natural Syntax parser gate. The initial semantic gate now
 covers local symbol/type inference, assignment mutability, expression operand

@@ -166,6 +166,22 @@ func ne_parse_expression(source: str, position: int, minimum: int) -> [str] {
         value = "(" + value + " " + operator.text + " " + ne_value(right) + ")";
         next = ne_next(right);
     }
+
+    if minimum <= 1 {
+        let ternary_position: int = ne_skip_lines(source, next);
+        let maybe = natural_next(source, ternary_position);
+        if maybe.text == "?" {
+            let then = ne_parse_expression(source, maybe.next, 0);
+            if ne_is_ok(then) == false { return then; }
+            let colon_position: int = ne_skip_lines(source, ne_next(then));
+            let colon = natural_next(source, colon_position);
+            if colon.text != ":" { return ne_fail(colon.next, "expected ':'"); }
+            let els = ne_parse_expression(source, colon.next, 0);
+            if ne_is_ok(els) == false { return els; }
+            return ne_ok(ne_next(els), "(" + value + " ? " +
+                         ne_value(then) + " : " + ne_value(els) + ")");
+        }
+    }
     return ne_ok(next, value);
 }
 

@@ -9,6 +9,10 @@ trap 'rm -rf "$tmp"' EXIT
 
 "$SURU" run "$DIR/natural_control_driver.suru" \
     "$ROOT/tests/natural/control_ast_valid.suru" >"$tmp/valid.out"
+"$SURU" run "$DIR/natural_control_driver.suru" \
+    "$ROOT/tests/natural/control_each_through_valid.suru" >"$tmp/each-through.out"
+grep -q '^ast|each|1|n from 1 through 5$' "$tmp/each-through.out"
+grep -q '^ast|end-each|3|$' "$tmp/each-through.out"
 grep -q '^ast|repeat|1|while (attempts < 3)$' "$tmp/valid.out"
 grep -q '^ast|when|4|(attempts == 3)$' "$tmp/valid.out"
 grep -q '^ast|otherwise-when|6|(attempts > 3)$' "$tmp/valid.out"

@@ -58,6 +58,24 @@ tail -n 1 "$tmp/invalid-escape.out" | diff -u \
     "$ROOT/tests/natural/invalid_escape.diag" -
 
 if "$SURU" run "$DIR/natural_lexer_driver.suru" \
+       "$ROOT/tests/natural/unterminated_string.suru" \
+       >"$tmp/unterminated-string.out"; then
+    echo "natural lexer: unterminated string was accepted" >&2
+    exit 1
+fi
+tail -n 1 "$tmp/unterminated-string.out" | diff -u \
+    "$ROOT/tests/natural/unterminated_string.diag" -
+
+if "$SURU" run "$DIR/natural_lexer_driver.suru" \
+       "$ROOT/tests/natural/unterminated_comment.suru" \
+       >"$tmp/unterminated-comment.out"; then
+    echo "natural lexer: unterminated comment was accepted" >&2
+    exit 1
+fi
+tail -n 1 "$tmp/unterminated-comment.out" | diff -u \
+    "$ROOT/tests/natural/unterminated_comment.diag" -
+
+if "$SURU" run "$DIR/natural_lexer_driver.suru" \
        "$ROOT/tests/natural/lexical_invalid_utf8.suru" \
        >"$tmp/invalid-utf8.out"; then
     echo "natural lexer: malformed UTF-8 was accepted" >&2

@@ -7,7 +7,8 @@ ROOT="$(cd "$DIR/../.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-for input in expression_valid.suru expression_postfix_valid.suru; do
+for input in expression_valid.suru expression_postfix_valid.suru \
+             expression_ternary_valid.suru; do
     "$SURU" run "$DIR/natural_expression_driver.suru" \
         "$ROOT/tests/natural/$input" >"$tmp/$input.out"
     grep -q '^expr|' "$tmp/$input.out"
@@ -23,6 +24,8 @@ grep -q '^0|2|1|24|24|' "$tmp/tokens.out"
 grep -q '^expr|(((1 + (2 \* 3)) == 7) and true)' "$tmp/expression_valid.suru.out"
 grep -q '^expr|items\[0\]\.name(first,(second + 1))' \
     "$tmp/expression_postfix_valid.suru.out"
+grep -q '^expr|(((1 + (2 \* 3)) == 7) ? (a ? b : c) : d)' \
+    "$tmp/expression_ternary_valid.suru.out"
 
 for input in expression_invalid.suru expression_unclosed.suru; do
     if "$SURU" run "$DIR/natural_expression_driver.suru" \
