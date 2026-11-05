@@ -43,6 +43,49 @@ func nw_elf_header(total: int, entry: int) -> str {
     return hd + ph;
 }
 
+func nw_elf_header2(total: int, entry: int, heap_vaddr: int, heap_size: int) -> str {
+    let hd: str = "";
+    hd = hd + str_chr_byte(0x7f) + "ELF" +
+        str_chr_byte(2) + str_chr_byte(1) + str_chr_byte(1) + str_chr_byte(0) +
+        str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0) +
+        str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
+    hd = hd + nw_u16(2);
+    hd = hd + nw_u16(62);
+    hd = hd + nw_u32(1);
+    hd = hd + nw_i64(entry);
+    hd = hd + nw_i64(64);
+    hd = hd + nw_i64(0);
+    hd = hd + nw_u32(0);
+    hd = hd + nw_u16(64);
+    hd = hd + nw_u16(56);
+    hd = hd + nw_u16(2);
+    hd = hd + nw_u16(0);
+    hd = hd + nw_u16(0);
+    hd = hd + nw_u16(0);
+
+    let ph1: str = "";
+    ph1 = ph1 + nw_u32(1);
+    ph1 = ph1 + nw_u32(5);
+    ph1 = ph1 + nw_i64(0);
+    ph1 = ph1 + nw_i64(0x400000);
+    ph1 = ph1 + nw_i64(0x400000);
+    ph1 = ph1 + nw_i64(total);
+    ph1 = ph1 + nw_i64(total);
+    ph1 = ph1 + nw_i64(0x1000);
+
+    let ph2: str = "";
+    ph2 = ph2 + nw_u32(1);
+    ph2 = ph2 + nw_u32(6);
+    ph2 = ph2 + nw_i64(total);
+    ph2 = ph2 + nw_i64(heap_vaddr);
+    ph2 = ph2 + nw_i64(heap_vaddr);
+    ph2 = ph2 + nw_i64(heap_size);
+    ph2 = ph2 + nw_i64(heap_size);
+    ph2 = ph2 + nw_i64(0x1000);
+
+    return hd + ph1 + ph2;
+}
+
 func nw_print_routine() -> str {
     mut code: str = "";
     // sub rsp, 32
