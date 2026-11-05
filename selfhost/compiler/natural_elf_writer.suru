@@ -1,7 +1,8 @@
-// SURU-owned ELF64 emitter (Stage 3 seed). Produces a minimal static x86-64
-// ELF64 executable that writes "hi\n" to stdout and exits 0 without invoking a
-// C compiler or linker. This establishes the ELF-output machinery in SURU; the
-// natural-backend binding (source -> machine code) is later work.
+// SURU-owned ELF64 emitter (Stage 3 seed). Produces minimal static x86-64
+// ELF64 executables (no C compiler/linker) for trivial Natural programs:
+// `show("literal")`, `show(<int constant>)`, and `show(<int expression>)`
+// over const_int / neg / add / sub / mul / div. Values are printed via a raw
+// divide-by-10 decimal routine and `write`/`exit` syscalls.
 
 use "natural_module_writer.suru";
 
@@ -9,81 +10,7 @@ func nw_u16(n: int) -> str {
     return str_chr_byte(n & 255) + str_chr_byte((n >> 8) & 255);
 }
 
-func nw_emit_elf_message(msg: str) -> str {
-    // Layout: ELF64 header (64) + one PT_LOAD program header (56) + code (46)
-    // + message (len(msg)). Entry at file offset 120 = vaddr 0x400078.
-    let base: int = 0x400000;
-    let code_off: int = 120;
-    let entry: int = base + code_off;
-    let code_len: int = 46;
-    let msg_off: int = code_off + code_len;
-    let total: int = msg_off + str_len(msg);
-
-    // ---- ELF64 header ----
-    mut hd: str = "";
-    hd = hd + str_chr_byte(0x7f) + "ELF" +
-        str_chr_byte(2) + str_chr_byte(1) + str_chr_byte(1) + str_chr_byte(0) +
-        str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0) +
-        str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
-    hd = hd + nw_u16(2);
-    hd = hd + nw_u16(62);
-    hd = hd + nw_u32(1);
-    hd = hd + nw_i64(entry);
-    hd = hd + nw_i64(64);
-    hd = hd + nw_i64(0);
-    hd = hd + nw_u32(0);
-    hd = hd + nw_u16(64);
-    hd = hd + nw_u16(56);
-    hd = hd + nw_u16(1);
-    hd = hd + nw_u16(0);
-    hd = hd + nw_u16(0);
-    hd = hd + nw_u16(0);
-
-    // ---- program header (PT_LOAD) ----
-    mut ph: str = "";
-    ph = ph + nw_u32(1);
-    ph = ph + nw_u32(5);
-    ph = ph + nw_i64(0);
-    ph = ph + nw_i64(base);
-    ph = ph + nw_i64(base);
-    ph = ph + nw_i64(total);
-    ph = ph + nw_i64(total);
-    ph = ph + nw_i64(0x1000);
-
-    // ---- code ----
-    mut code: str = "";
-    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC0);
-    code = code + str_chr_byte(0x01) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
-    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC7);
-    code = code + str_chr_byte(0x01) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
-    code = code + str_chr_byte(0x48) + str_chr_byte(0x8D) + str_chr_byte(0x35);
-    let disp: int = (base + msg_off) - (base + code_off + 21);
-    code = code + nw_u32(disp);
-    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC2);
-    code = code + nw_u32(str_len(msg));
-    code = code + str_chr_byte(0x0F) + str_chr_byte(0x05);
-    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC0);
-    code = code + str_chr_byte(0x3C) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
-    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC7);
-    code = code + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
-    code = code + str_chr_byte(0x0F) + str_chr_byte(0x05);
-
-    return hd + ph + code + msg;
-}
-
-func nw_emit_minimal_elf() -> str {
-    return nw_emit_elf_message("hi\n");
-}
-
-func nw_emit_elf_int(value: int) -> str {
-    // Layout: header(64) + phdr(56) + code. Code = mov rax,imm32 (7) +
-    // decimal-print loop (85). Entry at file offset 120 = vaddr 0x400078.
-    let base: int = 0x400000;
-    let code_off: int = 120;
-    let entry: int = base + code_off;
-    let code_len: int = 92;
-    let total: int = code_off + code_len;
-
+func nw_elf_header(total: int, entry: int) -> str {
     mut hd: str = "";
     hd = hd + str_chr_byte(0x7f) + "ELF" +
         str_chr_byte(2) + str_chr_byte(1) + str_chr_byte(1) + str_chr_byte(0) +
@@ -107,16 +34,17 @@ func nw_emit_elf_int(value: int) -> str {
     ph = ph + nw_u32(1);
     ph = ph + nw_u32(5);
     ph = ph + nw_i64(0);
-    ph = ph + nw_i64(base);
-    ph = ph + nw_i64(base);
+    ph = ph + nw_i64(0x400000);
+    ph = ph + nw_i64(0x400000);
     ph = ph + nw_i64(total);
     ph = ph + nw_i64(total);
     ph = ph + nw_i64(0x1000);
 
+    return hd + ph;
+}
+
+func nw_print_routine() -> str {
     mut code: str = "";
-    // mov rax, imm32(value)
-    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC0);
-    code = code + nw_u32(value);
     // sub rsp, 32
     code = code + str_chr_byte(0x48) + str_chr_byte(0x83) + str_chr_byte(0xEC) + str_chr_byte(0x20);
     // mov rbx, 10
@@ -163,6 +91,77 @@ func nw_emit_elf_int(value: int) -> str {
     code = code + str_chr_byte(0x48) + str_chr_byte(0x31) + str_chr_byte(0xFF);
     // syscall
     code = code + str_chr_byte(0x0F) + str_chr_byte(0x05);
+    return code;
+}
 
-    return hd + ph + code;
+func nw_emit_elf_int_expr(ops: [int], avs: [int]) -> str {
+    // Header(64) + phdr(56) = 120; entry at file offset 120.
+    mut code: str = "";
+    mut i: int = 0;
+    while i < array_len(ops) {
+        let op: int = ops[i];
+        if op == 1 {
+            code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC0);
+            code = code + nw_u32(avs[i]);
+            code = code + str_chr_byte(0x50);
+        } else if op == 11 {
+            code = code + str_chr_byte(0x58);
+            code = code + str_chr_byte(0x48) + str_chr_byte(0xF7) + str_chr_byte(0xD8);
+            code = code + str_chr_byte(0x50);
+        } else if op == 14 or op == 15 or op == 16 {
+            code = code + str_chr_byte(0x5B) + str_chr_byte(0x58);
+            if op == 14 { code = code + str_chr_byte(0x48) + str_chr_byte(0x01) + str_chr_byte(0xD8); }
+            else if op == 15 { code = code + str_chr_byte(0x48) + str_chr_byte(0x29) + str_chr_byte(0xD8); }
+            else { code = code + str_chr_byte(0x48) + str_chr_byte(0x0F) + str_chr_byte(0xAF) + str_chr_byte(0xC3); }
+            code = code + str_chr_byte(0x50);
+        } else if op == 17 {
+            code = code + str_chr_byte(0x5B) + str_chr_byte(0x58);
+            code = code + str_chr_byte(0x48) + str_chr_byte(0x31) + str_chr_byte(0xD2);
+            code = code + str_chr_byte(0x48) + str_chr_byte(0xF7) + str_chr_byte(0xF3);
+            code = code + str_chr_byte(0x50);
+        } else {
+            return "";
+        }
+        i += 1;
+    }
+    code = code + str_chr_byte(0x58); // pop rax (result)
+    code = code + nw_print_routine();
+    let total: int = 120 + str_len(code);
+    return nw_elf_header(total, 0x400000 + 120) + code;
+}
+
+func nw_emit_elf_message(msg: str) -> str {
+    let base: int = 0x400000;
+    let code_off: int = 120;
+    let entry: int = base + code_off;
+    let code_len: int = 46;
+    let msg_off: int = code_off + code_len;
+    let total: int = msg_off + str_len(msg);
+
+    mut code: str = "";
+    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC0);
+    code = code + str_chr_byte(0x01) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
+    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC7);
+    code = code + str_chr_byte(0x01) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
+    code = code + str_chr_byte(0x48) + str_chr_byte(0x8D) + str_chr_byte(0x35);
+    let disp: int = (base + msg_off) - (base + code_off + 21);
+    code = code + nw_u32(disp);
+    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC2);
+    code = code + nw_u32(str_len(msg));
+    code = code + str_chr_byte(0x0F) + str_chr_byte(0x05);
+    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC0);
+    code = code + str_chr_byte(0x3C) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
+    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC7);
+    code = code + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
+    code = code + str_chr_byte(0x0F) + str_chr_byte(0x05);
+
+    return nw_elf_header(total, entry) + code + msg;
+}
+
+func nw_emit_elf_int(value: int) -> str {
+    return nw_emit_elf_int_expr([1], [value]);
+}
+
+func nw_emit_minimal_elf() -> str {
+    return nw_emit_elf_message("hi\n");
 }

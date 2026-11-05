@@ -3,9 +3,9 @@ use "../../selfhost/compiler/natural_bytecode.suru";
 use "../../selfhost/compiler/natural_module_writer.suru";
 use "../../selfhost/compiler/natural_elf_writer.suru";
 
-// Minimal native backend path: compiles a trivial Natural program of the exact
-// shape `show(x)` (const_str/const_int; builtin println; pop; ret_unit) into a
-// standalone x86-64 ELF64 executable that prints the literal or integer.
+// Minimal native backend path: compiles a trivial Natural program whose body is
+// `show(x)` (string literal, integer constant, or integer expression over
+// const/neg/add/sub/mul/div) into a standalone x86-64 ELF64 executable.
 func main() {
     let source: str = source_load(args(0));
     let instructions: [str] = nbc_collect(source);
@@ -15,50 +15,77 @@ func main() {
     let fns: [[str]] = nw_collect_functions(instructions);
     if array_len(fns) != 1 { exit(2); }
     let ins: [str] = nw_emit_ins(fns[0]);
-    if array_len(ins) != 4 { exit(3); }
-    let f0: [str] = str_split(ins[0], "|");
-    let f1: [str] = str_split(ins[1], "|");
-    if nw_norm(f1[0]) != "builtin" or f1[1] != "1" { exit(5); }
+    let n: int = array_len(ins);
+    if n < 4 { exit(3); }
 
-    if nw_norm(f0[0]) == "const_int" {
-        let sidx: int = int_from_str(f0[1]);
+    let tail: [str] = str_split(ins[n - 3], "|");
+    if nw_norm(tail[0]) != "builtin" or tail[1] != "1" { exit(5); }
+
+    let first: [str] = str_split(ins[0], "|");
+    if nw_norm(first[0]) == "const_str" {
+        if n != 4 { exit(4); }
+        let sidx: int = int_from_str(first[1]);
         mut found: int = -1;
-        mut ival: int = 0;
+        mut val: str = "";
         mut i: int = 0;
         while i < array_len(instructions) {
-            if nbc_has_prefix(instructions[i], "#int|") {
+            if nbc_has_prefix(instructions[i], "#str|") {
                 found += 1;
                 if found == sidx {
-                    ival = nw_int_toll(substr(instructions[i], 5, str_len(instructions[i])));
+                    let raw: str = substr(instructions[i], 5, str_len(instructions[i]));
+                    if str_len(raw) >= 2 and raw[0] == "\"" and
+                       raw[str_len(raw) - 1] == "\"" {
+                        val = substr(raw, 1, str_len(raw) - 2);
+                    } else {
+                        val = raw;
+                    }
                 }
             }
             i += 1;
         }
-        write_file(args(1), nw_emit_elf_int(ival));
+        if val == "" { exit(6); }
+        write_file(args(1), nw_emit_elf_message(val + "\n"));
         exit(0);
     }
 
-    if nw_norm(f0[0]) != "const_str" { exit(4); }
-    let sidx: int = int_from_str(f0[1]);
-    mut found: int = -1;
-    mut val: str = "";
-    mut i: int = 0;
-    while i < array_len(instructions) {
-        if nbc_has_prefix(instructions[i], "#str|") {
-            found += 1;
-            if found == sidx {
-                let raw: str = substr(instructions[i], 5, str_len(instructions[i]));
-                if str_len(raw) >= 2 and raw[0] == "\"" and
-                   raw[str_len(raw) - 1] == "\"" {
-                    val = substr(raw, 1, str_len(raw) - 2);
-                } else {
-                    val = raw;
+    // Integer expression: prefix (const/arith/neg) + println + pop + ret_unit.
+    mut ops: [int] = [];
+    mut avs: [int] = [];
+    mut idx: int = 0;
+    while idx < n - 3 {
+        let f: [str] = str_split(ins[idx], "|");
+        let opname: str = nw_norm(f[0]);
+        mut id: int = 0;
+        if opname == "const_int" { id = 1; }
+        else if opname == "neg_i" { id = 11; }
+        else if opname == "add_i" { id = 14; }
+        else if opname == "sub_i" { id = 15; }
+        else if opname == "mul_i" { id = 16; }
+        else if opname == "div_i" { id = 17; }
+        else { exit(4); }
+        ops = array_concat(ops, [id]);
+        if id == 1 {
+            let sidx: int = int_from_str(f[1]);
+            mut found: int = -1;
+            mut ival: int = 0;
+            let pi: int = 0;
+            while pi < array_len(instructions) {
+                if nbc_has_prefix(instructions[pi], "#int|") {
+                    found += 1;
+                    if found == sidx {
+                        ival = nw_int_toll(substr(instructions[pi], 5, str_len(instructions[pi])));
+                    }
                 }
+                pi += 1;
             }
+            avs = array_concat(avs, [ival]);
+        } else {
+            avs = array_concat(avs, [0]);
         }
-        i += 1;
+        idx += 1;
     }
-    if val == "" { exit(6); }
-    write_file(args(1), nw_emit_elf_message(val + "\n"));
+    let elf: str = nw_emit_elf_int_expr(ops, avs);
+    if elf == "" { exit(7); }
+    write_file(args(1), elf);
     exit(0);
 }
