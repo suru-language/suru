@@ -54,6 +54,8 @@ run_case arr 'routine main() -> Unit\n    value xs: [Whole] = [10, 20, 30]\n    
 run_case arrset 'routine main() -> Unit\n    value xs: [Whole] = [1, 2]\n    set xs[0] to 9\n    show(xs[0])\nend routine'
 run_case rec 'record Point\n    change x: Whole\n    change y: Whole\nend record\nroutine main() -> Unit\n    value p: Point = none\n    set p.x to 3\n    set p.y to 4\n    show(p.x + p.y)\nend routine'
 run_case recparam 'record Point\n    change x: Whole\nend record\nroutine f(n: Whole, p: Point) -> Whole\n    give p.x + n\nend routine\nroutine main() -> Unit\n    value p: Point = none\n    set p.x to 5\n    show(f(2, p))\nend routine'
+run_case handled 'routine handled() -> Unit\n    attempt\n        show("try")\n    handle problem: FileError\n        show("handled")\n    end exception\n    ensure\n        show("cleanup")\n    end exception\n    give\nend attempt\nend routine'
+run_case exc 'routine main() -> Unit\n    attempt\n        show("try")\n    handle e: E\n        show("handled")\n    end exception\n    ensure\n        show("cleanup")\n    end exception\n    give\nend attempt\nend routine'
 
 # Fixture: control_valid.suru (runs cleanly on the reference VM).
 if "$SURU" --syntax=natural compile "$ROOT/tests/natural/control_valid.suru" \

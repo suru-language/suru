@@ -191,10 +191,11 @@ The bytecode object-emitting half is now owned by SURU:
   `.sbc` module and executes a core of the instruction set (constants, locals,
   int/float arithmetic and comparison, string concat, control flow, function
   calls and recursion, arrays (literal construction, index read/write),
-  records (construction, field read/write), print/println/to_str, returns)
-  under the C17 VM, with output parity to the C VM as the gate
+  records (construction, field read/write), exception handlers
+  (`PUSH_HANDLER`/`POP_HANDLER`/`NEW_EXCEPTION`/`THROW`), print/println/to_str,
+  returns) under the C17 VM, with output parity to the C VM as the gate
   (`natural_vm_run.sh`). This is the first execution step of the Stage 2 VM
-  port; closures and exception handlers remain open.
+  port; closures remain open.
 - Gates wired into `make selfhost-test`: `natural_compile_run.sh` (differential
   byte-identity, 58/58), `natural_verify_run.sh` (positive + injected invalid),
   `natural_build_run.sh` (full-pipeline acceptance all byte-identical), and
