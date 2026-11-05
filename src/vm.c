@@ -458,6 +458,42 @@ static bool builtin_array_len(s_vm *vm) {
     return push(vm, s_val_int((s_i64)v.u.o->count));
 }
 
+static bool builtin_str_from_codepoint(s_vm *vm) {
+    s_value v = pop(vm);
+    if (v.tag != S_VAL_INT) {
+        vm_trap(vm, "str_from_codepoint expects an integer");
+        return false;
+    }
+    s_i64 cp = v.u.i;
+    if (cp < 0 || cp > 0x10FFFF ||
+        (cp >= 0xD800 && cp <= 0xDFFF)) {
+        vm_trap(vm, "str_from_codepoint: invalid code point");
+        return false;
+    }
+    char buf[4];
+    s_size n = 0;
+    if (cp < 0x80) {
+        buf[0] = (char)cp;
+        n = 1;
+    } else if (cp < 0x800) {
+        buf[0] = (char)(0xC0 | (cp >> 6));
+        buf[1] = (char)(0x80 | (cp & 0x3F));
+        n = 2;
+    } else if (cp < 0x10000) {
+        buf[0] = (char)(0xE0 | (cp >> 12));
+        buf[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
+        buf[2] = (char)(0x80 | (cp & 0x3F));
+        n = 3;
+    } else {
+        buf[0] = (char)(0xF0 | (cp >> 18));
+        buf[1] = (char)(0x80 | ((cp >> 12) & 0x3F));
+        buf[2] = (char)(0x80 | ((cp >> 6) & 0x3F));
+        buf[3] = (char)(0x80 | (cp & 0x3F));
+        n = 4;
+    }
+    return push_str_from_buf(vm, buf, n);
+}
+
 static bool builtin_read_line(s_vm *vm) {
     s_size len;
     char *line = s_rt_read_line(&len);
@@ -1302,6 +1338,7 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_ARRAY_SORT: return builtin_array_sort(vm);
     case S_BUILTIN_STR_VALID_UTF8: return builtin_str_valid_utf8(vm);
     case S_BUILTIN_STR_UTF8_LEN: return builtin_str_utf8_len(vm);
+    case S_BUILTIN_STR_FROM_CODEPOINT: return builtin_str_from_codepoint(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

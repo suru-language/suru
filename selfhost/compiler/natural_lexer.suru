@@ -166,7 +166,7 @@ func natural_lex_dump(source: str) -> int {
         }
         if c == "\n" {
             if parens == 0 and brackets == 0 and not line_start {
-                n_emit("NEWLINE", source, i, i + 1);
+                n_emit("NEWLINE", source, i, i + 1, "");
             }
             i += 1;
             line_start = true;
@@ -204,8 +204,8 @@ func natural_lex_dump(source: str) -> int {
             i += 1;
             while i < n and n_is_continue(source[i]) { i += 1; }
             let word: str = substr(source, start, i - start);
-            if n_is_keyword(word) { n_emit("KEYWORD", source, start, i); }
-            else { n_emit("IDENT", source, start, i); }
+            if n_is_keyword(word) { n_emit("KEYWORD", source, start, i, word); }
+            else { n_emit("IDENT", source, start, i, word); }
             line_start = false;
             continue;
         }
@@ -221,7 +221,17 @@ func natural_lex_dump(source: str) -> int {
                 }
                 i += 1;
             }
-            n_emit("NUMBER", source, start, i);
+            let raw: str = substr(source, start, i - start);
+            mut decoded: str = raw;
+            if str_len(raw) >= 2 and raw[0] == "0" and
+               (raw[1] == "x" or raw[1] == "X" or raw[1] == "b" or raw[1] == "B") {
+                decoded = to_str(integer_value(raw));
+            } else if str_contains(raw, ".") or str_contains(raw, "e") or str_contains(raw, "E") {
+                decoded = f64_to_str(str_to_f64(strip_underscores(raw)));
+            } else {
+                decoded = to_str(integer_value(raw));
+            }
+            n_emit("NUMBER", source, start, i, decoded);
             line_start = false;
             continue;
         }
@@ -269,17 +279,18 @@ func natural_lex_dump(source: str) -> int {
             if i >= n { n_error(source, start, 202); return 1; }
             if interpolation_depth != 0 { n_error(source, start, 204); return 1; }
             i += 1;
-            n_emit("STRING", source, start, i);
+            let decoded: str = escaped_value(decode_string(source, start, i));
+            n_emit("STRING", source, start, i, decoded);
             line_start = false;
             continue;
         }
 
-        if c == "(" { parens += 1; n_emit("PUNCT", source, i, i + 1); i += 1; line_start = false; continue; }
-        if c == ")" { if parens > 0 { parens -= 1; } else { n_error(source, i, 205); return 1; } n_emit("PUNCT", source, i, i + 1); i += 1; line_start = false; continue; }
-        if c == "[" { brackets += 1; n_emit("PUNCT", source, i, i + 1); i += 1; line_start = false; continue; }
-        if c == "]" { if brackets > 0 { brackets -= 1; } else { n_error(source, i, 205); return 1; } n_emit("PUNCT", source, i, i + 1); i += 1; line_start = false; continue; }
+        if c == "(" { parens += 1; n_emit("PUNCT", source, i, i + 1, "("); i += 1; line_start = false; continue; }
+        if c == ")" { if parens > 0 { parens -= 1; } else { n_error(source, i, 205); return 1; } n_emit("PUNCT", source, i, i + 1, ")"); i += 1; line_start = false; continue; }
+        if c == "[" { brackets += 1; n_emit("PUNCT", source, i, i + 1, "["); i += 1; line_start = false; continue; }
+        if c == "]" { if brackets > 0 { brackets -= 1; } else { n_error(source, i, 205); return 1; } n_emit("PUNCT", source, i, i + 1, "]"); i += 1; line_start = false; continue; }
         if c == "{" or c == "}" or c == "," or c == ":" or c == "." {
-            n_emit("PUNCT", source, i, i + 1);
+            n_emit("PUNCT", source, i, i + 1, c);
             i += 1;
             line_start = false;
             continue;
@@ -288,13 +299,13 @@ func natural_lex_dump(source: str) -> int {
             i += 1;
             if i < n and (source[i] == "=" or source[i] == c or
                           (c == "-" and source[i] == ">")) { i += 1; }
-            n_emit("OPERATOR", source, start, i);
+            n_emit("OPERATOR", source, start, i, substr(source, start, i - start));
             line_start = false;
             continue;
         }
         n_error(source, i, 206);
         return 1;
     }
-    n_emit("EOF", source, n, n);
+    n_emit("EOF", source, n, n, "");
     return 0;
 }
