@@ -81,11 +81,13 @@ func natural_run_module(bytes: str) -> int {
     mut fn_bs: [[int]] = [];
     mut fn_cs: [[int]] = [];
     mut fn_frames: [int] = [];
+    mut fn_nparams: [int] = [];
     i = 0;
     while i < nfunc[0] {
         let nm: [int] = nr_u32_at(bytes, p);
         p = nm[1] + nm[0];
         let q: [int] = nr_u32_at(bytes, p);
+        let np: int = q[0];
         p = q[1];
         let q2: [int] = nr_u32_at(bytes, p);
         let fr: int = q2[0];
@@ -96,6 +98,7 @@ func natural_run_module(bytes: str) -> int {
         let nins: int = q4[0];
         p = q4[1];
         fn_frames = array_concat(fn_frames, [fr]);
+        fn_nparams = array_concat(fn_nparams, [np]);
         mut ops: [int] = [];
         mut avs: [int] = [];
         mut bvs: [int] = [];
@@ -120,28 +123,36 @@ func natural_run_module(bytes: str) -> int {
     }
 
     let fid: int = entry[0];
-    let ops: [int] = fn_ops[fid];
-    let avs: [int] = fn_as[fid];
-    let bs: [int] = fn_bs[fid];
-    let cs: [int] = fn_cs[fid];
-    let nins: int = array_len(ops);
     let frame: int = fn_frames[fid];
 
-    mut locals: [str] = [];
+    mut fr_fid: [int] = [fid];
+    mut fr_pc: [int] = [0];
+    mut fr_locals: [[str]] = [];
+    mut loc0: [str] = [];
     i = 0;
     while i < frame {
-        locals = array_concat(locals, ["N"]);
+        loc0 = array_concat(loc0, ["N"]);
         i += 1;
     }
+    fr_locals = array_concat(fr_locals, [loc0]);
 
     mut stack: [str] = [];
-    mut pc: int = 0;
     mut guard: int = 0;
-    while pc < nins and guard < 1000000 {
+    while guard < 10000000 {
         guard += 1;
+        let top: int = array_len(fr_fid) - 1;
+        let tfid: int = fr_fid[top];
+        let ops: [int] = fn_ops[tfid];
+        let avs: [int] = fn_as[tfid];
+        let bs: [int] = fn_bs[tfid];
+        let nins: int = array_len(ops);
+        let pc: int = fr_pc[top];
+        if pc >= nins { return 5; }
         let op: int = ops[pc];
         let a: int = avs[pc];
         let b: int = bs[pc];
+        let locals: [str] = fr_locals[top];
+
         if op == 1 {
             stack = vm_push(stack, "I" + to_str(intpool[a]));
         } else if op == 2 {
@@ -157,6 +168,7 @@ func natural_run_module(bytes: str) -> int {
             let val: str = stack[n - 1];
             stack = vm_pop(stack);
             locals[a] = val;
+            fr_locals[top] = locals;
         } else if op == 7 {
             stack = vm_pop(stack);
         } else if op == 8 {
@@ -201,12 +213,12 @@ func natural_run_module(bytes: str) -> int {
             stack = vm_pop(stack);
             let fx: float = str_to_f64(substr(x, 1, str_len(x)));
             let fy: float = str_to_f64(substr(y, 1, str_len(y)));
-            mut fr: float = 0.0;
-            if op == 19 { fr = fx + fy; }
-            else if op == 20 { fr = fx - fy; }
-            else if op == 21 { fr = fx * fy; }
-            else { fr = fx / fy; }
-            stack = vm_push(stack, "F" + f64_to_str(fr));
+            mut fr2: float = 0.0;
+            if op == 19 { fr2 = fx + fy; }
+            else if op == 20 { fr2 = fx - fy; }
+            else if op == 21 { fr2 = fx * fy; }
+            else { fr2 = fx / fy; }
+            stack = vm_push(stack, "F" + f64_to_str(fr2));
         } else if op == 29 or op == 30 or op == 31 or op == 32 or op == 33 or op == 34 {
             let n: int = array_len(stack);
             let y: str = stack[n - 1];
@@ -232,6 +244,25 @@ func natural_run_module(bytes: str) -> int {
             let sx: str = substr(x, 1, str_len(x));
             let sy: str = substr(y, 1, str_len(y));
             stack = vm_push(stack, "S" + sx + sy);
+        } else if op == 59 {
+            let nargs: int = fn_nparams[a];
+            mut callee: [str] = [];
+            mut k0: int = 0;
+            while k0 < nargs { callee = array_concat(callee, ["N"]); k0 += 1; }
+            mut k: int = nargs - 1;
+            while k >= 0 {
+                let n: int = array_len(stack);
+                let val: str = stack[n - 1];
+                stack = vm_pop(stack);
+                callee[k] = val;
+                k -= 1;
+            }
+            let cf: int = fn_frames[a];
+            while array_len(callee) < cf { callee = array_concat(callee, ["N"]); }
+            fr_fid = array_concat(fr_fid, [a]);
+            fr_pc = array_concat(fr_pc, [0]);
+            fr_locals = array_concat(fr_locals, [callee]);
+            continue;
         } else if op == 63 {
             if a == 0 {
                 let n: int = array_len(stack);
@@ -251,27 +282,31 @@ func natural_run_module(bytes: str) -> int {
             } else {
                 return 2;
             }
-        } else if op == 64 {
-            return 0;
-        } else if op == 65 {
-            return 0;
+        } else if op == 64 or op == 65 {
+            if array_len(fr_fid) == 1 { return 0; }
+            fr_fid = slice(fr_fid, 0, array_len(fr_fid) - 1);
+            fr_pc = slice(fr_pc, 0, array_len(fr_pc) - 1);
+            fr_locals = slice(fr_locals, 0, array_len(fr_locals) - 1);
+            let ntop: int = array_len(fr_fid) - 1;
+            fr_pc[ntop] = fr_pc[ntop] + 1;
+            continue;
         } else if op == 66 {
-            pc = a;
+            fr_pc[top] = a;
             continue;
         } else if op == 67 {
             let n: int = array_len(stack);
             let v: str = stack[n - 1];
             stack = vm_pop(stack);
-            if v[1] == "0" { pc = a; continue; }
+            if v[1] == "0" { fr_pc[top] = a; continue; }
         } else if op == 68 {
             let n: int = array_len(stack);
             let v: str = stack[n - 1];
             stack = vm_pop(stack);
-            if v[1] == "1" { pc = a; continue; }
+            if v[1] == "1" { fr_pc[top] = a; continue; }
         } else {
             return 3;
         }
-        pc += 1;
+        fr_pc[top] = fr_pc[top] + 1;
     }
-    return guard >= 1000000 ? 4 : 0;
+    return 4;
 }

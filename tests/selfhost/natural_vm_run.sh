@@ -48,6 +48,8 @@ run_case floatmul 'routine main() -> Unit\n    show(2.0 * 3.0)\nend routine'
 run_case cmp 'routine main() -> Unit\n    show(3 < 5)\n    show(5 >= 5)\nend routine'
 run_case loop 'routine main() -> Unit\n    value i: Whole = 0\n    repeat while i < 3\n        show(to_str(i))\n        set i to i + 1\n    end repeat\nend routine'
 run_case when 'routine main() -> Unit\n    value x: Whole = 2\n    when x > 1\n        show("big")\n    otherwise\n        show("small")\n    end when\nend routine'
+run_case call 'routine double(x: Whole) -> Whole\n    give x * 2\nend routine\nroutine main() -> Unit\n    value a: Whole = double(5)\n    show(to_str(a))\n    show(to_str(double(21)))\nend routine'
+run_case fib 'routine fib(n: Whole) -> Whole\n    when n < 2\n        give n\n    otherwise\n        give fib(n - 1) + fib(n - 2)\n    end when\nend routine\nroutine main() -> Unit\n    show(to_str(fib(6)))\nend routine'
 
 # Fixture: control_valid.suru (runs cleanly on the reference VM).
 if "$SURU" --syntax=natural compile "$ROOT/tests/natural/control_valid.suru" \

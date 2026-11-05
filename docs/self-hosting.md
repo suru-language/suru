@@ -189,10 +189,11 @@ The bytecode object-emitting half is now owned by SURU:
   write -> read -> re-write round-trip (`natural_reader_run.sh`, 57/57).
 - `selfhost/compiler/natural_vm.suru` is a SURU-written interpreter that loads a
   `.sbc` module and executes a core of the instruction set (constants, locals,
-  int/float arithmetic and comparison, string concat, control flow,
-  print/println/to_str, returns) under the C17 VM, with output parity to the C
-  VM as the gate (`natural_vm_run.sh`). This is the first execution step of the
-  Stage 2 VM port; calls, closures, arrays, records, and handlers remain open.
+  int/float arithmetic and comparison, string concat, control flow, function
+  calls and recursion, print/println/to_str, returns) under the C17 VM, with
+  output parity to the C VM as the gate (`natural_vm_run.sh`). This is the
+  first execution step of the Stage 2 VM port; closures, arrays, records, and
+  exception handlers remain open.
 - Gates wired into `make selfhost-test`: `natural_compile_run.sh` (differential
   byte-identity, 58/58), `natural_verify_run.sh` (positive + injected invalid),
   `natural_build_run.sh` (full-pipeline acceptance all byte-identical), and
