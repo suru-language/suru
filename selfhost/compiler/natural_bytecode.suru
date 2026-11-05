@@ -226,6 +226,69 @@ func nbc_split_ternary(text: str) -> [str] {
             str_trim(substr(text, colon + 1, str_len(text)))];
 }
 
+func nbc_record_index(instructions: [str], name: str) -> int {
+    let wanted: str = "#record|" + name + "|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], wanted) {
+            return int_from_str(substr(instructions[i], str_len(wanted),
+                                       str_len(instructions[i])));
+        }
+        i += 1;
+    }
+    return -1;
+}
+
+func nbc_field_index(instructions: [str], record: str, field: str) -> int {
+    let wanted: str = "#field|" + record + "|" + field + "|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], wanted) {
+            return int_from_str(substr(instructions[i], str_len(wanted),
+                                       str_len(instructions[i])));
+        }
+        i += 1;
+    }
+    return -1;
+}
+
+func nbc_collect_records(instructions: [str], lines: [str]) -> [str] {
+    mut result: [str] = instructions;
+    mut i: int = 0;
+    while i < array_len(lines) {
+        let line: str = str_trim(lines[i]);
+        if nbc_word(line) != "record" { i += 1; continue; }
+        let rname: str = str_trim(nbc_after(line, "record"));
+        if nbc_record_index(result, rname) >= 0 { i += 1; continue; }
+        let ridx: int = nbc_pool_count(result, "record");
+        result = array_concat(result, ["#record|" + rname + "|" + to_str(ridx)]);
+        mut field_idx: int = 0;
+        i += 1;
+        while i < array_len(lines) {
+            let fl: str = str_trim(lines[i]);
+            if fl == "end record" { i += 1; break; }
+            if fl == "" or nbc_word(fl) == "//" { i += 1; continue; }
+            if nbc_word(fl) == "routine" {
+                i += 1;
+                while i < array_len(lines) and str_trim(lines[i]) != "end routine" { i += 1; }
+                i += 1;
+                continue;
+            }
+            mut fbody: str = fl;
+            if nbc_word(fbody) == "change" { fbody = nbc_after(fbody, "change"); }
+            let fcolon: int = nbc_find(fbody, ":");
+            if fcolon > 0 {
+                let fname: str = str_trim(substr(fbody, 0, fcolon));
+                result = array_concat(result,
+                    ["#field|" + rname + "|" + fname + "|" + to_str(field_idx)]);
+                field_idx += 1;
+            }
+            i += 1;
+        }
+    }
+    return result;
+}
+
 func nbc_find_postfix(expression: str, open: str, close: str) -> [str] {
     mut depth: int = 0;
     mut quote: bool = false;
@@ -409,6 +472,25 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
     if nbc_has_prefix(text, "~") {
         result = nbc_emit_expression(result, substr(text, 1, str_len(text)));
         return nbc_emit(result, "BC_BIT_NOT", "");
+    }
+    if str_contains(text, ".") {
+        let dot: int = nbc_find(text, ".");
+        if dot > 0 {
+            let base: str = str_trim(substr(text, 0, dot));
+            let field: str = str_trim(substr(text, dot + 1, str_len(text)));
+            let base_type: str = nbc_find_type(result, base);
+            if base_type != "" {
+                let recidx: int = nbc_record_index(result, base_type);
+                if recidx >= 0 {
+                    let fidx: int = nbc_field_index(result, base_type, field);
+                    if fidx >= 0 {
+                        result = nbc_emit_expression(result, base);
+                        return nbc_emit(result, "BC_FIELD_LD",
+                                        to_str(recidx) + "|" + to_str(fidx));
+                    }
+                }
+            }
+        }
     }
     if str_len(text) >= 2 and text[0] == "[" and text[str_len(text) - 1] == "]" {
         let inner: str = substr(text, 1, str_len(text) - 2);
@@ -626,6 +708,7 @@ func natural_emit_bytecode(source: str) -> int {
     let lines: [str] = str_split(source, "\n");
     mut instructions: [str] = [];
     instructions = nbc_collect_functions(instructions, lines);
+    instructions = nbc_collect_records(instructions, lines);
     mut attempts: [str] = [];
     mut controls: [str] = [];
     mut labels: int = 0;
@@ -670,6 +753,9 @@ func natural_emit_bytecode(source: str) -> int {
                     }
                 }
             }
+            continue;
+        }
+        if nbc_word(line) == "record" or line == "end record" {
             continue;
         }
         if nbc_word(line) == "repeat" {
@@ -879,6 +965,28 @@ func natural_emit_bytecode(source: str) -> int {
             let to_at: int = nbc_find(rest, " to ");
             if to_at < 0 { println("bytecode-error|assignment requires 'to'"); return 1; }
             let target: str = str_trim(substr(rest, 0, to_at));
+            if str_contains(target, ".") {
+                let dot: int = nbc_find(target, ".");
+                if dot > 0 {
+                    let base: str = str_trim(substr(target, 0, dot));
+                    let field: str = str_trim(substr(target, dot + 1, str_len(target)));
+                    let base_type: str = nbc_find_type(instructions, base);
+                    if base_type != "" {
+                        let recidx: int = nbc_record_index(instructions, base_type);
+                        if recidx >= 0 {
+                            let fidx: int = nbc_field_index(instructions, base_type, field);
+                            if fidx >= 0 {
+                                instructions = nbc_emit_expression(instructions, base);
+                                instructions = nbc_emit_expression(instructions,
+                                    substr(rest, to_at + 4, str_len(rest)));
+                                instructions = nbc_emit(instructions, "BC_FIELD_ST",
+                                    to_str(recidx) + "|" + to_str(fidx));
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
             if str_contains(target, "[") {
                 let bracket = nbc_find_postfix(target, "[", "]");
                 if int_from_str(bracket[0]) >= 0 {
