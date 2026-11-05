@@ -1,0 +1,2 @@
+value flag: Bool = true
+value x: Whole = flag ? 1 : "nope"

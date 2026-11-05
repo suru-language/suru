@@ -1,0 +1,4 @@
+routine f() -> Whole
+    value flag: Bool = true
+    give flag ? 1 : 2
+end routine

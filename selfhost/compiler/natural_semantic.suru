@@ -61,10 +61,33 @@ func nss_find_top(expression: str, needle: str) -> int {
     return -1;
 }
 
+func nss_find_colon_after(expression: str, from: int) -> int {
+    mut depth: int = 0;
+    mut i: int = from + 1;
+    while i < str_len(expression) {
+        if expression[i] == "(" { depth += 1; }
+        if expression[i] == ")" { depth -= 1; }
+        if depth == 0 and expression[i] == ":" { return i; }
+        i += 1;
+    }
+    return -1;
+}
+
 func nss_split(expression: str) -> [str] {
     let wrapped: bool = nss_outer_wrapped(expression);
     mut inner: str = expression;
     if wrapped { inner = substr(expression, 1, str_len(expression) - 2); }
+
+    let question: int = nss_find_top(inner, "?");
+    if question >= 0 {
+        let colon: int = nss_find_colon_after(inner, question);
+        if colon >= 0 {
+            return ["ternary",
+                    str_trim(substr(inner, 0, question)),
+                    str_trim(substr(inner, question + 1, colon - question - 1)),
+                    str_trim(substr(inner, colon + 1, str_len(inner)))];
+        }
+    }
 
     let words: [str] = [" or ", " and "];
     mut w: int = 0;
@@ -102,6 +125,19 @@ func nss_split(expression: str) -> [str] {
 
 func nss_expr_type(expression: str, names: [str], types: [str]) -> [str] {
     let parts: [str] = nss_split(expression);
+    if parts[0] == "ternary" {
+        let condition: [str] = nss_expr_type(parts[1], names, types);
+        if condition[0] == "error" { return condition; }
+        if condition[1] != "Bool" { return ["error", "ternary condition requires Bool"]; }
+        let then_type: [str] = nss_expr_type(parts[2], names, types);
+        if then_type[0] == "error" { return then_type; }
+        let else_type: [str] = nss_expr_type(parts[3], names, types);
+        if else_type[0] == "error" { return else_type; }
+        if then_type[1] != else_type[1] {
+            return ["error", "ternary branches must have the same type"];
+        }
+        return ["ok", then_type[1]];
+    }
     if parts[0] == "unary" {
         let operand: [str] = nss_expr_type(parts[2], names, types);
         if operand[0] == "error" { return operand; }

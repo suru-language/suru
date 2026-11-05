@@ -1,0 +1,3 @@
+value flag: Bool = true
+value x: Whole = flag ? 10 : 20
+value y: Text = flag ? "a" : "b"

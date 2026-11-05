@@ -148,6 +148,43 @@ func nbc_top_operator(text: str, operators: [str]) -> [str] {
     return ["-1", ""];
 }
 
+func nbc_split_ternary(text: str) -> [str] {
+    mut depth: int = 0;
+    mut quote: bool = false;
+    mut question: int = -1;
+    mut i: int = 0;
+    while i < str_len(text) {
+        let c: str = text[i];
+        if c == "\"" { quote = not quote; }
+        if not quote {
+            if c == "(" or c == "[" { depth += 1; }
+            if c == ")" or c == "]" { depth -= 1; }
+            if depth == 0 and c == "?" { question = i; break; }
+        }
+        i += 1;
+    }
+    if question < 0 { return ["", "", ""]; }
+    let cond: str = str_trim(substr(text, 0, question));
+    mut colon: int = -1;
+    depth = 0;
+    quote = false;
+    i = question + 1;
+    while i < str_len(text) {
+        let c: str = text[i];
+        if c == "\"" { quote = not quote; }
+        if not quote {
+            if c == "(" or c == "[" { depth += 1; }
+            if c == ")" or c == "]" { depth -= 1; }
+            if depth == 0 and c == ":" { colon = i; break; }
+        }
+        i += 1;
+    }
+    if colon < 0 { return ["", "", ""]; }
+    return [cond,
+            str_trim(substr(text, question + 1, colon - question - 1)),
+            str_trim(substr(text, colon + 1, str_len(text)))];
+}
+
 func nbc_emit_arguments(instructions: [str], text: str) -> [str] {
     mut result: [str] = instructions;
     let comma = nbc_top_operator(text, [","]);
@@ -214,6 +251,20 @@ func nbc_collect_functions(instructions: [str], lines: [str]) -> [str] {
 func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
     mut result: [str] = instructions;
     mut text: str = str_trim(nbc_outer_parens(str_trim(expression)));
+    let ternary = nbc_split_ternary(text);
+    if ternary[0] != "" {
+        let base: int = array_len(result);
+        let else_label: str = "ternary-else-" + to_str(base);
+        let end_label: str = "ternary-end-" + to_str(base + 1);
+        result = nbc_emit_expression(result, ternary[0]);
+        result = nbc_emit(result, "BC_JZ", "@" + else_label);
+        result = nbc_emit_expression(result, ternary[1]);
+        result = nbc_emit(result, "BC_JMP", "@" + end_label);
+        result = nbc_label(result, else_label);
+        result = nbc_emit_expression(result, ternary[2]);
+        result = nbc_label(result, end_label);
+        return result;
+    }
     let logical = nbc_top_operator(text, [" or ", " and "]);
     if int_from_str(logical[0]) >= 0 {
         let at: int = int_from_str(logical[0]);

@@ -28,6 +28,18 @@ if grep -q '^bc|.*|LABEL|' "$tmp/bytecode.out"; then
 fi
 
 "$SURU" run "$DIR/natural_bytecode_driver.suru" \
+    "$ROOT/tests/natural/bytecode_ternary.suru" >"$tmp/ternary.out"
+grep -q '^pool|int|0|1$' "$tmp/ternary.out"
+grep -q '^pool|int|1|2$' "$tmp/ternary.out"
+grep -q 'BC_JZ|6' "$tmp/ternary.out"
+grep -q 'BC_JMP|7' "$tmp/ternary.out"
+grep -q 'BC_LD_LOCAL|0' "$tmp/ternary.out"
+if grep -q 'BC_TRAP\|LABEL' "$tmp/ternary.out"; then
+    echo "natural bytecode lowering: ternary emitted trap/unresolved label" >&2
+    exit 1
+fi
+
+"$SURU" run "$DIR/natural_bytecode_driver.suru" \
     "$ROOT/tests/natural/bytecode_values.suru" >"$tmp/values.out"
 grep -q '^pool|int|0|9$' "$tmp/values.out"
 grep -q '^pool|int|1|1$' "$tmp/values.out"
