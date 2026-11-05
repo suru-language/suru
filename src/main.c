@@ -25,7 +25,11 @@ static char *read_file(const char *path, s_size *len) {
     return text;
 }
 
-static int cmd_run(const char *path, int argc, char **argv) {
+static int cmd_run(const char *path, int argc, char **argv, int natural) {
+    if (natural) {
+        fprintf(stderr, "suru: --syntax=natural is not yet implemented for 'run'\n");
+        return 1;
+    }
     s_size len;
     char *src = read_file(path, &len);
     if (!src) {
@@ -43,7 +47,11 @@ static int cmd_run(const char *path, int argc, char **argv) {
     return rc;
 }
 
-static int cmd_check(const char *path) {
+static int cmd_check(const char *path, int natural) {
+    if (natural) {
+        fprintf(stderr, "suru: --syntax=natural is not yet implemented for 'check'\n");
+        return 1;
+    }
     s_size len;
     char *src = read_file(path, &len);
     if (!src) {
@@ -57,7 +65,11 @@ static int cmd_check(const char *path) {
     return rc == 0 ? 0 : 1;
 }
 
-static int cmd_compile(const char *path, const char *outpath) {
+static int cmd_compile(const char *path, const char *outpath, int natural) {
+    if (natural) {
+        fprintf(stderr, "suru: --syntax=natural is not yet implemented for 'compile'\n");
+        return 1;
+    }
     s_size len;
     char *src = read_file(path, &len);
     if (!src) {
@@ -109,11 +121,12 @@ static int cmd_exec(const char *path) {
 
 static void usage(void) {
     fprintf(stderr,
-            "usage: suru <run|check|compile|exec> <path> [args...]\n"
+            "usage: suru [--syntax=legacy|natural] <run|check|compile|exec> <path> [args...]\n"
             "  run    <file.suru> [args...]   compile and run a source file\n"
             "  check  <file.suru>             compile and type-check only\n"
             "  compile <file.suru> <out.sbc>  compile to bytecode module\n"
-            "  exec   <module.sbc> [args...]  run a precompiled bytecode module\n");
+            "  exec   <module.sbc> [args...]  run a precompiled bytecode module\n"
+            "  --syntax selects the language edition; legacy is the default.\n");
 }
 
 int main(int argc, char **argv) {
@@ -129,6 +142,23 @@ int main(int argc, char **argv) {
             return 0;
         }
     }
+    int natural = 0;
+    int w = 1;
+    for (int r = 1; r < argc; ++r) {
+        if (strncmp(argv[r], "--syntax=", 9) == 0) {
+            const char *v = argv[r] + 9;
+            if (strcmp(v, "natural") == 0) natural = 1;
+            else if (strcmp(v, "legacy") == 0) natural = 0;
+            else {
+                fprintf(stderr, "suru: unknown syntax '%s'\n", v);
+                return 2;
+            }
+        } else {
+            argv[w++] = argv[r];
+        }
+    }
+    argc = w;
+
     if (argc < 3) {
         usage();
         return 2;
@@ -136,17 +166,17 @@ int main(int argc, char **argv) {
     const char *cmd = argv[1];
     const char *path = argv[2];
     if (strcmp(cmd, "run") == 0) {
-        return cmd_run(path, argc - 3, argv + 3);
+        return cmd_run(path, argc - 3, argv + 3, natural);
     }
     if (strcmp(cmd, "check") == 0) {
-        return cmd_check(path);
+        return cmd_check(path, natural);
     }
     if (strcmp(cmd, "compile") == 0) {
         if (argc < 4) {
             usage();
             return 2;
         }
-        return cmd_compile(path, argv[3]);
+        return cmd_compile(path, argv[3], natural);
     }
     if (strcmp(cmd, "exec") == 0) {
         return cmd_exec(path);

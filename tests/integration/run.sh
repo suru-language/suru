@@ -39,6 +39,29 @@ for src in "$DIR"/*.suru; do
     echo "ok: $name"
 done
 
+# --syntax flag selection.
+tests=$((tests + 3))
+if "$SURU" run --syntax=legacy "$DIR/hello.suru" >/dev/null 2>&1; then
+    echo "ok: syntax-legacy"
+else
+    echo "FAIL: syntax-legacy"
+    fail=$((fail + 1))
+fi
+if ! "$SURU" --syntax=natural check "$DIR/hello.suru" >/dev/null 2>&1; then
+    echo "ok: syntax-natural-pending"
+else
+    echo "FAIL: syntax-natural-pending"
+    fail=$((fail + 1))
+fi
+"$SURU" --syntax=foo check "$DIR/hello.suru" >/dev/null 2>&1
+code=$?
+if [ "$code" -eq 2 ]; then
+    echo "ok: syntax-invalid"
+else
+    echo "FAIL: syntax-invalid (exit $code)"
+    fail=$((fail + 1))
+fi
+
 # Bytecode round-trip: compile hello.suru to .sbc and exec it.
 tmp="$(mktemp -d)"
 tests=$((tests + 1))
