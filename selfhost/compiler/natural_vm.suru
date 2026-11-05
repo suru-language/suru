@@ -15,6 +15,7 @@ func vm_tag(enc: str) -> int {
     if enc[0] == "I" { return 1; }
     if enc[0] == "S" { return 2; }
     if enc[0] == "B" { return 3; }
+    if enc[0] == "F" { return 4; }
     return 0;
 }
 
@@ -32,6 +33,7 @@ func vm_to_str(enc: str) -> str {
     if tag == 1 { return to_str(int_from_str(substr(enc, 1, str_len(enc)))); }
     if tag == 2 { return substr(enc, 1, str_len(enc)); }
     if tag == 3 { return enc[1] == "1" ? "true" : "false"; }
+    if tag == 4 { return f64_to_str(str_to_f64(substr(enc, 1, str_len(enc)))); }
     return "unit";
 }
 
@@ -220,7 +222,7 @@ func natural_run_module(bytes: str) -> int {
             else if op == 32 { r = iv <= jv; }
             else if op == 33 { r = iv > jv; }
             else { r = iv >= jv; }
-            stack = vm_push(stack, r ? "B1" : "B0");
+            stack = vm_push(stack, r ? "I1" : "I0");
         } else if op == 47 {
             let n: int = array_len(stack);
             let y: str = stack[n - 1];
