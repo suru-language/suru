@@ -68,7 +68,7 @@ func main() {
             let sidx: int = int_from_str(f[1]);
             mut found: int = -1;
             mut ival: int = 0;
-            let pi: int = 0;
+            mut pi: int = 0;
             while pi < array_len(instructions) {
                 if nbc_has_prefix(instructions[pi], "#int|") {
                     found += 1;
