@@ -1,0 +1,120 @@
+use "../../selfhost/compiler/natural_bytecode.suru";
+use "../../selfhost/compiler/source.suru";
+func main() {
+    let src: str = source_load(args(0));
+    let lines: [str] = str_split(src, "\n");
+    mut instructions: [str] = [];
+    instructions = nbc_collect_functions(instructions, lines);
+    instructions = nbc_collect_records(instructions, lines);
+    instructions = nbc_collect_choices(instructions, lines);
+    mut attempts: [str] = [];
+    mut controls: [str] = [];
+    mut labels: int = 0;
+    mut i: int = 0;
+    while i < array_len(lines) {
+        let line: str = str_trim(lines[i]);
+        println("DBG line[" + to_str(i) + "] [" + line + "]");
+        mut next_line: str = "";
+        mut look: int = i + 1;
+        while look < array_len(lines) and str_trim(lines[look]) == "" { look += 1; }
+        if look < array_len(lines) { next_line = str_trim(lines[look]); }
+        i += 1;
+        if line == "" or nbc_word(line) == "//" or nbc_word(line) == "#!" { continue; }
+        if nbc_word(line) == "routine" or
+           (nbc_word(line) == "expose" and nbc_word(nbc_after(line, "expose")) == "routine") {
+            let rline: str = (nbc_word(line) == "expose") ?
+                nbc_after(line, "expose") : line;
+            let rr: str = nbc_after(rline, "routine");
+            let ro: int = nbc_find(rr, "(");
+            if ro > 0 {
+                let rname: str = str_trim(substr(rr, 0, ro));
+                let rclose: int = nbc_find(rr, ")");
+                let params: str = str_trim(substr(rr, ro + 1, rclose - ro - 1));
+                mut nparams: int = 0;
+                if params != "" { nparams = array_len(str_split(params, ",")); }
+                instructions = array_concat(instructions,
+                    ["#funcbody|" + rname + "|" + to_str(nparams)]);
+                if params != "" {
+                    let plist: [str] = str_split(params, ",");
+                    mut pidx: int = 0;
+                    while pidx < array_len(plist) {
+                        let part: str = str_trim(plist[pidx]);
+                        let pcolon: int = nbc_find(part, ":");
+                        if pcolon > 0 {
+                            let pname: str = str_trim(substr(part, 0, pcolon));
+                            let ptype: str = str_trim(substr(part, pcolon + 1, str_len(part)));
+                            instructions = nbc_bind(instructions, pname);
+                            instructions = nbc_note_type(instructions, pname, ptype);
+                        }
+                        pidx += 1;
+                    }
+                }
+            }
+            continue;
+        }
+        if nbc_word(line) == "record" {
+            while i < array_len(lines) and str_trim(lines[i]) != "end record" { i += 1; }
+            continue;
+        }
+        if nbc_word(line) == "choice" {
+            while i < array_len(lines) and str_trim(lines[i]) != "end choice" { i += 1; }
+            continue;
+        }
+        if nbc_word(line) == "choose" {
+            let sel: str = "choose-sel-" + to_str(labels);
+            let finish: str = "choose-end-" + to_str(labels);
+            labels += 1;
+            instructions = nbc_bind(instructions, sel);
+            instructions = nbc_emit_expression(instructions, nbc_after(line, "choose"));
+            instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(nbc_slot(instructions, sel)));
+            controls = array_concat(controls, ["choose|" + sel + "|" + finish + "|"]);
+            continue;
+        }
+        if nbc_word(line) == "case" {
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if current[3] != "" { instructions = nbc_label(instructions, current[3]); }
+            let variant: str = str_trim(nbc_after(line, "case"));
+            println("DBG case variant=[" + variant + "]");
+            let choice: str = nbc_variant_choice(instructions, variant);
+            println("DBG choice=[" + choice + "]");
+            let tag: int = nbc_variant_tag(instructions, choice, variant);
+            println("DBG tag=" + to_str(tag));
+            let next: str = "choose-next-" + to_str(labels);
+            labels += 1;
+            instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(nbc_slot(instructions, current[1])));
+            instructions = nbc_const(instructions, "int", "BC_CONST_INT", to_str(tag));
+            instructions = nbc_emit(instructions, "BC_EQ_I", "");
+            instructions = nbc_emit(instructions, "BC_JZ", "@" + next);
+            controls[array_len(controls) - 1] = current[0] + "|" + current[1] + "|" + current[2] + "|" + next;
+            continue;
+        }
+        if line == "end choose" {
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if current[3] != "" { instructions = nbc_label(instructions, current[3]); }
+            instructions = nbc_label(instructions, current[2]);
+            controls = slice(controls, 0, array_len(controls) - 1);
+            continue;
+        }
+        if nbc_word(line) == "value" or nbc_word(line) == "change" or nbc_word(line) == "constant" {
+            println("DBG binding line=[" + line + "]");
+            let rest: str = nbc_after(line, nbc_word(line));
+            let equals: int = nbc_find(rest, "=");
+            if equals >= 0 {
+                let declaration: str = str_trim(substr(rest, 0, equals));
+                let colon: int = nbc_find(declaration, ":");
+                let name: str = colon < 0 ? declaration : str_trim(substr(declaration, 0, colon));
+                instructions = nbc_bind(instructions, name);
+                instructions = nbc_emit_expression(instructions, substr(rest, equals + 1, str_len(rest)));
+                instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(nbc_slot(instructions, name)));
+            }
+            continue;
+        }
+        instructions = nbc_expression_statement(instructions, line);
+        if not nbc_has_prefix(line, "show(") { instructions = nbc_emit(instructions, "BC_POP", ""); }
+    }
+    mut k: int = 0;
+    while k < array_len(instructions) {
+        println(to_str(k) + "|" + instructions[k]);
+        k += 1;
+    }
+}

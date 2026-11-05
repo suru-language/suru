@@ -239,6 +239,76 @@ func nbc_record_index(instructions: [str], name: str) -> int {
     return -1;
 }
 
+func nbc_variant_choice(instructions: [str], variant: str) -> str {
+    let needle: str = "#variant|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        let item: str = instructions[i];
+        if nbc_has_prefix(item, needle) and str_contains(item, "|" + variant + "|") {
+            let rest: str = substr(item, str_len(needle), str_len(item));
+            let bar: int = nbc_find(rest, "|");
+            if bar > 0 { return substr(rest, 0, bar); }
+        }
+        i += 1;
+    }
+    return "";
+}
+
+func nbc_is_variant(instructions: [str], variant: str) -> bool {
+    return nbc_variant_choice(instructions, variant) != "";
+}
+
+func nbc_choice_index(instructions: [str], name: str) -> int {
+    let wanted: str = "#choice|" + name + "|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], wanted) {
+            return int_from_str(substr(instructions[i], str_len(wanted),
+                                       str_len(instructions[i])));
+        }
+        i += 1;
+    }
+    return -1;
+}
+
+func nbc_variant_tag(instructions: [str], choice: str, variant: str) -> int {
+    let wanted: str = "#variant|" + choice + "|" + variant + "|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], wanted) {
+            return int_from_str(substr(instructions[i], str_len(wanted),
+                                       str_len(instructions[i])));
+        }
+        i += 1;
+    }
+    return -1;
+}
+
+func nbc_collect_choices(instructions: [str], lines: [str]) -> [str] {
+    mut result: [str] = instructions;
+    mut i: int = 0;
+    while i < array_len(lines) {
+        let line: str = str_trim(lines[i]);
+        if nbc_word(line) != "choice" { i += 1; continue; }
+        let cname: str = str_trim(nbc_after(line, "choice"));
+        if nbc_choice_index(result, cname) >= 0 { i += 1; continue; }
+        let cidx: int = nbc_pool_count(result, "choice");
+        result = array_concat(result, ["#choice|" + cname + "|" + to_str(cidx)]);
+        mut tag: int = 0;
+        i += 1;
+        while i < array_len(lines) {
+            let vl: str = str_trim(lines[i]);
+            if vl == "end choice" { i += 1; break; }
+            if vl == "" or nbc_word(vl) == "//" { i += 1; continue; }
+            result = array_concat(result,
+                ["#variant|" + cname + "|" + vl + "|" + to_str(tag)]);
+            tag += 1;
+            i += 1;
+        }
+    }
+    return result;
+}
+
 func nbc_record_nfields(instructions: [str], record: str) -> int {
     let prefix: str = "#field|" + record + "|";
     mut count: int = 0;
@@ -552,6 +622,11 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
     if str_len(text) >= 2 and text[0] == "\"" and text[str_len(text) - 1] == "\"" {
         return nbc_const(result, "str", "BC_CONST_STR", text);
     }
+    if nbc_is_variant(instructions, text) {
+        let tag: int = nbc_variant_tag(instructions,
+            nbc_variant_choice(instructions, text), text);
+        return nbc_const(result, "int", "BC_CONST_INT", to_str(tag));
+    }
     let slot: int = nbc_slot(instructions, text);
     if slot >= 0 { return nbc_emit(result, "BC_LD_LOCAL", to_str(slot)); }
     return nbc_emit(result, "BC_TRAP", "unknown expression: " + text);
@@ -736,12 +811,14 @@ func natural_emit_bytecode(source: str) -> int {
     mut instructions: [str] = [];
     instructions = nbc_collect_functions(instructions, lines);
     instructions = nbc_collect_records(instructions, lines);
+    instructions = nbc_collect_choices(instructions, lines);
     mut attempts: [str] = [];
     mut controls: [str] = [];
     mut labels: int = 0;
     mut i: int = 0;
     while i < array_len(lines) {
         let line: str = str_trim(lines[i]);
+        println("MAIN [" + line + "]");
         mut next_line: str = "";
         mut look: int = i + 1;
         while look < array_len(lines) and str_trim(lines[look]) == "" { look += 1; }
@@ -784,6 +861,68 @@ func natural_emit_bytecode(source: str) -> int {
         }
         if nbc_word(line) == "record" {
             while i < array_len(lines) and str_trim(lines[i]) != "end record" { i += 1; }
+            if i < array_len(lines) { i += 1; }
+            continue;
+        }
+        if nbc_word(line) == "choice" {
+            while i < array_len(lines) and str_trim(lines[i]) != "end choice" { i += 1; }
+            if i < array_len(lines) { i += 1; }
+            continue;
+        }
+        if nbc_word(line) == "choose" {
+            let sel: str = "choose-sel-" + to_str(labels);
+            let finish: str = "choose-end-" + to_str(labels);
+            labels += 1;
+            instructions = nbc_bind(instructions, sel);
+            instructions = nbc_emit_expression(instructions, nbc_after(line, "choose"));
+            instructions = nbc_emit(instructions, "BC_ST_LOCAL",
+                                    to_str(nbc_slot(instructions, sel)));
+            controls = array_concat(controls, ["choose|" + sel + "|" + finish + "|"]);
+            continue;
+        }
+        if nbc_word(line) == "case" {
+            if array_len(controls) == 0 {
+                println("bytecode-error|case outside choose");
+                return 1;
+            }
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if current[0] != "choose" {
+                println("bytecode-error|case outside choose");
+                return 1;
+            }
+            if current[3] != "" {
+                instructions = nbc_label(instructions, current[3]);
+            }
+            let variant: str = str_trim(nbc_after(line, "case"));
+            let choice: str = nbc_variant_choice(instructions, variant);
+            let tag: int = nbc_variant_tag(instructions, choice, variant);
+            let next: str = "choose-next-" + to_str(labels);
+            labels += 1;
+            instructions = nbc_emit(instructions, "BC_LD_LOCAL",
+                                    to_str(nbc_slot(instructions, current[1])));
+            instructions = nbc_const(instructions, "int", "BC_CONST_INT",
+                                     to_str(tag));
+            instructions = nbc_emit(instructions, "BC_EQ_I", "");
+            instructions = nbc_emit(instructions, "BC_JZ", "@" + next);
+            controls[array_len(controls) - 1] = current[0] + "|" +
+                current[1] + "|" + current[2] + "|" + next;
+            continue;
+        }
+        if line == "end choose" {
+            if array_len(controls) == 0 {
+                println("bytecode-error|end choose without choose");
+                return 1;
+            }
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if current[0] != "choose" {
+                println("bytecode-error|mismatched choose terminator");
+                return 1;
+            }
+            if current[3] != "" {
+                instructions = nbc_label(instructions, current[3]);
+            }
+            instructions = nbc_label(instructions, current[2]);
+            controls = slice(controls, 0, array_len(controls) - 1);
             continue;
         }
         if nbc_word(line) == "repeat" {
@@ -970,6 +1109,7 @@ func natural_emit_bytecode(source: str) -> int {
         if line == "end routine" { instructions = nbc_emit(instructions, "BC_RET_UNIT", ""); continue; }
         if nbc_word(line) == "value" or nbc_word(line) == "change" or
            nbc_word(line) == "constant" {
+            println("DBGV [" + line + "]");
             let rest: str = nbc_after(line, nbc_word(line));
             let equals: int = nbc_find(rest, "=");
             if equals < 0 { println("bytecode-error|binding requires '='"); return 1; }
@@ -1052,5 +1192,7 @@ func natural_emit_bytecode(source: str) -> int {
     }
     if array_len(attempts) != 0 { println("bytecode-error|unterminated attempt"); return 1; }
     if array_len(controls) != 0 { println("bytecode-error|unterminated control block"); return 1; }
-    return nbc_render(instructions);
+    println("DBG prerender nins=" + to_str(array_len(instructions)));
+    let _r: int = nbc_render(instructions);
+    return _r;
 }

@@ -1,0 +1,18 @@
+use "../../selfhost/compiler/natural_bytecode.suru";
+use "../../selfhost/compiler/source.suru";
+func main() {
+    let src: str = source_load(args(0));
+    let lines: [str] = str_split(src, "\n");
+    mut empty: [str] = [];
+    let f: [str] = nbc_collect_functions(empty, lines);
+    println("after funcs: " + to_str(array_len(f)));
+    let r: [str] = nbc_collect_records(f, lines);
+    println("after records: " + to_str(array_len(r)));
+    let c: [str] = nbc_collect_choices(r, lines);
+    println("after choices: " + to_str(array_len(c)));
+    mut i: int = 0;
+    while i < array_len(c) {
+        println(to_str(i) + " " + c[i]);
+        i += 1;
+    }
+}

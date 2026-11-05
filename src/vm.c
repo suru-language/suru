@@ -1512,6 +1512,8 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                    vm->cur_fid, pc, s_bc_op_table[in->op].name, vm->sp,
                    vm->fp, in->a, in->b);
         switch (in->op) {
+        case BC_NOP:
+            pc++; break;
         case BC_CONST_INT:
             if (!push(vm, s_val_int(m->ints[in->a]))) return 1;
             pc++; break;
