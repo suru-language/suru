@@ -84,12 +84,14 @@ func nw_print_routine() -> str {
     code = code + str_chr_byte(0x4C) + str_chr_byte(0x29) + str_chr_byte(0xCA);
     // syscall
     code = code + str_chr_byte(0x0F) + str_chr_byte(0x05);
-    // mov rax, 60
+    return code;
+}
+
+func nw_exit_syscall() -> str {
+    let code: str = "";
     code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC0);
     code = code + str_chr_byte(0x3C) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
-    // xor rdi, rdi
     code = code + str_chr_byte(0x48) + str_chr_byte(0x31) + str_chr_byte(0xFF);
-    // syscall
     code = code + str_chr_byte(0x0F) + str_chr_byte(0x05);
     return code;
 }
@@ -149,6 +151,7 @@ func nw_emit_elf_int_expr(ops: [int], avs: [int]) -> str {
     }
     code = code + str_chr_byte(0x58); // pop rax (result)
     code = code + nw_print_routine();
+    code = code + nw_exit_syscall();
     let total: int = 120 + str_len(code);
     return nw_elf_header(total, 0x400000 + 120) + code;
 }
