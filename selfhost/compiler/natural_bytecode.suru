@@ -296,14 +296,16 @@ func nbc_collect_choices(instructions: [str], lines: [str]) -> [str] {
     while i < array_len(lines) {
         let line: str = str_trim(lines[i]);
         if nbc_word(line) != "choice" { i += 1; continue; }
-        let cname: str = str_trim(nbc_after(line, "choice"));
+        let raw_cname: str = str_trim(nbc_after(line, "choice"));
+        let cname: str = substr(raw_cname, 0, str_len(raw_cname));
         if nbc_choice_index(result, cname) >= 0 { i += 1; continue; }
         let cidx: int = nbc_pool_count(result, "choice");
         result = array_concat(result, ["#choice|" + cname + "|" + to_str(cidx)]);
         mut tag: int = 0;
         i += 1;
         while i < array_len(lines) {
-            let vl: str = str_trim(lines[i]);
+            let raw_vl: str = str_trim(lines[i]);
+            let vl: str = substr(raw_vl, 0, str_len(raw_vl));
             if vl == "end choice" { i += 1; break; }
             if vl == "" or nbc_word(vl) == "//" { i += 1; continue; }
             result = array_concat(result,
