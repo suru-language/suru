@@ -2,6 +2,89 @@
 // token trace; parser integration is a later phase and legacy lexer semantics
 // remain in lexer.suru.
 
+func strip_underscores(text: str) -> str {
+    mut out: str = "";
+    mut i: int = 0;
+    while i < str_len(text) {
+        if text[i] != "_" { out = out + text[i]; }
+        i += 1;
+    }
+    return out;
+}
+
+func hex_value(c: str) -> int {
+    if c >= "0" and c <= "9" { return int_from_str(c); }
+    if c == "a" or c == "A" { return 10; }
+    if c == "b" or c == "B" { return 11; }
+    if c == "c" or c == "C" { return 12; }
+    if c == "d" or c == "D" { return 13; }
+    if c == "e" or c == "E" { return 14; }
+    return 15;
+}
+
+func integer_value(text: str) -> int {
+    let clean: str = strip_underscores(text);
+    if str_len(clean) >= 2 and clean[0] == "0" and
+       (clean[1] == "x" or clean[1] == "X") {
+        mut value: int = 0;
+        mut i: int = 2;
+        while i < str_len(clean) {
+            value = value * 16 + hex_value(clean[i]);
+            i += 1;
+        }
+        return value;
+    }
+    if str_len(clean) >= 2 and clean[0] == "0" and
+       (clean[1] == "b" or clean[1] == "B") {
+        mut value: int = 0;
+        mut i: int = 2;
+        while i < str_len(clean) {
+            value = value * 2 + int_from_str(clean[i]);
+            i += 1;
+        }
+        return value;
+    }
+    return int_from_str(clean);
+}
+
+func decode_string(source: str, start: int, finish: int) -> str {
+    mut out: str = "";
+    mut i: int = start + 1;
+    while i < finish - 1 {
+        if source[i] != "\\" {
+            out = out + source[i];
+            i += 1;
+        } else {
+            let e: str = source[i + 1];
+            if e == "n" { out = out + "\n"; }
+            else if e == "t" { out = out + "\t"; }
+            else if e == "r" { out = out + "\r"; }
+            else if e == "0" { out = out + "\0"; }
+            else if e == "\\" { out = out + "\\"; }
+            else if e == "\"" { out = out + "\""; }
+            else { out = out + "'"; }
+            i += 2;
+        }
+    }
+    return out;
+}
+
+func escaped_value(text: str) -> str {
+    mut out: str = "";
+    mut i: int = 0;
+    while i < str_len(text) {
+        let c: str = text[i];
+        if c == "\\" { out = out + "\\\\"; }
+        else if c == "\n" { out = out + "\\n"; }
+        else if c == "\t" { out = out + "\\t"; }
+        else if c == "\r" { out = out + "\\r"; }
+        else if c == "\0" { out = out + "\\0"; }
+        else { out = out + c; }
+        i += 1;
+    }
+    return out;
+}
+
 const N_EOF = 0;
 const N_NEWLINE = 1;
 const N_IDENT = 2;
@@ -31,11 +114,11 @@ func n_is_keyword(word: str) -> bool {
     return str_contains(" across and as attempt bring case change choose constant contract each end ensure exception expose false from give handle if in not through until otherwise or record repeat routine set show supports true value when while throws this none ", " " + word + " ");
 }
 
-func n_emit(kind: str, source: str, start: int, finish: int) {
+func n_emit(kind: str, source: str, start: int, finish: int, decoded: str) {
     println(kind + "|" + to_str(source_line_at(source, start)) + "|" +
             to_str(source_scalar_column_at(source, start)) + "|" +
             to_str(start) + "|" + to_str(finish) + "|" +
-            substr(source, start, finish - start));
+            substr(source, start, finish - start) + "|" + decoded);
 }
 
 func n_error(source: str, position: int, code: int) {
