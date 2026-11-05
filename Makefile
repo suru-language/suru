@@ -135,6 +135,10 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_reader_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_corpus_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_vm_closure_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_exec_vm_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_elf_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_elf_compile_run.sh $(BINDIR)/suru
 
 .PHONY: selfhost-compare
 selfhost-compare: $(BINDIR)/suru
@@ -144,6 +148,10 @@ selfhost-compare: $(BINDIR)/suru
 	@tests/selfhost/natural_reader_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_corpus_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_vm_closure_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_exec_vm_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_elf_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_elf_compile_run.sh $(BINDIR)/suru
 
 # Bootstrap: compile the SURU-written full compiler driver (natural_build_driver
 # .suru) into a .sbc object with the C17 toolchain, then rebuild a natural

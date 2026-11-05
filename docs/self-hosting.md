@@ -208,8 +208,27 @@ The bytecode object-emitting half is now owned by SURU:
   drivers re-read the source after the frontend check because running the
   frontend first imposes GC pressure that corrupts aliasing source views (a
   known SURU string-aliasing fragility); re-reading yields deterministic,
-  C-identical output. This is the first execution step of the Stage 2 VM port;
-  closures (not produced by any frontend test) remain unimplemented.
+  C-identical output.   This is the first execution step of the Stage 2 VM port. The interpreter now
+  implements the full instruction set, including closures (`BC_MKCLOSURE`,
+  `BC_MKCLOSURE_V`, `BC_CALLV`) matching the C VM's capture/call convention
+  (env placed in callee local slot 0, args after it); a hand-built module gate
+  (`natural_vm_closure_run.sh`) verifies identical output on both VMs.
+  Closures are not yet produced by the Natural frontend, so they are exercised
+  only through that crafted-module gate. The interpreter is also reachable from
+  the CLI as `suru exec --vm=natural`, which runs a module through the SURU VM
+  and is gated to match the default C17 exec on the clean corpus
+  (`natural_exec_vm_run.sh`).
+- `selfhost/compiler/natural_elf_writer.suru` is a Stage 3 seed: a SURU-written
+  ELF64 emitter that produces a minimal static x86-64 executable (write + exit
+  syscalls, no C compiler/linker). It is gated by `natural_elf_run.sh`, which
+  verifies `file` recognizes the output as an x86-64 ELF64 executable and that
+  it runs and prints "hi". A minimal native-backend path
+  (`natural_elf_compile_driver.suru`) compiles a trivial `show(x)` program
+  end-to-end in SURU into a standalone x86-64 ELF64 executable that prints the
+  literal or non-negative integer constant (with raw x86-64 decimal conversion)
+  (`natural_elf_compile_run.sh`). This is the first step of the Stage 3
+  backend; emitting general bytecode (arithmetic on expressions, control flow,
+  pools, calls) to machine code is later work.
 - Gates wired into `make selfhost-test`: `natural_compile_run.sh` (differential
   byte-identity, 58/58), `natural_verify_run.sh` (positive + injected invalid),
   `natural_build_run.sh` (full-pipeline acceptance all byte-identical), and

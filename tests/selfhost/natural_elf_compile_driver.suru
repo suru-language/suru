@@ -1,0 +1,64 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_bytecode.suru";
+use "../../selfhost/compiler/natural_module_writer.suru";
+use "../../selfhost/compiler/natural_elf_writer.suru";
+
+// Minimal native backend path: compiles a trivial Natural program of the exact
+// shape `show(x)` (const_str/const_int; builtin println; pop; ret_unit) into a
+// standalone x86-64 ELF64 executable that prints the literal or integer.
+func main() {
+    let source: str = source_load(args(0));
+    let instructions: [str] = nbc_collect(source);
+    if array_len(instructions) == 1 and instructions[0] == "#emit-failed" {
+        exit(1);
+    }
+    let fns: [[str]] = nw_collect_functions(instructions);
+    if array_len(fns) != 1 { exit(2); }
+    let ins: [str] = nw_emit_ins(fns[0]);
+    if array_len(ins) != 4 { exit(3); }
+    let f0: [str] = str_split(ins[0], "|");
+    let f1: [str] = str_split(ins[1], "|");
+    if nw_norm(f1[0]) != "builtin" or f1[1] != "1" { exit(5); }
+
+    if nw_norm(f0[0]) == "const_int" {
+        let sidx: int = int_from_str(f0[1]);
+        mut found: int = -1;
+        mut ival: int = 0;
+        mut i: int = 0;
+        while i < array_len(instructions) {
+            if nbc_has_prefix(instructions[i], "#int|") {
+                found += 1;
+                if found == sidx {
+                    ival = nw_int_toll(substr(instructions[i], 5, str_len(instructions[i])));
+                }
+            }
+            i += 1;
+        }
+        write_file(args(1), nw_emit_elf_int(ival));
+        exit(0);
+    }
+
+    if nw_norm(f0[0]) != "const_str" { exit(4); }
+    let sidx: int = int_from_str(f0[1]);
+    mut found: int = -1;
+    mut val: str = "";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], "#str|") {
+            found += 1;
+            if found == sidx {
+                let raw: str = substr(instructions[i], 5, str_len(instructions[i]));
+                if str_len(raw) >= 2 and raw[0] == "\"" and
+                   raw[str_len(raw) - 1] == "\"" {
+                    val = substr(raw, 1, str_len(raw) - 2);
+                } else {
+                    val = raw;
+                }
+            }
+        }
+        i += 1;
+    }
+    if val == "" { exit(6); }
+    write_file(args(1), nw_emit_elf_message(val + "\n"));
+    exit(0);
+}

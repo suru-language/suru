@@ -325,6 +325,52 @@ func natural_run_module(bytes: str) -> int {
             let ar: str = stack[n - 1];
             stack = vm_pop(stack);
             stack = vm_push(stack, "I" + to_str(vm_arr_count(ar)));
+        } else if op == 60 {
+            stack = vm_push(stack, "C" + to_str(a));
+        } else if op == 61 {
+            let n: int = array_len(stack);
+            let cnt: int = b;
+            mut elems: [str] = [];
+            mut k: int = 0;
+            while k < cnt {
+                elems = array_concat(elems, [stack[n - cnt + k]]);
+                k += 1;
+            }
+            let env: str = vm_arr_build(cnt, elems);
+            k = 0;
+            while k < cnt { stack = vm_pop(stack); k += 1; }
+            stack = vm_push(stack, "C" + to_str(a) + "|" + env);
+        } else if op == 62 {
+            let nargs: int = a;
+            let nn: int = array_len(stack);
+            mut args: [str] = [];
+            mut k: int = 0;
+            while k < nargs {
+                args = array_concat(args, [stack[nn - nargs + k]]);
+                k += 1;
+            }
+            k = 0;
+            while k < nargs { stack = vm_pop(stack); k += 1; }
+            let cl: str = stack[array_len(stack) - 1];
+            stack = vm_pop(stack);
+            let bar: int = nbc_find(cl, "|");
+            let fid2: int = bar < 0 ?
+                int_from_str(substr(cl, 1, str_len(cl) - 1)) :
+                int_from_str(substr(cl, 1, bar - 1));
+            let has_env: bool = bar >= 0;
+            mut callee: [str] = [];
+            if has_env {
+                let env2: str = substr(cl, bar + 1, str_len(cl));
+                callee = array_concat([env2], args);
+            } else {
+                callee = args;
+            }
+            let cf: int = fn_frames[fid2];
+            while array_len(callee) < cf { callee = array_concat(callee, ["N"]); }
+            fr_fid = array_concat(fr_fid, [fid2]);
+            fr_pc = array_concat(fr_pc, [0]);
+            fr_locals = array_concat(fr_locals, [callee]);
+            continue;
         } else if op == 52 {
             let n: int = array_len(stack);
             let cnt: int = b;

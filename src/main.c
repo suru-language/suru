@@ -33,6 +33,7 @@ static char *read_file(const char *path, s_size *len) {
 }
 
 static int cmd_exec(const char *path, int argc, char **argv);
+static int cmd_exec_natural_vm(const char *path, const char *argv0);
 
 static int cmd_run(const char *path, int argc, char **argv, int natural,
                    const char *argv0) {
@@ -396,6 +397,18 @@ static int cmd_exec(const char *path, int argc, char **argv) {
     return rc;
 }
 
+static int cmd_exec_natural_vm(const char *path, const char *argv0) {
+    char driver[2048];
+    if (resolve_driver(driver, sizeof driver, argv0,
+                       "natural_vm_driver.suru") != 0) {
+        fprintf(stderr, "suru: natural VM driver not found\n");
+        return 1;
+    }
+    char cmd[4096];
+    snprintf(cmd, sizeof cmd, "\"%s\" run \"%s\" \"%s\"", argv0, driver, path);
+    return system(cmd) == 0 ? 0 : 1;
+}
+
 static void usage(void) {
     fprintf(stderr,
             "usage: suru [--syntax=legacy|natural] <run|check|compile|exec> <path> [args...]\n"
@@ -403,7 +416,8 @@ static void usage(void) {
             "  check  <file.suru>             compile and type-check only\n"
             "  compile <file.suru> <out.sbc>  compile to bytecode module\n"
             "  exec   <module.sbc> [args...]  run a precompiled bytecode module\n"
-            "  --syntax selects the language edition; legacy is the default.\n");
+            "  --syntax selects the language edition; legacy is the default.\n"
+            "  --vm=natural runs an exec module through the SURU-written VM.\n");
 }
 
 int main(int argc, char **argv) {
@@ -420,6 +434,7 @@ int main(int argc, char **argv) {
         }
     }
     int natural = 0;
+    int vm_natural = 0;
     int w = 1;
     for (int r = 1; r < argc; ++r) {
         if (strncmp(argv[r], "--syntax=", 9) == 0) {
@@ -428,6 +443,13 @@ int main(int argc, char **argv) {
             else if (strcmp(v, "legacy") == 0) natural = 0;
             else {
                 fprintf(stderr, "suru: unknown syntax '%s'\n", v);
+                return 2;
+            }
+        } else if (strncmp(argv[r], "--vm=", 5) == 0) {
+            const char *v = argv[r] + 5;
+            if (strcmp(v, "natural") == 0) vm_natural = 1;
+            else {
+                fprintf(stderr, "suru: unknown vm '%s'\n", v);
                 return 2;
             }
         } else {
@@ -456,6 +478,7 @@ int main(int argc, char **argv) {
         return cmd_compile(path, argv[3], natural, argv[0]);
     }
     if (strcmp(cmd, "exec") == 0) {
+        if (vm_natural) return cmd_exec_natural_vm(path, argv[0]);
         return cmd_exec(path, argc - 3, argv + 3);
     }
     usage();

@@ -1,0 +1,33 @@
+use "../../selfhost/compiler/natural_module_writer.suru";
+
+// Emits a hand-built module that exercises BC_MKCLOSURE_V / BC_CALLV:
+// main captures the integer 5 into a closure over use_env, then invokes it via
+// call_v; use_env reads its first frame slot (the captured environment array),
+// indexes element 0, and prints it. Output: "5" on both VMs.
+func main() {
+    let intb: [str] = [nw_i64(0), nw_i64(5)];
+    let floats: [str] = [];
+    let strs: [str] = [];
+    let recf: [int] = [];
+    let fn_names: [str] = ["main", "use_env"];
+    let fn_nparams: [int] = [0, 1];
+    let fn_frames: [int] = [1, 1];
+    let fn_maxdepths: [int] = [1024, 1024];
+    let ops0: [int] = [1, 61, 62, 65];
+    let as0: [int] = [1, 1, 0, 0];
+    let bs0: [int] = [0, 1, 0, 0];
+    let cs0: [int] = [0, 0, 0, 0];
+    let ops1: [int] = [5, 1, 54, 63, 63, 7, 65];
+    let as1: [int] = [0, 0, 0, 5, 1, 0, 0];
+    let bs1: [int] = [0, 0, 0, 0, 0, 0, 0];
+    let cs1: [int] = [0, 0, 0, 0, 0, 0, 0];
+    let fn_ops: [[int]] = [ops0, ops1];
+    let fn_as: [[int]] = [as0, as1];
+    let fn_bs: [[int]] = [bs0, bs1];
+    let fn_cs: [[int]] = [cs0, cs1];
+    let bytes: str = nw_emit_module(intb, floats, strs, recf,
+        fn_names, fn_nparams, fn_frames, fn_maxdepths,
+        fn_ops, fn_as, fn_bs, fn_cs);
+    write_file(args(0), bytes);
+    exit(0);
+}
