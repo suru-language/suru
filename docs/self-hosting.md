@@ -194,8 +194,11 @@ The bytecode object-emitting half is now owned by SURU:
   records (construction, field read/write), exception handlers
   (`PUSH_HANDLER`/`POP_HANDLER`/`NEW_EXCEPTION`/`THROW`), print/println/to_str,
   returns) under the C17 VM, with output parity to the C VM as the gate
-  (`natural_vm_run.sh`). This is the first execution step of the Stage 2 VM
-  port; closures remain open.
+  (`natural_vm_run.sh`). The interpreter agrees with the reference VM on the
+  entire corpus of programs the C VM executes cleanly (12 fixtures), and
+  handles signed 64-bit constants via two's-complement parsing. This is the
+  first execution step of the Stage 2 VM port; closures (not produced by any
+  frontend test) remain unimplemented.
 - Gates wired into `make selfhost-test`: `natural_compile_run.sh` (differential
   byte-identity, 58/58), `natural_verify_run.sh` (positive + injected invalid),
   `natural_build_run.sh` (full-pipeline acceptance all byte-identical), and
