@@ -1,0 +1,6 @@
+use "../../selfhost/compiler/natural_lexer.suru";
+use "../../selfhost/compiler/source.suru";
+
+func main() {
+    exit(natural_lex_dump(str_repeat(" ", 67108865)));
+}
