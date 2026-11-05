@@ -342,6 +342,24 @@ else
 fi
 rm -f "$natprog"
 
+# Natural check/run agreement: record-field mutation + choose on a parameter.
+tests=$((tests + 1))
+natprog="$(mktemp)"
+printf 'record Point\n    change x: Whole\n    change y: Whole\nend record\nchoice Kind\n    Circle\n    Square\nend choice\nroutine area(shape: Kind, p: Point) -> Whole\n    value base: Whole = p.x * p.y\n    choose shape\n    case Circle\n        give base * 3\n    case Square\n        give base\n    end choose\nend routine\nroutine main() -> Unit\n    value p: Point = none\n    set p.x to 3\n    set p.y to 4\n    value k: Kind = Circle\n    show(area(k, p))\nend routine\n' > "$natprog"
+if "$SURU" --syntax=natural check "$natprog" >/dev/null 2>&1; then
+    actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+    if [ "$actual" = "36" ]; then
+        echo "ok: nat-check-run-agree"
+    else
+        echo "FAIL: nat-check-run-agree (run output '$actual')"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL: nat-check-run-agree (check rejected a runnable program)"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
 # Program arguments: run argtest.suru with two args.
 tests=$((tests + 1))
 actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"

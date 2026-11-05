@@ -21,6 +21,26 @@ func nss_mutable(names: [str], mutable: [bool], name: str) -> bool {
     return false;
 }
 
+func remove_at_str(items: [str], idx: int) -> [str] {
+    mut out: [str] = [];
+    mut i: int = 0;
+    while i < array_len(items) {
+        if i != idx { out = array_concat(out, [items[i]]); }
+        i += 1;
+    }
+    return out;
+}
+
+func remove_at_bool(items: [bool], idx: int) -> [bool] {
+    mut out: [bool] = [];
+    mut i: int = 0;
+    while i < array_len(items) {
+        if i != idx { out = array_concat(out, [items[i]]); }
+        i += 1;
+    }
+    return out;
+}
+
 func nss_find_index(items: [str], name: str) -> int {
     mut i: int = 0;
     while i < array_len(items) {
@@ -54,6 +74,21 @@ func nss_outer_wrapped(expression: str) -> bool {
         i += 1;
     }
     return depth == 0;
+}
+
+func nss_base_type(typ: str) -> str {
+    let lt: int = nss_find(typ, "<");
+    if lt < 0 { return typ; }
+    return str_trim(substr(typ, 0, lt));
+}
+
+func nss_find(expression: str, needle: str) -> int {
+    mut i: int = 0;
+    while i + str_len(needle) <= str_len(expression) {
+        if substr(expression, i, str_len(needle)) == needle { return i; }
+        i += 1;
+    }
+    return -1;
 }
 
 func nss_find_top(expression: str, needle: str) -> int {
@@ -244,6 +279,30 @@ func nss_expr_type(expression: str, names: [str], types: [str]) -> [str] {
     if str_len(atom) > 0 and atom[0] >= "0" and atom[0] <= "9" {
         return ["ok", "Whole"];
     }
+    if str_len(atom) >= 2 and atom[str_len(atom) - 1] == ")" {
+        let open_idx: int = nss_find(atom, "(");
+        if open_idx > 0 {
+            let ctor: str = str_trim(substr(atom, 0, open_idx));
+            let ctor_type: str = nss_lookup(names, types, ctor);
+            if ctor_type != "" {
+                return ["ok", ctor_type];
+            }
+            if ctor == "Some" or ctor == "none" { return ["ok", "Option"]; }
+            if ctor == "ok" or ctor == "error" { return ["ok", "Result"]; }
+        }
+    }
+    let dot: int = nss_find_top(atom, ".");
+    if dot > 0 {
+        let base: str = str_trim(substr(atom, 0, dot));
+        let field: str = str_trim(substr(atom, dot + 1, str_len(atom)));
+        let base_type: str = nss_lookup(names, types, base);
+        if base_type != "" {
+            let qualified: str = base_type + "." + field;
+            let ftype: str = nss_lookup(names, types, qualified);
+            if ftype != "" { return ["ok", ftype]; }
+        }
+        return ["error", "unknown field '" + atom + "'"];
+    }
     let known: str = nss_lookup(names, types, atom);
     if known == "" { return ["error", "unknown name '" + atom + "'"]; }
     return ["ok", known];
@@ -309,7 +368,13 @@ func natural_semantic_check(source: str) -> int {
     mut types: [str] = [];
     mut mutable: [bool] = [];
     mut rec_names: [str] = [];
+    mut choice_variants: [str] = [];
+    mut choice_payload_types: [str] = [];
+    mut current_choice: str = "";
+    mut choose_bound: [[str]] = [];
+    mut routine_bound: [[str]] = [];
     mut rec_fields: [[str]] = [];
+    mut rec_ftypes: [[str]] = [];
     mut rec_mut: [[bool]] = [];
     mut position: int = 0;
     while true {
@@ -326,6 +391,7 @@ func natural_semantic_check(source: str) -> int {
             }
             rec_names = array_concat(rec_names, [rname.text]);
             mut fields: [str] = [];
+            mut ftypes: [str] = [];
             mut muts: [bool] = [];
             mut pos: int = rname.next;
             let supports = natural_next(source, pos);
@@ -356,8 +422,17 @@ func natural_semantic_check(source: str) -> int {
                     f_mut = true;
                     field_tok = natural_next(source, t.next);
                 }
-                if field_tok.kind == NT_IDENT {
+                 if field_tok.kind == NT_IDENT {
+                    mut ftype: str = "Whole";
+                    let colon_tok = natural_next(source, field_tok.next);
+                    if colon_tok.text == ":" {
+                        let type_tok = natural_next(source, colon_tok.next);
+                        if type_tok.kind == NT_IDENT or type_tok.kind == NT_WORD {
+                            ftype = type_tok.text;
+                        }
+                    }
                     fields = array_concat(fields, [field_tok.text]);
+                    ftypes = array_concat(ftypes, [ftype]);
                     muts = array_concat(muts, [f_mut]);
                     pos = nss_skip_statement(source, field_tok.next);
                     continue;
@@ -365,7 +440,14 @@ func natural_semantic_check(source: str) -> int {
                 nss_error(first.line, "invalid record member"); return 1;
             }
             rec_fields = array_concat(rec_fields, [fields]);
+            rec_ftypes = array_concat(rec_ftypes, [ftypes]);
             rec_mut = array_concat(rec_mut, [muts]);
+            mut fi2: int = 0;
+            while fi2 < array_len(fields) {
+                names = array_concat(names, [rname.text + "." + fields[fi2]]);
+                types = array_concat(types, [ftypes[fi2]]);
+                fi2 += 1;
+            }
             position = pos;
             continue;
         }
@@ -382,6 +464,8 @@ func natural_semantic_check(source: str) -> int {
         if first.text == "routine" {
             let rname = natural_next(source, first.next);
             if rname.kind != NT_IDENT { nss_error(first.line, "expected routine name"); return 1; }
+            let empty_rscope: [str] = [];
+            routine_bound = array_concat(routine_bound, [empty_rscope]);
             let lp = natural_next(source, rname.next);
             if lp.text != "(" { nss_error(first.line, "expected '(' in routine"); return 1; }
             mut p: int = lp.next;
@@ -397,6 +481,9 @@ func natural_semantic_check(source: str) -> int {
                     names = array_concat(names, [pname.text]);
                     types = array_concat(types, [typ[2]]);
                     mutable = array_concat(mutable, [false]);
+                    let rbl: [str] = routine_bound[array_len(routine_bound) - 1];
+                    routine_bound[array_len(routine_bound) - 1] =
+                        array_concat(rbl, [pname.text]);
                     p = int_from_str(typ[1]);
                     let sep = natural_next(source, p);
                     if sep.text == "," { p = sep.next; continue; }
@@ -410,7 +497,47 @@ func natural_semantic_check(source: str) -> int {
             if position < 0 { nss_error(first.line, "expected routine body"); return 1; }
             continue;
         }
-        if first.text == "contract" or first.text == "choice" {
+        if first.text == "choice" {
+            let cname = natural_next(source, first.next);
+            mut cpos: int = cname.next;
+            while true {
+                let ct = natural_next(source, cpos);
+                if ct.error { nss_error(first.line, "lexical error"); return 1; }
+                if ct.kind == NT_EOF { nss_error(first.line, "unterminated choice"); return 1; }
+                if ct.text == "end" {
+                    let ck = natural_next(source, ct.next);
+                    if ck.text == "choice" { position = ck.next; break; }
+                }
+                if ct.kind == NT_IDENT {
+                    let vt = natural_next(source, ct.next);
+                    let vname: str = ct.text;
+                    mut vtype: str = "Whole";
+                    if vt.text == "(" {
+                        let pname_t = natural_next(source, vt.next);
+                        let pcolon = natural_next(source, pname_t.next);
+                        mut pend: int = pcolon.next;
+                        if pcolon.text == ":" {
+                            let ptype_t = natural_next(source, pcolon.next);
+                            vtype = ptype_t.text;
+                            pend = ptype_t.next;
+                        }
+                        cpos = pend;
+                    } else {
+                        cpos = vt.next;
+                    }
+                    choice_variants = array_concat(choice_variants,
+                        [cname.text + "." + vname]);
+                    choice_payload_types = array_concat(choice_payload_types, [vtype]);
+                    names = array_concat(names, [vname]);
+                    types = array_concat(types, [cname.text]);
+                    mutable = array_concat(mutable, [false]);
+                    continue;
+                }
+                cpos = ct.next;
+            }
+            continue;
+        }
+        if first.text == "contract" {
             let cname = natural_next(source, first.next);
             let end = nss_skip_to_end(source, cname.next, first.text);
             if end < 0 { nss_error(first.line, "unterminated " + first.text); return 1; }
@@ -443,7 +570,9 @@ func natural_semantic_check(source: str) -> int {
             if ne_is_ok(expression) == false { nss_error(first.line, ne_message(expression)); return 1; }
             let inferred = nss_expr_type(ne_value(expression), names, types);
             if inferred[0] == "error" { nss_error(first.line, inferred[1]); return 1; }
-            if declared != "" and declared != inferred[1] and inferred[1] != "None" {
+            let declared_base: str = nss_base_type(declared);
+            let inferred_base: str = nss_base_type(inferred[1]);
+            if declared != "" and declared_base != inferred_base and inferred_base != "None" {
                 nss_error(first.line, "initializer type " + inferred[1] + " does not match " + declared);
                 return 1;
             }
@@ -530,9 +659,80 @@ func natural_semantic_check(source: str) -> int {
             continue;
         }
 
-        if first.text == "end" or first.text == "otherwise" or
-           first.text == "case" or first.text == "each" or
-           first.text == "choose" {
+        if first.text == "case" {
+            let crest = natural_next(source, first.next);
+            if crest.kind == NT_IDENT {
+                let variant_name: str = crest.text;
+                let after_v = natural_next(source, crest.next);
+                if after_v.text == "(" {
+                    let pname = natural_next(source, after_v.next);
+                    if pname.kind == NT_IDENT and nss_has(names, pname.text) == false {
+                        mut vtype: str = "Whole";
+                        let vi: int = nss_find_index(choice_variants,
+                            current_choice + "." + variant_name);
+                        if vi >= 0 { vtype = choice_payload_types[vi]; }
+                        names = array_concat(names, [pname.text]);
+                        types = array_concat(types, [vtype]);
+                        mutable = array_concat(mutable, [true]);
+                        if array_len(choose_bound) > 0 {
+                            let tbl: [str] = choose_bound[array_len(choose_bound) - 1];
+                            choose_bound[array_len(choose_bound) - 1] =
+                                array_concat(tbl, [pname.text]);
+                        }
+                    }
+                    let pre = natural_next(source, pname.next);
+                    position = pre.next;
+                } else {
+                    position = after_v.next;
+                }
+            } else {
+                position = nss_skip_statement(source, first.next);
+            }
+            continue;
+        }
+        if first.text == "choose" {
+            let csel = natural_next(source, first.next);
+            if csel.kind == NT_IDENT {
+                let resolved: str = nss_lookup(names, types, csel.text);
+                current_choice = resolved == "" ? csel.text : resolved;
+            }
+            let empty_strs: [str] = [];
+            choose_bound = array_concat(choose_bound, [empty_strs]);
+            position = nss_skip_statement(source, first.next);
+            continue;
+        }
+        if first.text == "end" {
+            let end_kind = natural_next(source, first.next);
+            mut pop_bound: [str] = [];
+            mut pop_stack: [[str]] = [];
+            if end_kind.text == "choose" {
+                pop_stack = choose_bound;
+            } else if end_kind.text == "routine" {
+                pop_stack = routine_bound;
+            }
+            if array_len(pop_stack) > 0 {
+                pop_bound = pop_stack[array_len(pop_stack) - 1];
+                mut bi: int = 0;
+                while bi < array_len(pop_bound) {
+                    let bname: str = pop_bound[bi];
+                    let idx: int = nss_find_index(names, bname);
+                    if idx >= 0 {
+                        names = remove_at_str(names, idx);
+                        types = remove_at_str(types, idx);
+                        mutable = remove_at_bool(mutable, idx);
+                    }
+                    bi += 1;
+                }
+                if end_kind.text == "choose" {
+                    choose_bound = slice(choose_bound, 0, array_len(choose_bound) - 1);
+                } else {
+                    routine_bound = slice(routine_bound, 0, array_len(routine_bound) - 1);
+                }
+            }
+            position = end_kind.next;
+            continue;
+        }
+        if first.text == "otherwise" or first.text == "each" {
             position = nss_skip_statement(source, first.next);
             continue;
         }

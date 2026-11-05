@@ -271,6 +271,17 @@ func natural_parse_check(source: str) -> int {
             if np_starts(target, "this.") {
                 simple_target = substr(target, 5, str_len(target));
             }
+            let dot: int = np_find_text(simple_target, ".", 0);
+            if dot > 0 {
+                let base: str = str_trim(substr(simple_target, 0, dot));
+                let known: str = str_join(mutable_names, "|") + "|" +
+                    str_join(immutable_names, "|");
+                if str_contains(known, base) == false {
+                    np_error(number, 314, "assignment target is not mutable");
+                    return 1;
+                }
+                continue;
+            }
             if array_len(mutable_names) == 0 or
                str_contains(str_join(mutable_names, "|"), simple_target) == false {
                 if str_contains(str_join(immutable_names, "|"), simple_target) {

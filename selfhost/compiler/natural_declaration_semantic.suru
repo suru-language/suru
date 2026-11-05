@@ -99,6 +99,21 @@ func nds_pop_bool(stack: [bool]) -> [bool] {
     return slice(stack, 0, array_len(stack) - 1);
 }
 
+func nds_is_identifier(text: str) -> bool {
+    if str_len(text) == 0 { return false; }
+    let c0: str = text[0];
+    if not ((c0 >= "a" and c0 <= "z") or (c0 >= "A" and c0 <= "Z") or
+            c0 == "_") { return false; }
+    mut i: int = 1;
+    while i < str_len(text) {
+        let c: str = text[i];
+        if not ((c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or
+                (c >= "0" and c <= "9") or c == "_") { return false; }
+        i += 1;
+    }
+    return true;
+}
+
 func nds_variant_name(line: str) -> str {
     let rest: str = str_trim(nds_after(line, "case"));
     let open: int = nds_find(rest, "(", 0);
@@ -163,6 +178,7 @@ func natural_declaration_check(source: str) -> int {
     mut choose_stack: [str] = [];
     mut choose_seen: [str] = [];
     mut choose_wildcard: [bool] = [];
+    mut choose_known: [bool] = [];
     mut current_record: str = "";
     mut current_contract: str = "";
     mut current_choice: str = "";
@@ -221,7 +237,8 @@ func natural_declaration_check(source: str) -> int {
                 nds_error(line, "mismatched end choose"); return 1;
             }
             let choice: str = choose_stack[array_len(choose_stack) - 1];
-            if nds_choice_complete(variant_keys,
+            if choose_known[array_len(choose_known) - 1] and
+               nds_choice_complete(variant_keys,
                                    choose_seen[array_len(choose_seen) - 1], choice,
                                    choose_wildcard[array_len(choose_wildcard) - 1]) == false {
                 nds_error(line, "choice match is not exhaustive"); return 1;
@@ -229,6 +246,7 @@ func natural_declaration_check(source: str) -> int {
             choose_stack = nds_pop_str(choose_stack);
             choose_seen = nds_pop_str(choose_seen);
             choose_wildcard = nds_pop_bool(choose_wildcard);
+            choose_known = nds_pop_bool(choose_known);
             continue;
         }
         if raw == "end attempt" {
@@ -333,12 +351,16 @@ func natural_declaration_check(source: str) -> int {
 
         if nds_word(raw) == "choose" {
             let choice: str = str_trim(nds_after(raw, "choose"));
-            if nss_has(choice_names, choice) == false {
-                nds_error(line, "choose references unknown choice '" + choice + "'"); return 1;
+            let known: bool = nss_has(choice_names, choice);
+            if known == false {
+                if nds_is_identifier(choice) == false {
+                    nds_error(line, "choose references unknown choice '" + choice + "'"); return 1;
+                }
             }
             choose_stack = array_concat(choose_stack, [choice]);
             choose_seen = array_concat(choose_seen, [""]);
             choose_wildcard = array_concat(choose_wildcard, [false]);
+            choose_known = array_concat(choose_known, [known]);
             continue;
         }
         if nds_word(raw) == "case" {
@@ -349,6 +371,9 @@ func natural_declaration_check(source: str) -> int {
             let variant: str = nds_variant_name(raw);
             if variant == "_" {
                 choose_wildcard[array_len(choose_wildcard) - 1] = true;
+                continue;
+            }
+            if choose_known[array_len(choose_known) - 1] == false {
                 continue;
             }
             let key: str = choice + "." + variant;
