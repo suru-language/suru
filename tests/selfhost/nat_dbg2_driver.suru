@@ -1,6 +1,0 @@
-use "../../selfhost/compiler/natural_bytecode.suru";
-use "../../selfhost/compiler/source.suru";
-func main() {
-    let src: str = source_load(args(0));
-    exit(natural_emit_bytecode(src));
-}
