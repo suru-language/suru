@@ -1,0 +1,23 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_frontend.suru";
+use "../../selfhost/compiler/natural_bytecode.suru";
+use "../../selfhost/compiler/natural_module_writer.suru";
+use "../../selfhost/compiler/natural_verifier.suru";
+use "../../selfhost/compiler/natural_module_reader.suru";
+use "../../selfhost/compiler/natural_vm.suru";
+
+// End-to-end self-hosted compile-and-run: frontend check -> bytecode lowering
+// -> verifier -> module writer -> SURU interpreter. The whole pipeline runs in
+// SURU; the C17 VM only hosts this driver. Output must match `suru
+// --syntax=natural run` for the corpus.
+func main() {
+    let source: str = source_load(args(0));
+    if natural_frontend_check(source) != 0 { exit(2); }
+    let instructions: [str] = nbc_collect(source);
+    if array_len(instructions) == 1 and instructions[0] == "#emit-failed" {
+        exit(3);
+    }
+    if natural_verify(instructions) != 0 { exit(4); }
+    let bytes: str = nw_serialize(instructions);
+    exit(natural_run_module(bytes));
+}
