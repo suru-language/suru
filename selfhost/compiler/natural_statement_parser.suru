@@ -46,6 +46,43 @@ func nas_finish(source: str, position: int, node: str) -> [str] {
     return nas_fail(t.start, "expected statement terminator");
 }
 
+func nas_parse_type(source: str, position: int) -> [str] {
+    let first = natural_next(source, position);
+    let text: str = first.text;
+    if first.kind == NT_PUNCT and text == "[" {
+        let inner = nas_parse_type(source, first.next);
+        if inner[0] != "ok" { return inner; }
+        let close = natural_next(source, int_from_str(inner[1]));
+        if close.text != "]" { return nas_fail(close.start, "expected ']' in array type"); }
+        return nas_ok(close.next, "[" + inner[2] + "]");
+    }
+    if first.kind == NT_IDENT or first.kind == NT_WORD {
+        let after = natural_next(source, first.next);
+        if after.text == "<" {
+            let elem = nas_parse_type(source, after.next);
+            if elem[0] != "ok" { return elem; }
+            mut current: int = int_from_str(elem[1]);
+            mut argtext: str = elem[2];
+            while true {
+                let sep = natural_next(source, current);
+                if sep.text == "," {
+                    let nextarg = nas_parse_type(source, sep.next);
+                    if nextarg[0] != "ok" { return nextarg; }
+                    argtext = argtext + "," + nextarg[2];
+                    current = int_from_str(nextarg[1]);
+                    continue;
+                }
+                if sep.text == ">" {
+                    return nas_ok(sep.next, text + "<" + argtext + ">");
+                }
+                return nas_fail(sep.start, "expected ',' or '>' in generic type");
+            }
+        }
+        return nas_ok(first.next, text);
+    }
+    return nas_fail(first.start, "expected binding type");
+}
+
 func nas_parse_binding(source: str, first: NToken, mode: str) -> [str] {
     let name = natural_next(source, first.next);
     if name.kind != NT_IDENT {
@@ -55,12 +92,10 @@ func nas_parse_binding(source: str, first: NToken, mode: str) -> [str] {
     mut annotation: str = "";
     let colon = natural_next(source, position);
     if colon.text == ":" {
-        let type_name = natural_next(source, colon.next);
-        if type_name.kind != NT_IDENT and type_name.kind != NT_WORD {
-            return nas_fail(type_name.start, "expected binding type");
-        }
-        annotation = ":" + type_name.text;
-        position = type_name.next;
+        let typ = nas_parse_type(source, colon.next);
+        if typ[0] != "ok" { return nas_fail(colon.next, typ[2]); }
+        annotation = ":" + typ[2];
+        position = int_from_str(typ[1]);
     }
     let equals = natural_next(source, position);
     if equals.text != "=" {

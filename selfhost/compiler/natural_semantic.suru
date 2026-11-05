@@ -61,6 +61,29 @@ func nss_find_top(expression: str, needle: str) -> int {
     return -1;
 }
 
+func nss_split_top_level(text: str, sep: str) -> [str] {
+    mut parts: [str] = [];
+    mut depth: int = 0;
+    mut quote: bool = false;
+    mut start: int = 0;
+    mut i: int = 0;
+    while i < str_len(text) {
+        let c: str = text[i];
+        if c == "\"" { quote = not quote; }
+        if not quote {
+            if c == "(" or c == "[" { depth += 1; }
+            if c == ")" or c == "]" { depth -= 1; }
+            if depth == 0 and c == sep {
+                parts = array_concat(parts, [str_trim(substr(text, start, i - start))]);
+                start = i + 1;
+            }
+        }
+        i += 1;
+    }
+    parts = array_concat(parts, [str_trim(substr(text, start, str_len(text) - start))]);
+    return parts;
+}
+
 func nss_find_colon_after(expression: str, from: int) -> int {
     mut depth: int = 0;
     mut i: int = from + 1;
@@ -184,6 +207,21 @@ func nss_expr_type(expression: str, names: [str], types: [str]) -> [str] {
     let atom: str = parts[1];
     if atom == "true" or atom == "false" { return ["ok", "Bool"]; }
     if atom == "none" { return ["ok", "None"]; }
+    if str_len(atom) >= 2 and atom[0] == "[" and atom[str_len(atom) - 1] == "]" {
+        let inner: str = substr(atom, 1, str_len(atom) - 2);
+        if inner == "" { return ["ok", "[]"]; }
+        let elems: [str] = nss_split_top_level(inner, ",");
+        let elem_type: [str] = nss_expr_type(elems[0], names, types);
+        if elem_type[0] == "error" { return elem_type; }
+        mut elem_idx: int = 1;
+        while elem_idx < array_len(elems) {
+            let et: [str] = nss_expr_type(elems[elem_idx], names, types);
+            if et[0] == "error" { return et; }
+            if et[1] != elem_type[1] { return ["error", "array elements must share a type"]; }
+            elem_idx += 1;
+        }
+        return ["ok", "[" + elem_type[1] + "]"];
+    }
     if str_len(atom) > 0 and atom[0] == "\"" { return ["ok", "Text"]; }
     if str_contains(atom, ".") or str_contains(atom, "e") or str_contains(atom, "E") {
         if str_len(atom) > 0 and atom[0] >= "0" and atom[0] <= "9" {
@@ -237,9 +275,10 @@ func natural_semantic_check(source: str) -> int {
             mut after_name: int = name.next;
             let colon = natural_next(source, after_name);
             if colon.text == ":" {
-                let type_name = natural_next(source, colon.next);
-                declared = type_name.text;
-                after_name = type_name.next;
+                let typ = nas_parse_type(source, colon.next);
+                if typ[0] != "ok" { nss_error(first.line, typ[2]); return 1; }
+                declared = typ[2];
+                after_name = int_from_str(typ[1]);
             }
             let equals = natural_next(source, after_name);
             if equals.text != "=" { nss_error(first.line, "binding requires an initializer"); return 1; }

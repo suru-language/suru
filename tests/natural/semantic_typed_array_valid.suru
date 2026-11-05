@@ -1,0 +1,4 @@
+value xs: [Whole] = [1, 2]
+value ys: [Whole] = [3]
+value m: [[Whole]] = [[1], [2]]
+value greeting: [Text] = ["a", "b"]
