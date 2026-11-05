@@ -290,7 +290,8 @@ func nw_serialize(instructions: [str]) -> str {
         if nbc_has_prefix(item, "#int|") {
             ints = array_concat(ints, [nw_int_toll(substr(item, 5, str_len(item)))]);
         } else if nbc_has_prefix(item, "#float|") {
-            floats = array_concat(floats, [substr(item, 7, str_len(item))]);
+            floats = array_concat(floats,
+                [nw_f64(substr(item, 7, str_len(item)))]);
         } else if nbc_has_prefix(item, "#str|") {
             let raw: str = substr(item, 5, str_len(item));
             mut val: str = raw;
@@ -311,15 +312,74 @@ func nw_serialize(instructions: [str]) -> str {
     mut nfuncs: int = array_len(fns);
     if nfuncs == 0 { nfuncs = 1; }
 
+    mut fn_names: [str] = [];
+    mut fn_nparams: [int] = [];
+    mut fn_frames: [int] = [];
+    mut fn_maxdepths: [int] = [];
+    mut fn_ops: [[int]] = [];
+    mut fn_as: [[int]] = [];
+    mut fn_bs: [[int]] = [];
+    mut fn_cs: [[int]] = [];
+    i = 0;
+    while i < nfuncs {
+        let name: str = nw_func_name(instructions, i);
+        let nparams: int = nw_func_nparams(instructions, i);
+        mut items: [str] = [];
+        if nfuncs > 1 or array_len(fns) > 0 { items = fns[i]; }
+        let ins: [str] = nw_emit_ins(items);
+        let map: [int] = nw_slotmap(ins);
+        let nslots: int = array_len(map);
+        mut frame: int = nslots < nparams ? nparams : nslots;
+        if frame == 0 { frame = 1; }
+        fn_names = array_concat(fn_names, [name]);
+        fn_nparams = array_concat(fn_nparams, [nparams]);
+        fn_frames = array_concat(fn_frames, [frame]);
+        fn_maxdepths = array_concat(fn_maxdepths, [1024]);
+        mut ops: [int] = [];
+        mut avs: [int] = [];
+        mut bvs: [int] = [];
+        mut cvs: [int] = [];
+        mut j: int = 0;
+        while j < array_len(ins) {
+            let fields: [str] = str_split(ins[j], "|");
+            let op: str = nw_norm(fields[0]);
+            let opid: int = nw_op_id(fields[0]);
+            let a: int = int_from_str(fields[1]);
+            let b: int = fields[2] == "" ? 0 : int_from_str(fields[2]);
+            let c: int = fields[3] == "" ? 0 : int_from_str(fields[3]);
+            let ra: int = (op == "ld_local" or op == "st_local") ?
+                nw_slot_index(map, a) : a;
+            ops = array_concat(ops, [opid]);
+            avs = array_concat(avs, [ra]);
+            bvs = array_concat(bvs, [b]);
+            cvs = array_concat(cvs, [c]);
+            j += 1;
+        }
+        fn_ops = array_concat(fn_ops, [ops]);
+        fn_as = array_concat(fn_as, [avs]);
+        fn_bs = array_concat(fn_bs, [bvs]);
+        fn_cs = array_concat(fn_cs, [cvs]);
+        i += 1;
+    }
+    return nw_emit_module(ints, floats, strs, records,
+                          fn_names, fn_nparams, fn_frames, fn_maxdepths,
+                          fn_ops, fn_as, fn_bs, fn_cs);
+}
+
+func nw_emit_module(ints: [int], floats: [str], strs: [str], recnfields: [int],
+                    fn_names: [str], fn_nparams: [int], fn_frames: [int],
+                    fn_maxdepths: [int], fn_ops: [[int]], fn_as: [[int]],
+                    fn_bs: [[int]], fn_cs: [[int]]) -> str {
     let nints: int = array_len(ints);
     let nfloats: int = array_len(floats);
     let nstrings: int = array_len(strs);
-    let nrecords: int = array_len(records);
+    let nrecords: int = array_len(recnfields);
+    let nfuncs: int = array_len(fn_names);
 
     mut entry: int = 0;
-    i = 0;
+    mut i: int = 0;
     while i < nfuncs {
-        if nw_func_name(instructions, i) == "main" { entry = i; }
+        if fn_names[i] == "main" { entry = i; }
         i += 1;
     }
 
@@ -336,7 +396,7 @@ func nw_serialize(instructions: [str]) -> str {
     i = 0;
     while i < nints { out = out + nw_i64(ints[i]); i += 1; }
     i = 0;
-    while i < nfloats { out = out + nw_f64(floats[i]); i += 1; }
+    while i < nfloats { out = out + floats[i]; i += 1; }
     i = 0;
     while i < nstrings {
         let len: int = str_len(strs[i]);
@@ -345,40 +405,27 @@ func nw_serialize(instructions: [str]) -> str {
         i += 1;
     }
     i = 0;
-    while i < nrecords { out = out + nw_u32(records[i]); i += 1; }
+    while i < nrecords { out = out + nw_u32(recnfields[i]); i += 1; }
 
     i = 0;
     while i < nfuncs {
-        let name: str = nw_func_name(instructions, i);
-        let nparams: int = nw_func_nparams(instructions, i);
-        mut items: [str] = [];
-        if nfuncs > 1 or array_len(fns) > 0 { items = fns[i]; }
-        let ins: [str] = nw_emit_ins(items);
-        let map: [int] = nw_slotmap(ins);
-        let nslots: int = array_len(map);
-        mut frame: int = nslots < nparams ? nparams : nslots;
-        if frame == 0 { frame = 1; }
-        let namelen: int = str_len(name);
-        out = out + nw_u32(namelen);
+        let name: str = fn_names[i];
+        out = out + nw_u32(str_len(name));
         out = out + name;
-        out = out + nw_u32(nparams);
-        out = out + nw_u32(frame);
-        out = out + nw_u32(1024);
-        out = out + nw_u32(array_len(ins));
+        out = out + nw_u32(fn_nparams[i]);
+        out = out + nw_u32(fn_frames[i]);
+        out = out + nw_u32(fn_maxdepths[i]);
+        let ops: [int] = fn_ops[i];
+        let avs: [int] = fn_as[i];
+        let bvs: [int] = fn_bs[i];
+        let cvs: [int] = fn_cs[i];
+        out = out + nw_u32(array_len(ops));
         mut j: int = 0;
-        while j < array_len(ins) {
-            let fields: [str] = str_split(ins[j], "|");
-            let op: str = nw_norm(fields[0]);
-            let opid: int = nw_op_id(fields[0]);
-            let a: int = int_from_str(fields[1]);
-            let b: int = fields[2] == "" ? 0 : int_from_str(fields[2]);
-            let c: int = fields[3] == "" ? 0 : int_from_str(fields[3]);
-            let ra: int = (op == "ld_local" or op == "st_local") ?
-                nw_slot_index(map, a) : a;
-            out = out + str_chr_byte(opid);
-            out = out + nw_u32(ra);
-            out = out + nw_u32(b);
-            out = out + nw_u32(c);
+        while j < array_len(ops) {
+            out = out + str_chr_byte(ops[j]);
+            out = out + nw_u32(avs[j]);
+            out = out + nw_u32(bvs[j]);
+            out = out + nw_u32(cvs[j]);
             j += 1;
         }
         i += 1;

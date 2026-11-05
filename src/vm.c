@@ -522,6 +522,42 @@ static bool builtin_f64_to_bytes(s_vm *vm) {
     return push_str_from_buf(vm, (const char *)buf, 8);
 }
 
+static bool builtin_str_byte_at(s_vm *vm) {
+    s_value idx = pop(vm);
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR ||
+        idx.tag != S_VAL_INT) {
+        vm_trap(vm, "str_byte_at expects (str, int)");
+        return false;
+    }
+    s_size len = s_obj_str_len(s.u.o);
+    s_i64 i = idx.u.i;
+    if (i < 0 || (s_u64)i >= len) {
+        vm_trap(vm, "str_byte_at out of range");
+        return false;
+    }
+    return push(vm, s_val_int((s_u8)s_obj_str_data(s.u.o)[i]));
+}
+
+static bool builtin_bytes_to_f64(s_vm *vm) {
+    s_value s = pop(vm);
+    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+        vm_trap(vm, "bytes_to_f64 expects a string");
+        return false;
+    }
+    if (s_obj_str_len(s.u.o) < 8) {
+        vm_trap(vm, "bytes_to_f64 needs 8 bytes");
+        return false;
+    }
+    unsigned char buf[8];
+    memcpy(buf, s_obj_str_data(s.u.o), 8);
+    s_u64 bits = 0;
+    for (int i = 0; i < 8; ++i) bits |= (s_u64)buf[i] << (8 * i);
+    double d;
+    memcpy(&d, &bits, 8);
+    return push(vm, s_val_float(d));
+}
+
 static bool builtin_read_line(s_vm *vm) {
     s_size len;
     char *line = s_rt_read_line(&len);
@@ -1369,6 +1405,8 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_STR_FROM_CODEPOINT: return builtin_str_from_codepoint(vm);
     case S_BUILTIN_STR_CHR_BYTE: return builtin_str_chr_byte(vm);
     case S_BUILTIN_F64_TO_BYTES: return builtin_f64_to_bytes(vm);
+    case S_BUILTIN_STR_BYTE_AT: return builtin_str_byte_at(vm);
+    case S_BUILTIN_BYTES_TO_F64: return builtin_bytes_to_f64(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;
