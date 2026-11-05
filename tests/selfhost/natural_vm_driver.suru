@@ -1,0 +1,7 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_vm.suru";
+
+func main() {
+    let bytes: str = read_file(args(0));
+    exit(natural_run_module(bytes));
+}

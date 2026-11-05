@@ -1,0 +1,132 @@
+// SURU-owned bytecode module reader (loader). Parses the .sbc wire format
+// emitted by nw_emit_module / C s_bc_write into structured pools and function
+// tables, then can re-serialize byte-for-byte identical via nw_emit_module.
+// This is the load half of a future SURU VM; correctness is enforced by the
+// write -> read -> re-write round-trip gate.
+
+use "natural_module_writer.suru";
+
+func nr_u32_at(bytes: str, p: int) -> [int] {
+    let v: int = str_byte_at(bytes, p) +
+        str_byte_at(bytes, p + 1) * 256 +
+        str_byte_at(bytes, p + 2) * 65536 +
+        str_byte_at(bytes, p + 3) * 16777216;
+    return [v, p + 4];
+}
+
+func nr_i64_at(bytes: str, p: int) -> [int] {
+    mut w: int = 1;
+    mut v: int = 0;
+    mut k: int = 0;
+    while k < 8 {
+        v = v + str_byte_at(bytes, p + k) * w;
+        k += 1;
+        if k < 8 { w = w * 256; }
+    }
+    return [v, p + 8];
+}
+
+func nr_roundtrip(bytes: str) -> str {
+    if substr(bytes, 0, 4) != "SURU" {
+        println("reader-error|bad magic");
+        return "";
+    }
+    let ver: [int] = nr_u32_at(bytes, 4);
+    let entry: [int] = nr_u32_at(bytes, ver[1]);
+    let nints: [int] = nr_u32_at(bytes, entry[1]);
+    let nfl: [int] = nr_u32_at(bytes, nints[1]);
+    let nstr: [int] = nr_u32_at(bytes, nfl[1]);
+    let nrec: [int] = nr_u32_at(bytes, nstr[1]);
+    let nfunc: [int] = nr_u32_at(bytes, nrec[1]);
+    mut p: int = nfunc[1];
+
+    mut intbytes: [str] = [];
+    mut i: int = 0;
+    while i < nints[0] {
+        intbytes = array_concat(intbytes, [substr(bytes, p, 8)]);
+        p += 8;
+        i += 1;
+    }
+
+    mut floats: [str] = [];
+    i = 0;
+    while i < nfl[0] {
+        floats = array_concat(floats, [substr(bytes, p, 8)]);
+        p += 8;
+        i += 1;
+    }
+
+    mut strs: [str] = [];
+    i = 0;
+    while i < nstr[0] {
+        let L: [int] = nr_u32_at(bytes, p);
+        strs = array_concat(strs, [substr(bytes, L[1], L[0])]);
+        p = L[1] + L[0];
+        i += 1;
+    }
+
+    mut recnfields: [int] = [];
+    i = 0;
+    while i < nrec[0] {
+        let rr: [int] = nr_u32_at(bytes, p);
+        recnfields = array_concat(recnfields, [rr[0]]);
+        p = rr[1];
+        i += 1;
+    }
+
+    mut fn_names: [str] = [];
+    mut fn_nparams: [int] = [];
+    mut fn_frames: [int] = [];
+    mut fn_maxdepths: [int] = [];
+    mut fn_ops: [[int]] = [];
+    mut fn_as: [[int]] = [];
+    mut fn_bs: [[int]] = [];
+    mut fn_cs: [[int]] = [];
+
+    i = 0;
+    while i < nfunc[0] {
+        let nm: [int] = nr_u32_at(bytes, p);
+        fn_names = array_concat(fn_names, [substr(bytes, nm[1], nm[0])]);
+        p = nm[1] + nm[0];
+        let q: [int] = nr_u32_at(bytes, p);
+        let np: int = q[0];
+        p = q[1];
+        let q2: [int] = nr_u32_at(bytes, p);
+        let fr: int = q2[0];
+        p = q2[1];
+        let q3: [int] = nr_u32_at(bytes, p);
+        let md: int = q3[0];
+        p = q3[1];
+        let q4: [int] = nr_u32_at(bytes, p);
+        let nins: int = q4[0];
+        p = q4[1];
+        fn_nparams = array_concat(fn_nparams, [np]);
+        fn_frames = array_concat(fn_frames, [fr]);
+        fn_maxdepths = array_concat(fn_maxdepths, [md]);
+        mut ops: [int] = [];
+        mut avs: [int] = [];
+        mut bvs: [int] = [];
+        mut cvs: [int] = [];
+        mut j: int = 0;
+        while j < nins {
+            ops = array_concat(ops, [str_byte_at(bytes, p)]);
+            let a: [int] = nr_u32_at(bytes, p + 1);
+            let b: [int] = nr_u32_at(bytes, a[1]);
+            let c: [int] = nr_u32_at(bytes, b[1]);
+            avs = array_concat(avs, [a[0]]);
+            bvs = array_concat(bvs, [b[0]]);
+            cvs = array_concat(cvs, [c[0]]);
+            p = c[1];
+            j += 1;
+        }
+        fn_ops = array_concat(fn_ops, [ops]);
+        fn_as = array_concat(fn_as, [avs]);
+        fn_bs = array_concat(fn_bs, [bvs]);
+        fn_cs = array_concat(fn_cs, [cvs]);
+        i += 1;
+    }
+
+    return nw_emit_module(intbytes, floats, strs, recnfields,
+                          fn_names, fn_nparams, fn_frames, fn_maxdepths,
+                          fn_ops, fn_as, fn_bs, fn_cs);
+}

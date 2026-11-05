@@ -1,0 +1,10 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_module_reader.suru";
+
+func main() {
+    let bytes: str = read_file(args(0));
+    let out: str = nr_roundtrip(bytes);
+    if out == "" { exit(1); }
+    write_file(args(1), out);
+    exit(0);
+}

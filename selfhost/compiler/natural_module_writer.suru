@@ -282,7 +282,7 @@ func nw_slot_index(map: [int], slot: int) -> int {
 }
 
 func nw_serialize(instructions: [str]) -> str {
-    mut ints: [int] = [];
+    mut intbytes: [str] = [];
     mut floats: [str] = [];
     mut strs: [str] = [];
     mut records: [int] = [];
@@ -290,7 +290,9 @@ func nw_serialize(instructions: [str]) -> str {
     while i < array_len(instructions) {
         let item: str = instructions[i];
         if nbc_has_prefix(item, "#int|") {
-            ints = array_concat(ints, [nw_int_toll(substr(item, 5, str_len(item)))]);
+            let iv: str = nw_i64(nw_int_toll(substr(item, 5, str_len(item))));
+            intbytes = array_concat(intbytes,
+                [substr(iv, 0, str_len(iv))]);
         } else if nbc_has_prefix(item, "#float|") {
             floats = array_concat(floats,
                 [nw_f64(substr(item, 7, str_len(item)))]);
@@ -363,16 +365,16 @@ func nw_serialize(instructions: [str]) -> str {
         fn_cs = array_concat(fn_cs, [cvs]);
         i += 1;
     }
-    return nw_emit_module(ints, floats, strs, records,
+    return nw_emit_module(intbytes, floats, strs, records,
                           fn_names, fn_nparams, fn_frames, fn_maxdepths,
                           fn_ops, fn_as, fn_bs, fn_cs);
 }
 
-func nw_emit_module(ints: [int], floats: [str], strs: [str], recnfields: [int],
+func nw_emit_module(intbytes: [str], floats: [str], strs: [str], recnfields: [int],
                     fn_names: [str], fn_nparams: [int], fn_frames: [int],
                     fn_maxdepths: [int], fn_ops: [[int]], fn_as: [[int]],
                     fn_bs: [[int]], fn_cs: [[int]]) -> str {
-    let nints: int = array_len(ints);
+    let nints: int = array_len(intbytes);
     let nfloats: int = array_len(floats);
     let nstrings: int = array_len(strs);
     let nrecords: int = array_len(recnfields);
@@ -396,7 +398,7 @@ func nw_emit_module(ints: [int], floats: [str], strs: [str], recnfields: [int],
     out = out + nw_u32(nfuncs);
 
     i = 0;
-    while i < nints { out = out + nw_i64(ints[i]); i += 1; }
+    while i < nints { out = out + intbytes[i]; i += 1; }
     i = 0;
     while i < nfloats { out = out + floats[i]; i += 1; }
     i = 0;

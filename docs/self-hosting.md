@@ -183,9 +183,14 @@ The bytecode object-emitting half is now owned by SURU:
 - Drivers: `natural_compile_driver.suru` (bytecode -> writer), 
   `natural_build_driver.suru` (frontend -> bytecode -> verifier -> writer), and
   `natural_verify_driver.suru` / `natural_verify_cases_driver.suru`.
+- `selfhost/compiler/natural_module_reader.suru` parses the `.sbc` wire format
+  back into pools/function tables and re-serializes byte-identically via
+  `nw_emit_module`; it is the load half of a future SURU VM, gated by a
+  write -> read -> re-write round-trip (`natural_reader_run.sh`, 57/57).
 - Gates wired into `make selfhost-test`: `natural_compile_run.sh` (differential
   byte-identity, 58/58), `natural_verify_run.sh` (positive + injected invalid),
-  and `natural_build_run.sh` (full-pipeline acceptance all byte-identical).
+  `natural_build_run.sh` (full-pipeline acceptance all byte-identical), and
+  `natural_reader_run.sh` (module-reader round-trip).
 - Make targets: `selfhost-compare` runs the three gates; `selfhost-bootstrap`
   compiles `natural_build_driver.suru` into `build/bin/natural_compiler.sbc`;
   `selfhost-rebuild` runs it on the natural corpus and requires byte-identical

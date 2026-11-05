@@ -1,0 +1,261 @@
+// SURU-written bytecode interpreter (VM) for a practical core of the .sbc
+// instruction set. Loads a module via the same wire-logic as
+// natural_module_reader.suru and executes the entry routine under the C17 VM,
+// emitting output through SURU's own print/println. Differential parity with
+// the C VM is the acceptance gate.
+//
+// Values on the interpreter stack are encoded as single-character-tagged
+// strings: "I"<int>, "S"<str>, "B1"/"B0", "N" (none/unit). Surfacing only the
+// subset used by the corpus test programs (constants, locals, int arithmetic,
+// int/string comparison, control flow, print/println/to_str, returns).
+
+use "natural_module_reader.suru";
+
+func vm_tag(enc: str) -> int {
+    if enc[0] == "I" { return 1; }
+    if enc[0] == "S" { return 2; }
+    if enc[0] == "B" { return 3; }
+    return 0;
+}
+
+func vm_push(stack: [str], enc: str) -> [str] {
+    let stable: str = substr(enc, 0, str_len(enc));
+    return array_concat(stack, [stable]);
+}
+
+func vm_pop(stack: [str]) -> [str] {
+    return slice(stack, 0, array_len(stack) - 1);
+}
+
+func vm_to_str(enc: str) -> str {
+    let tag: int = vm_tag(enc);
+    if tag == 1 { return to_str(int_from_str(substr(enc, 1, str_len(enc)))); }
+    if tag == 2 { return substr(enc, 1, str_len(enc)); }
+    if tag == 3 { return enc[1] == "1" ? "true" : "false"; }
+    return "unit";
+}
+
+func natural_run_module(bytes: str) -> int {
+    let ver: [int] = nr_u32_at(bytes, 4);
+    let entry: [int] = nr_u32_at(bytes, ver[1]);
+    let nints: [int] = nr_u32_at(bytes, entry[1]);
+    let nfl: [int] = nr_u32_at(bytes, nints[1]);
+    let nstr: [int] = nr_u32_at(bytes, nfl[1]);
+    let nrec: [int] = nr_u32_at(bytes, nstr[1]);
+    let nfunc: [int] = nr_u32_at(bytes, nrec[1]);
+    mut p: int = nfunc[1];
+
+    mut intpool: [int] = [];
+    mut i: int = 0;
+    while i < nints[0] {
+        let r: [int] = nr_i64_at(bytes, p);
+        intpool = array_concat(intpool, [r[0]]);
+        p = r[1];
+        i += 1;
+    }
+
+    mut flpool: [float] = [];
+    i = 0;
+    while i < nfl[0] {
+        flpool = array_concat(flpool,
+            [bytes_to_f64(substr(bytes, p, 8))]);
+        p += 8;
+        i += 1;
+    }
+
+    mut strpool: [str] = [];
+    i = 0;
+    while i < nstr[0] {
+        let L: [int] = nr_u32_at(bytes, p);
+        strpool = array_concat(strpool, [substr(bytes, L[1], L[0])]);
+        p = L[1] + L[0];
+        i += 1;
+    }
+
+    p += 4 * nrec[0];
+
+    mut fn_ops: [[int]] = [];
+    mut fn_as: [[int]] = [];
+    mut fn_bs: [[int]] = [];
+    mut fn_cs: [[int]] = [];
+    mut fn_frames: [int] = [];
+    i = 0;
+    while i < nfunc[0] {
+        let nm: [int] = nr_u32_at(bytes, p);
+        p = nm[1] + nm[0];
+        let q: [int] = nr_u32_at(bytes, p);
+        p = q[1];
+        let q2: [int] = nr_u32_at(bytes, p);
+        let fr: int = q2[0];
+        p = q2[1];
+        let q3: [int] = nr_u32_at(bytes, p);
+        p = q3[1];
+        let q4: [int] = nr_u32_at(bytes, p);
+        let nins: int = q4[0];
+        p = q4[1];
+        fn_frames = array_concat(fn_frames, [fr]);
+        mut ops: [int] = [];
+        mut avs: [int] = [];
+        mut bvs: [int] = [];
+        mut cvs: [int] = [];
+        mut j: int = 0;
+        while j < nins {
+            ops = array_concat(ops, [str_byte_at(bytes, p)]);
+            let a: [int] = nr_u32_at(bytes, p + 1);
+            let b: [int] = nr_u32_at(bytes, a[1]);
+            let c: [int] = nr_u32_at(bytes, b[1]);
+            avs = array_concat(avs, [a[0]]);
+            bvs = array_concat(bvs, [b[0]]);
+            cvs = array_concat(cvs, [c[0]]);
+            p = c[1];
+            j += 1;
+        }
+        fn_ops = array_concat(fn_ops, [ops]);
+        fn_as = array_concat(fn_as, [avs]);
+        fn_bs = array_concat(fn_bs, [bvs]);
+        fn_cs = array_concat(fn_cs, [cvs]);
+        i += 1;
+    }
+
+    let fid: int = entry[0];
+    let ops: [int] = fn_ops[fid];
+    let avs: [int] = fn_as[fid];
+    let bs: [int] = fn_bs[fid];
+    let cs: [int] = fn_cs[fid];
+    let nins: int = array_len(ops);
+    let frame: int = fn_frames[fid];
+
+    mut locals: [str] = [];
+    i = 0;
+    while i < frame {
+        locals = array_concat(locals, ["N"]);
+        i += 1;
+    }
+
+    mut stack: [str] = [];
+    mut pc: int = 0;
+    mut guard: int = 0;
+    while pc < nins and guard < 1000000 {
+        guard += 1;
+        let op: int = ops[pc];
+        let a: int = avs[pc];
+        let b: int = bs[pc];
+        if op == 1 {
+            stack = vm_push(stack, "I" + to_str(intpool[a]));
+        } else if op == 2 {
+            stack = vm_push(stack, "F" + f64_to_str(flpool[a]));
+        } else if op == 3 {
+            stack = vm_push(stack, "S" + strpool[a]);
+        } else if op == 4 {
+            stack = vm_push(stack, "N");
+        } else if op == 5 {
+            stack = vm_push(stack, locals[a]);
+        } else if op == 6 {
+            let n: int = array_len(stack);
+            let val: str = stack[n - 1];
+            stack = vm_pop(stack);
+            locals[a] = val;
+        } else if op == 7 {
+            stack = vm_pop(stack);
+        } else if op == 8 {
+            let n: int = array_len(stack);
+            stack = vm_push(stack, stack[n - 1]);
+        } else if op == 9 {
+            let n: int = array_len(stack);
+            let t1: str = stack[n - 1];
+            let t2: str = stack[n - 2];
+            stack[n - 1] = t2;
+            stack[n - 2] = t1;
+        } else if op == 10 {
+            let n: int = array_len(stack);
+            let v: str = stack[n - 1];
+            stack = vm_pop(stack);
+            stack = vm_push(stack, v[1] == "1" ? "B0" : "B1");
+        } else if op == 11 {
+            let n: int = array_len(stack);
+            let v: str = stack[n - 1];
+            stack = vm_pop(stack);
+            stack = vm_push(stack, "I" + to_str(0 - int_from_str(substr(v, 1, str_len(v)))));
+        } else if op == 14 or op == 15 or op == 16 or op == 17 or op == 18 {
+            let n: int = array_len(stack);
+            let y: str = stack[n - 1];
+            let x: str = stack[n - 2];
+            stack = vm_pop(stack);
+            stack = vm_pop(stack);
+            let iv: int = int_from_str(substr(x, 1, str_len(x)));
+            let jv: int = int_from_str(substr(y, 1, str_len(y)));
+            mut res: int = 0;
+            if op == 14 { res = iv + jv; }
+            else if op == 15 { res = iv - jv; }
+            else if op == 16 { res = iv * jv; }
+            else if op == 17 { res = iv / jv; }
+            else { res = iv % jv; }
+            stack = vm_push(stack, "I" + to_str(res));
+        } else if op == 29 or op == 30 or op == 31 or op == 32 or op == 33 or op == 34 {
+            let n: int = array_len(stack);
+            let y: str = stack[n - 1];
+            let x: str = stack[n - 2];
+            stack = vm_pop(stack);
+            stack = vm_pop(stack);
+            let iv: int = int_from_str(substr(x, 1, str_len(x)));
+            let jv: int = int_from_str(substr(y, 1, str_len(y)));
+            mut r: bool = false;
+            if op == 29 { r = iv == jv; }
+            else if op == 30 { r = iv != jv; }
+            else if op == 31 { r = iv < jv; }
+            else if op == 32 { r = iv <= jv; }
+            else if op == 33 { r = iv > jv; }
+            else { r = iv >= jv; }
+            stack = vm_push(stack, r ? "B1" : "B0");
+        } else if op == 47 {
+            let n: int = array_len(stack);
+            let y: str = stack[n - 1];
+            let x: str = stack[n - 2];
+            stack = vm_pop(stack);
+            stack = vm_pop(stack);
+            let sx: str = substr(x, 1, str_len(x));
+            let sy: str = substr(y, 1, str_len(y));
+            stack = vm_push(stack, "S" + sx + sy);
+        } else if op == 63 {
+            if a == 0 {
+                let n: int = array_len(stack);
+                let v: str = stack[n - 1];
+                stack = vm_pop(stack);
+                print(vm_to_str(v));
+            } else if a == 1 {
+                let n: int = array_len(stack);
+                let v: str = stack[n - 1];
+                stack = vm_pop(stack);
+                println(vm_to_str(v));
+            } else if a == 5 {
+                let n: int = array_len(stack);
+                let v: str = stack[n - 1];
+                stack = vm_pop(stack);
+                stack = vm_push(stack, "S" + vm_to_str(v));
+            } else {
+                return 2;
+            }
+        } else if op == 64 {
+            return 0;
+        } else if op == 65 {
+            return 0;
+        } else if op == 66 {
+            pc = a;
+            continue;
+        } else if op == 67 {
+            let n: int = array_len(stack);
+            let v: str = stack[n - 1];
+            stack = vm_pop(stack);
+            if v[1] == "0" { pc = a; continue; }
+        } else if op == 68 {
+            let n: int = array_len(stack);
+            let v: str = stack[n - 1];
+            stack = vm_pop(stack);
+            if v[1] == "1" { pc = a; continue; }
+        } else {
+            return 3;
+        }
+        pc += 1;
+    }
+    return guard >= 1000000 ? 4 : 0;
+}
