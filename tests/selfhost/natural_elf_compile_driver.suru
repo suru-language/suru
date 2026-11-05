@@ -48,11 +48,13 @@ func main() {
         exit(0);
     }
 
-    // Integer expression: prefix (const/arith/neg) + println + pop + ret_unit.
+    // Generic program compiler over the full instruction stream.
     mut ops: [int] = [];
     mut avs: [int] = [];
+    mut bvs: [int] = [];
+    mut cvs: [int] = [];
     mut idx: int = 0;
-    while idx < n - 3 {
+    while idx < n {
         let f: [str] = str_split(ins[idx], "|");
         let opname: str = nw_norm(f[0]);
         mut id: int = 0;
@@ -64,6 +66,18 @@ func main() {
         else if opname == "sub_i" { id = 15; }
         else if opname == "mul_i" { id = 16; }
         else if opname == "div_i" { id = 17; }
+        else if opname == "eq_i" { id = 29; }
+        else if opname == "ne_i" { id = 30; }
+        else if opname == "lt_i" { id = 31; }
+        else if opname == "le_i" { id = 32; }
+        else if opname == "gt_i" { id = 33; }
+        else if opname == "ge_i" { id = 34; }
+        else if opname == "jmp" { id = 66; }
+        else if opname == "jz" { id = 67; }
+        else if opname == "jnz" { id = 68; }
+        else if opname == "pop" { id = 7; }
+        else if opname == "ret" or opname == "ret_unit" { id = 65; }
+        else if opname == "builtin" { id = 63; }
         else { exit(4); }
         ops = array_concat(ops, [id]);
         if id == 1 {
@@ -84,11 +98,11 @@ func main() {
         } else if id == 5 or id == 6 {
             avs = array_concat(avs, [int_from_str(f[1])]);
         } else {
-            avs = array_concat(avs, [0]);
+            avs = array_concat(avs, [int_from_str(f[1])]);
         }
         idx += 1;
     }
-    let elf: str = nw_emit_elf_int_expr(ops, avs);
+    let elf: str = nw_emit_elf_program(ops, avs, bvs, cvs);
     if elf == "" { exit(7); }
     write_file(args(1), elf);
     exit(0);

@@ -1,0 +1,6 @@
+use "../../selfhost/compiler/natural_elf_writer.suru";
+
+func main() {
+    write_file(args(0), nw_emit_elf_repeat());
+    exit(0);
+}

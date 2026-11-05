@@ -112,7 +112,7 @@ func nw_emit_elf_int_expr(ops: [int], avs: [int]) -> str {
     // prologue
     code = code + str_chr_byte(0x55);
     code = code + str_chr_byte(0x48) + str_chr_byte(0x89) + str_chr_byte(0xE5);
-    code = code + str_chr_byte(0x48) + str_chr_byte(0x83) + str_chr_byte(0xEC) + str_chr_byte(nlocals * 8);
+    code = code + str_chr_byte(0x48) + str_chr_byte(0x83) + str_chr_byte(0xEC) + str_chr_byte(96 + nlocals * 8);
 
     mut j: int = 0;
     while j < array_len(ops) {
@@ -190,4 +190,196 @@ func nw_emit_elf_int(value: int) -> str {
 
 func nw_emit_minimal_elf() -> str {
     return nw_emit_elf_message("hi\n");
+}
+
+func nw_emit_elf_program(ops: [int], as: [int], bs: [int], cs: [int]) -> str {
+    let nins: int = array_len(ops);
+    mut nlocals: int = 0;
+    let i0: int = 0;
+    while i0 < nins {
+        if (ops[i0] == 5 or ops[i0] == 6) and as[i0] + 1 > nlocals {
+            nlocals = as[i0] + 1;
+        }
+        i0 += 1;
+    }
+
+    mut buf: [int] = [];
+    mut pc_pos: [int] = [];
+    mut fx: [str] = [];
+
+    buf = array_concat(buf, [0x55, 0x48,0x89,0xE5, 0x48,0x83,0xEC,0x68]);
+    let pad: int = 96 + nlocals * 8;
+    buf[7] = pad & 255;
+
+    let pc: int = 0;
+    while pc < nins {
+        pc_pos = array_concat(pc_pos, [array_len(buf)]);
+        let op: int = ops[pc];
+        let a: int = as[pc];
+        let b: int = bs[pc];
+        if op == 1 {
+            buf = array_concat(buf, [0x48,0xC7,0xC0]);
+            buf = array_concat(buf, [a & 255, (a >> 8) & 255, (a >> 16) & 255, (a >> 24) & 255, 0x50]);
+        } else if op == 5 {
+            let disp: int = 256 - 8 * (a + 1);
+            buf = array_concat(buf, [0x48,0x8B,0x45,disp, 0x50]);
+        } else if op == 6 {
+            let disp: int = 256 - 8 * (a + 1);
+            buf = array_concat(buf, [0x58, 0x48,0x89,0x45,disp]);
+        } else if op == 11 {
+            buf = array_concat(buf, [0x58, 0x48,0xF7,0xD8, 0x50]);
+        } else if op == 14 or op == 15 or op == 16 {
+            buf = array_concat(buf, [0x5B,0x58]);
+            if op == 14 { buf = array_concat(buf, [0x48,0x01,0xD8]); }
+            else if op == 15 { buf = array_concat(buf, [0x48,0x29,0xD8]); }
+            else { buf = array_concat(buf, [0x48,0x0F,0xAF,0xC3]); }
+            buf = array_concat(buf, [0x50]);
+        } else if op == 17 {
+            buf = array_concat(buf, [0x5B,0x58, 0x48,0x31,0xD2, 0x48,0xF7,0xF3, 0x50]);
+        } else if op == 29 or op == 30 or op == 31 or op == 32 or op == 33 or op == 34 {
+            buf = array_concat(buf, [0x5B,0x58, 0x48,0x39,0xD8]);
+            if op == 29 { buf = array_concat(buf, [0x0F,0x94,0xC0]); }
+            else if op == 30 { buf = array_concat(buf, [0x0F,0x95,0xC0]); }
+            else if op == 31 { buf = array_concat(buf, [0x0F,0x9C,0xC0]); }
+            else if op == 32 { buf = array_concat(buf, [0x0F,0x9E,0xC0]); }
+            else if op == 33 { buf = array_concat(buf, [0x0F,0x9F,0xC0]); }
+            else { buf = array_concat(buf, [0x0F,0x9D,0xC0]); }
+            buf = array_concat(buf, [0x48,0x0F,0xB6,0xC0, 0x50]);
+        } else if op == 63 {
+            if a != 1 { return ""; }
+            buf = array_concat(buf, [0x58]);
+            let pr: str = nw_print_routine();
+            let k: int = 0;
+            while k < str_len(pr) {
+                buf = array_concat(buf, [str_byte_at(pr, k)]);
+                k += 1;
+            }
+            buf = array_concat(buf, [0x50]);
+        } else if op == 7 {
+            buf = array_concat(buf, [0x58]);
+        } else if op == 64 or op == 65 {
+            // fall through; final exit syscall terminates
+        } else if op == 66 {
+            buf = array_concat(buf, [0xE9]);
+            let d: int = array_len(buf);
+            buf = array_concat(buf, [0,0,0,0]);
+            fx = array_concat(fx, [to_str(d) + "|" + to_str(a)]);
+        } else if op == 67 {
+            buf = array_concat(buf, [0x58, 0x48,0x85,0xC0, 0x0F,0x84]);
+            let d: int = array_len(buf);
+            buf = array_concat(buf, [0,0,0,0]);
+            fx = array_concat(fx, [to_str(d) + "|" + to_str(a)]);
+        } else if op == 68 {
+            buf = array_concat(buf, [0x58, 0x48,0x85,0xC0, 0x0F,0x85]);
+            let d: int = array_len(buf);
+            buf = array_concat(buf, [0,0,0,0]);
+            fx = array_concat(fx, [to_str(d) + "|" + to_str(a)]);
+        } else {
+            return "";
+        }
+        pc += 1;
+    }
+
+    buf = array_concat(buf, [0x48,0xC7,0xC0,0x3C,0,0,0, 0x48,0x31,0xFF, 0x0F,0x05]);
+
+    let fi: int = 0;
+    while fi < array_len(fx) {
+        let entry: [str] = str_split(fx[fi], "|");
+        let d: int = int_from_str(entry[0]);
+        let tg: int = int_from_str(entry[1]);
+        let tpos: int = tg < array_len(pc_pos) ? pc_pos[tg] : -1;
+        let disp: int = tpos - (d + 4);
+        buf[d] = disp & 255;
+        buf[d + 1] = (disp >> 8) & 255;
+        buf[d + 2] = (disp >> 16) & 255;
+        buf[d + 3] = (disp >> 24) & 255;
+        fi += 1;
+    }
+
+    let s: str = "";
+    let bi: int = 0;
+    while bi < array_len(buf) {
+        s = s + str_chr_byte(buf[bi]);
+        bi += 1;
+    }
+    let total: int = 120 + str_len(s);
+    return nw_elf_header(total, 0x400000 + 120) + s;
+}
+
+func nw_emit_elf_repeat() -> str {
+    // Micro-assembler loop: `change i=0; repeat while i<3 { show(i); i=i+1 }`.
+    // Frame reserves a red zone (via +96) so the print routine's 32-byte stack
+    // scratch never overlaps the local at [rbp-8].
+    mut buf: [int] = [];
+    mut lab_names: [str] = [];
+    mut lab_pos: [int] = [];
+    mut fx: [str] = [];
+
+    buf = array_concat(buf, [0x55, 0x48,0x89,0xE5, 0x48,0x83,0xEC,0x68]);
+    buf = array_concat(buf, [0x48,0xC7,0xC0,0,0,0,0, 0x50]);
+    buf = array_concat(buf, [0x58, 0x48,0x89,0x45,0xF8]);
+
+    lab_names = array_concat(lab_names, ["loop"]);
+    lab_pos = array_concat(lab_pos, [array_len(buf)]);
+
+    buf = array_concat(buf, [0x48,0x8B,0x45,0xF8, 0x50]);
+    buf = array_concat(buf, [0x48,0xC7,0xC0,3,0,0,0, 0x50]);
+    buf = array_concat(buf, [0x5B,0x58, 0x48,0x39,0xD8, 0x0F,0x9C,0xC0, 0x48,0x0F,0xB6,0xC0, 0x50]);
+    buf = array_concat(buf, [0x58, 0x48,0x85,0xC0, 0x0F,0x84]);
+    let d0: int = array_len(buf);
+    buf = array_concat(buf, [0,0,0,0]);
+    fx = array_concat(fx, [to_str(d0) + "|exit"]);
+
+    buf = array_concat(buf, [0x48,0x8B,0x45,0xF8, 0x50]);
+    buf = array_concat(buf, [0x58]);
+    let pr: str = nw_print_routine();
+    mut k: int = 0;
+    while k < str_len(pr) {
+        buf = array_concat(buf, [str_byte_at(pr, k)]);
+        k += 1;
+    }
+    buf = array_concat(buf, [0x50]);
+    buf = array_concat(buf, [0x58]);
+    buf = array_concat(buf, [0x48,0x8B,0x45,0xF8, 0x50]);
+    buf = array_concat(buf, [0x48,0xC7,0xC0,1,0,0,0, 0x50]);
+    buf = array_concat(buf, [0x5B,0x58, 0x48,0x01,0xD8, 0x50]);
+    buf = array_concat(buf, [0x58, 0x48,0x89,0x45,0xF8]);
+
+    buf = array_concat(buf, [0xE9]);
+    let d1: int = array_len(buf);
+    buf = array_concat(buf, [0,0,0,0]);
+    fx = array_concat(fx, [to_str(d1) + "|loop"]);
+
+    lab_names = array_concat(lab_names, ["exit"]);
+    lab_pos = array_concat(lab_pos, [array_len(buf)]);
+
+    buf = array_concat(buf, [0x48,0xC7,0xC0,0x3C,0,0,0, 0x48,0x31,0xFF, 0x0F,0x05]);
+
+    mut fi: int = 0;
+    while fi < array_len(fx) {
+        let entry: [str] = str_split(fx[fi], "|");
+        let d: int = int_from_str(entry[0]);
+        let tname: str = entry[1];
+        mut tpos: int = -1;
+        mut li: int = 0;
+        while li < array_len(lab_names) {
+            if lab_names[li] == tname { tpos = lab_pos[li]; }
+            li += 1;
+        }
+        let disp: int = tpos - (d + 4);
+        buf[d] = disp & 255;
+        buf[d + 1] = (disp >> 8) & 255;
+        buf[d + 2] = (disp >> 16) & 255;
+        buf[d + 3] = (disp >> 24) & 255;
+        fi += 1;
+    }
+
+    mut s: str = "";
+    mut bi: int = 0;
+    while bi < array_len(buf) {
+        s = s + str_chr_byte(buf[bi]);
+        bi += 1;
+    }
+    let total: int = 120 + str_len(s);
+    return nw_elf_header(total, 0x400000 + 120) + s;
 }
