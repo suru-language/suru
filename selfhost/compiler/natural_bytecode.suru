@@ -72,6 +72,24 @@ func nbc_intern(instructions: [str], kind: str, value: str) -> [str] {
     return array_concat(instructions, ["#" + kind + "|" + value]);
 }
 
+func nbc_find_type(instructions: [str], name: str) -> str {
+    let needle: str = "#type|" + name + "|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], needle) {
+            return substr(instructions[i], str_len(needle), str_len(instructions[i]));
+        }
+        i += 1;
+    }
+    return "";
+}
+
+func nbc_note_type(instructions: [str], name: str, typ: str) -> [str] {
+    if typ == "" { return instructions; }
+    if nbc_find_type(instructions, name) != "" { return instructions; }
+    return array_concat(instructions, ["#type|" + name + "|" + typ]);
+}
+
 func nbc_slot(instructions: [str], name: str) -> int {
     let wanted: str = "#slot|" + name + "|";
     mut i: int = 0;
@@ -300,7 +318,9 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
         mut byte_op: str = "BC_ADD_I";
         if op == " - " { byte_op = "BC_SUB_I"; }
         else if (str_len(left) >= 2 and left[0] == "\"") or
-                (str_len(right) >= 2 and right[0] == "\"") {
+                (str_len(right) >= 2 and right[0] == "\"") or
+                (nbc_find_type(result, left) == "Text") or
+                (nbc_find_type(result, right) == "Text") {
             byte_op = "BC_CONCAT_S";
         }
         return nbc_emit(result, byte_op, "");
@@ -696,6 +716,11 @@ func natural_emit_bytecode(source: str) -> int {
             let colon: int = nbc_find(declaration, ":");
             let name: str = colon < 0 ? declaration : str_trim(substr(declaration, 0, colon));
             instructions = nbc_bind(instructions, name);
+            if colon >= 0 {
+                let decl_type: str = str_trim(substr(declaration, colon + 1,
+                                                     str_len(declaration)));
+                instructions = nbc_note_type(instructions, name, decl_type);
+            }
             instructions = nbc_emit_expression(instructions,
                 substr(rest, equals + 1, str_len(rest)));
             instructions = nbc_emit(instructions, "BC_ST_LOCAL",
