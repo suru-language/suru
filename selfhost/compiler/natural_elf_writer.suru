@@ -191,3 +191,95 @@ func nw_emit_elf_int(value: int) -> str {
 func nw_emit_minimal_elf() -> str {
     return nw_emit_elf_message("hi\n");
 }
+
+func nw_emit_elf_repeat() -> str {
+    // Micro-assembler: build code into a mutable byte buffer, record label
+    // positions, and resolve jz/jmp rel32 displacements at the end.
+    mut buf: [int] = [];
+    mut lab_names: [str] = [];
+    mut lab_pos: [int] = [];
+    mut fx: [str] = [];
+
+    // prologue: push rbp; mov rbp,rsp; sub rsp,8
+    buf = array_concat(buf, [0x55, 0x48,0x89,0xE5, 0x48,0x83,0xEC,0x08]);
+
+    // const 0; st_local 0
+    buf = array_concat(buf, [0x48,0xC7,0xC0,0,0,0,0, 0x50]);
+    buf = array_concat(buf, [0x58, 0x48,0x89,0x45,0xF8]);
+
+    // label loop
+    lab_names = array_concat(lab_names, ["loop"]);
+    lab_pos = array_concat(lab_pos, [array_len(buf)]);
+
+    // ld_local 0; const 3; lt_i
+    buf = array_concat(buf, [0x48,0x8B,0x45,0xF8, 0x50]);
+    buf = array_concat(buf, [0x48,0xC7,0xC0,3,0,0,0, 0x50]);
+    buf = array_concat(buf, [0x5B,0x58, 0x48,0x39,0xD8, 0x0F,0x9C,0xC0, 0x48,0x0F,0xB6,0xC0, 0x50]);
+
+    // jz exit: pop rax; test rax,rax; jz rel32
+    buf = array_concat(buf, [0x58, 0x48,0x85,0xC0, 0x0F,0x84]);
+    let d0: int = array_len(buf);
+    buf = array_concat(buf, [0,0,0,0]);
+    fx = array_concat(fx, [to_str(d0) + "|exit"]);
+
+    // builtin println: pop rax (int); print digits; push dummy
+    buf = array_concat(buf, [0x58]);
+    let pr: str = nw_print_routine();
+    let k: int = 0;
+    while k < str_len(pr) {
+        buf = array_concat(buf, [str_byte_at(pr, k)]);
+        k += 1;
+    }
+    buf = array_concat(buf, [0x50]);
+
+    // pop
+    buf = array_concat(buf, [0x58]);
+
+    // ld_local 0; const 1; add_i; st_local 0
+    buf = array_concat(buf, [0x48,0x8B,0x45,0xF8, 0x50]);
+    buf = array_concat(buf, [0x48,0xC7,0xC0,1,0,0,0, 0x50]);
+    buf = array_concat(buf, [0x5B,0x58, 0x48,0x01,0xD8, 0x50]);
+    buf = array_concat(buf, [0x58, 0x48,0x89,0x45,0xF8]);
+
+    // jmp loop
+    buf = array_concat(buf, [0xE9]);
+    let d1: int = array_len(buf);
+    buf = array_concat(buf, [0,0,0,0]);
+    fx = array_concat(fx, [to_str(d1) + "|loop"]);
+
+    // label exit
+    lab_names = array_concat(lab_names, ["exit"]);
+    lab_pos = array_concat(lab_pos, [array_len(buf)]);
+
+    // exit syscall
+    buf = array_concat(buf, [0x48,0xC7,0xC0,0x3C,0,0,0, 0x48,0x31,0xFF, 0x0F,0x05]);
+
+    // resolve fixups
+    let fi: int = 0;
+    while fi < array_len(fx) {
+        let entry: [str] = str_split(fx[fi], "|");
+        let d: int = int_from_str(entry[0]);
+        let tname: str = entry[1];
+        let tpos: int = -1;
+        let li: int = 0;
+        while li < array_len(lab_names) {
+            if lab_names[li] == tname { tpos = lab_pos[li]; }
+            li += 1;
+        }
+        let disp: int = tpos - (d + 4);
+        buf[d] = disp & 255;
+        buf[d + 1] = (disp >> 8) & 255;
+        buf[d + 2] = (disp >> 16) & 255;
+        buf[d + 3] = (disp >> 24) & 255;
+        fi += 1;
+    }
+
+    let s: str = "";
+    let bi: int = 0;
+    while bi < array_len(buf) {
+        s = s + str_chr_byte(buf[bi]);
+        bi += 1;
+    }
+    let total: int = 120 + str_len(s);
+    return nw_elf_header(total, 0x400000 + 120) + s;
+}
