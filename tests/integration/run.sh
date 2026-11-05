@@ -236,6 +236,37 @@ else
 fi
 rm -f "$natprog"
 
+# Natural run: choice dispatch with multiple variants.
+tests=$((tests + 1))
+natprog="$(mktemp)"
+printf 'choice Color\n    Red\n    Green\n    Blue\nend choice\nroutine main() -> Unit\n    value c: Color = Green\n    choose c\n    case Red\n        show("r")\n    case Green\n        show("g")\n    case Blue\n        show("b")\n    end choose\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "g" ]; then
+    echo "ok: nat-run-choose"
+else
+    echo "FAIL: nat-run-choose (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
+# Natural run: attempt/handle/ensure exception path.
+tests=$((tests + 1))
+natprog="$(mktemp)"
+printf 'routine main() -> Unit\n    attempt\n        show("try")\n    handle e: E\n        show("handled")\n    end exception\n    ensure\n        show("cleanup")\n    end exception\n    give\nend attempt\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "try
+cleanup" ]; then
+    echo "ok: nat-run-exception"
+else
+    echo "FAIL: nat-run-exception (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
 # Program arguments: run argtest.suru with two args.
 tests=$((tests + 1))
 actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"
