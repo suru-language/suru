@@ -154,7 +154,7 @@ func nas_parse_give(source: str, first: NToken) -> [str] {
         value = ne_value(expression);
         position = ne_next(expression);
     } else {
-        position = next.next;
+        position = next.start;
     }
     let node = na_make("give", first.line, value);
     return nas_finish(source, position, na_render(node));

@@ -1,0 +1,6 @@
+use "../../selfhost/compiler/natural_frontend.suru";
+use "../../selfhost/compiler/source.suru";
+
+func main() {
+    exit(natural_frontend_check(source_load(args(0))));
+}

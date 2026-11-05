@@ -288,6 +288,22 @@ func nss_skip_routine(source: str, position: int) -> int {
     return -1;
 }
 
+func nss_skip_to_end(source: str, position: int, kind: str) -> int {
+    mut p: int = position;
+    while true {
+        let t = natural_next(source, p);
+        if t.error or t.kind == NT_EOF { return -1; }
+        if t.text == "end" {
+            let k = natural_next(source, t.next);
+            if k.text == kind { return k.next; }
+            p = k.next;
+            continue;
+        }
+        p = t.next;
+    }
+    return -1;
+}
+
 func natural_semantic_check(source: str) -> int {
     mut names: [str] = [];
     mut types: [str] = [];
@@ -312,6 +328,11 @@ func natural_semantic_check(source: str) -> int {
             mut fields: [str] = [];
             mut muts: [bool] = [];
             mut pos: int = rname.next;
+            let supports = natural_next(source, pos);
+            if supports.text == "supports" {
+                pos = nss_skip_statement(source, supports.next);
+                if pos < 0 { nss_error(first.line, "expected record body"); return 1; }
+            }
             mut closed: bool = false;
             while not closed {
                 let t = natural_next(source, pos);
@@ -346,6 +367,34 @@ func natural_semantic_check(source: str) -> int {
             rec_fields = array_concat(rec_fields, [fields]);
             rec_mut = array_concat(rec_mut, [muts]);
             position = pos;
+            continue;
+        }
+
+        if first.text == "expose" {
+            position = first.next;
+            continue;
+        }
+        if first.text == "bring" {
+            position = nss_skip_statement(source, first.next);
+            if position < 0 { nss_error(first.line, "expected bring declaration"); return 1; }
+            continue;
+        }
+        if first.text == "routine" {
+            position = nss_skip_statement(source, first.next);
+            if position < 0 { nss_error(first.line, "expected routine body"); return 1; }
+            continue;
+        }
+        if first.text == "contract" or first.text == "choice" {
+            let cname = natural_next(source, first.next);
+            let end = nss_skip_to_end(source, cname.next, first.text);
+            if end < 0 { nss_error(first.line, "unterminated " + first.text); return 1; }
+            position = end;
+            continue;
+        }
+        if first.text == "attempt" {
+            let end = nss_skip_to_end(source, first.next, "attempt");
+            if end < 0 { nss_error(first.line, "unterminated attempt"); return 1; }
+            position = end;
             continue;
         }
 

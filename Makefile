@@ -119,6 +119,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/run.sh $(BINDIR)/suru $(SELFHOST_REF)
 	@tests/selfhost/natural_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_parser_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_frontend_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_expression_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_ast_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_control_run.sh $(BINDIR)/suru
