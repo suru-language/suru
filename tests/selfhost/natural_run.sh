@@ -84,4 +84,12 @@ fi
 tail -n 1 "$tmp/resource_interp_deep.out" | diff -u \
     "$ROOT/tests/natural/resource_interp_deep.diag" -
 
+if "$SURU" run "$DIR/natural_too_large_driver.suru" \
+       >"$tmp/resource_too_large.out"; then
+    echo "natural lexer: oversized source was accepted" >&2
+    exit 1
+fi
+tail -n 1 "$tmp/resource_too_large.out" | diff -u \
+    "$ROOT/tests/natural/resource_too_large.diag" -
+
 echo "natural lexer: approved lexical corpus passed"

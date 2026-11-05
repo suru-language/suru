@@ -1,0 +1,7 @@
+use "../../selfhost/compiler/natural_lexer.suru";
+use "../../selfhost/compiler/source.suru";
+
+func main() {
+    let big: str = str_pad("x", 67108865, " ");
+    exit(natural_lex_dump(big));
+}
