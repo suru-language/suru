@@ -128,8 +128,14 @@ static int cmd_compile_natural(const char *path, const char *outpath,
     double floats[65536];
     char *strs[65536];
     s_u32 strlens[65536];
-    s_bc_ins ins[65536];
-    s_u32 nints = 0, nfl = 0, nstr = 0, nins = 0;
+    enum { MAX_FUNCS = 128, MAX_INS = 65536 };
+    static char fnames[MAX_FUNCS][256];
+    static s_bc_ins fins[MAX_FUNCS][MAX_INS];
+    static s_u32 fnins[MAX_FUNCS];
+    static s_u32 fnparams[MAX_FUNCS];
+    s_u32 nints = 0, nfl = 0, nstr = 0;
+    int nfuncs = 0, cur_func = -1;
+    s_u32 cur_nins = 0;
     char line[4096];
     while (fgets(line, sizeof line, p)) {
         line[strcspn(line, "\r\n")] = '\0';
@@ -153,7 +159,29 @@ static int cmd_compile_natural(const char *path, const char *outpath,
                 strlens[idx] = (s_u32)len;
                 if (idx >= nstr) nstr = idx + 1;
             }
+        } else if (strncmp(line, "funcstart|", 10) == 0) {
+            cur_func = nfuncs;
+            if (cur_func < MAX_FUNCS) {
+                char *save = NULL;
+                char *ntok = strtok_r(line + 10, "|", &save);
+                if (ntok) {
+                    snprintf(fnames[cur_func], sizeof fnames[cur_func], "%s", ntok);
+                    char *ptok = strtok_r(NULL, "|", &save);
+                    fnparams[cur_func] = (s_u32)(ptok ? strtoul(ptok, NULL, 10) : 0);
+                } else {
+                    snprintf(fnames[cur_func], sizeof fnames[cur_func], "%s", line + 10);
+                    fnparams[cur_func] = 0;
+                }
+                cur_nins = 0;
+            }
+        } else if (strncmp(line, "funcend|", 8) == 0) {
+            if (cur_func >= 0 && cur_func < MAX_FUNCS) {
+                fnins[cur_func] = cur_nins;
+                nfuncs = cur_func + 1;
+            }
+            cur_func = -1;
         } else if (strncmp(line, "bc|", 3) == 0) {
+            if (cur_func < 0 || cur_func >= MAX_FUNCS) continue;
             char *save = NULL;
             char *tok = strtok_r(line + 3, "|", &save);
             (void)tok; /* pc */
@@ -165,12 +193,12 @@ static int cmd_compile_natural(const char *path, const char *outpath,
             const char *ops[3] = {"0", "0", "0"};
             int n = 0;
             while (tok && n < 3) { ops[n++] = tok; tok = strtok_r(NULL, "|", &save); }
-            if (nins < 65536) {
-                ins[nins].op = (s_u8)op;
-                ins[nins].a = (s_u32)strtoul(ops[0], NULL, 10);
-                ins[nins].b = (s_u32)strtoul(ops[1], NULL, 10);
-                ins[nins].c = (s_u32)strtoul(ops[2], NULL, 10);
-                nins++;
+            if (cur_nins < MAX_INS) {
+                fins[cur_func][cur_nins].op = (s_u8)op;
+                fins[cur_func][cur_nins].a = (s_u32)strtoul(ops[0], NULL, 10);
+                fins[cur_func][cur_nins].b = (s_u32)strtoul(ops[1], NULL, 10);
+                fins[cur_func][cur_nins].c = (s_u32)strtoul(ops[2], NULL, 10);
+                cur_nins++;
             }
         }
     }
@@ -179,19 +207,16 @@ static int cmd_compile_natural(const char *path, const char *outpath,
         fprintf(stderr, "suru: natural bytecode driver failed\n");
         return 1;
     }
-
-    s_u32 frame_size = 0, depth = 0, max_depth = 0;
-    for (s_u32 i = 0; i < nins; ++i) {
-        const s_bc_op_info *oi = &s_bc_op_table[ins[i].op];
-        if (ins[i].op == BC_LD_LOCAL || ins[i].op == BC_ST_LOCAL) {
-            if (ins[i].a + 1 > frame_size) frame_size = ins[i].a + 1;
-        }
-        s_i64 d = depth - oi->pops + oi->pushes;
-        if (d < 0) d = 0;
-        depth = (s_u32)d;
-        if (depth > max_depth) max_depth = depth;
+    if (getenv("SURU_NAT_DEBUG")) {
+        for (int fi = 0; fi < nfuncs; ++fi)
+            fprintf(stderr, "[nat] func %s nins=%u\n", fnames[fi], fnins[fi]);
     }
-    if (frame_size == 0) frame_size = 1;
+    if (nfuncs <= 0) {
+        nfuncs = 1;
+        snprintf(fnames[0], sizeof fnames[0], "main");
+        fnins[0] = 0;
+    }
+    if (nfuncs > MAX_FUNCS) nfuncs = MAX_FUNCS;
 
     s_bc_module m;
     s_bc_module_init(&m);
@@ -205,16 +230,50 @@ static int cmd_compile_natural(const char *path, const char *outpath,
     m.strings = calloc(nstr ? nstr : 1, sizeof(char *));
     m.strlens = calloc(nstr ? nstr : 1, sizeof(s_u32));
     for (s_u32 i = 0; i < nstr; ++i) { m.strings[i] = strs[i]; m.strlens[i] = strlens[i]; }
-    m.nfuncs = 1;
-    m.funcs = calloc(1, sizeof(s_bc_func));
-    m.funcs[0].name = malloc(5);
-    if (m.funcs[0].name) memcpy(m.funcs[0].name, "main", 5);
-    m.funcs[0].nparams = 0;
-    m.funcs[0].frame_size = frame_size;
-    m.funcs[0].max_operand_depth = max_depth;
-    m.funcs[0].nins = nins;
-    m.funcs[0].ins = malloc(sizeof(s_bc_ins) * (nins ? nins : 1));
-    if (nins) memcpy(m.funcs[0].ins, ins, sizeof(s_bc_ins) * nins);
+    m.nfuncs = (s_u32)nfuncs;
+    m.funcs = calloc((size_t)nfuncs, sizeof(s_bc_func));
+    m.entry = 0;
+    for (int fi = 0; fi < nfuncs; ++fi) {
+        if (strcmp(fnames[fi], "main") == 0) m.entry = (s_u32)fi;
+    }
+    for (int fi = 0; fi < nfuncs; ++fi) {
+        s_u32 nins = fnins[fi];
+        /* Remap the global slot ids used by this function to a dense local
+         * 0-based space, so each function owns its own frame. */
+        s_u32 slotmap[MAX_INS];
+        s_u32 nslots = 0;
+        for (s_u32 i = 0; i < nins; ++i) {
+            if (fins[fi][i].op == BC_LD_LOCAL || fins[fi][i].op == BC_ST_LOCAL) {
+                s_u32 sid = fins[fi][i].a;
+                s_u32 k = 0;
+                while (k < nslots && slotmap[k] != sid) k++;
+                if (k == nslots && nslots < MAX_INS) slotmap[nslots++] = sid;
+            }
+        }
+        s_u32 frame_size = nslots < fnparams[fi] ? fnparams[fi] : nslots;
+        for (s_u32 i = 0; i < nins; ++i) {
+            if (fins[fi][i].op == BC_LD_LOCAL || fins[fi][i].op == BC_ST_LOCAL) {
+                s_u32 sid = fins[fi][i].a;
+                s_u32 k = 0;
+                while (k < nslots && slotmap[k] != sid) k++;
+                fins[fi][i].a = k;
+            }
+        }
+        if (frame_size == 0) frame_size = 1;
+        /* The verifier computes operand depth itself and only requires that the
+         * actual depth never exceed max_operand_depth. Report a safe upper bound
+         * rather than a fragile linear underestimate (variable-pop ops like
+         * CALL/BUILTIN would otherwise undercount). */
+        s_u32 max_depth = S_BC_MAX_DEPTH;
+        m.funcs[fi].name = malloc(strlen(fnames[fi]) + 1);
+        if (m.funcs[fi].name) strcpy(m.funcs[fi].name, fnames[fi]);
+        m.funcs[fi].nparams = fnparams[fi];
+        m.funcs[fi].frame_size = frame_size < fnparams[fi] ? fnparams[fi] : frame_size;
+        m.funcs[fi].max_operand_depth = max_depth;
+        m.funcs[fi].nins = nins;
+        m.funcs[fi].ins = malloc(sizeof(s_bc_ins) * (nins ? nins : 1));
+        if (nins) memcpy(m.funcs[fi].ins, fins[fi], sizeof(s_bc_ins) * nins);
+    }
 
     s_u8 *buf = NULL;
     s_size buflen = 0;

@@ -471,25 +471,51 @@ func nbc_resolve_operand(operand: str, labels: [str], positions: [int]) -> str {
     return operand;
 }
 
-func nbc_render(instructions: [str]) -> int {
+func nbc_render_section(instructions: [str], start: int, end: int) {
     mut labels: [str] = [];
     mut positions: [int] = [];
     mut pc: int = 0;
-    mut i: int = 0;
-    while i < array_len(instructions) {
+    mut i: int = start;
+    while i < end {
         let item: str = instructions[i];
         if str_len(item) > 0 and item[0] == "@" {
             labels = array_concat(labels, [substr(item, 1, str_len(item))]);
             positions = array_concat(positions, [pc]);
-        } else if str_len(item) > 0 and item[0] == "#" {
-            // Pool and slot metadata do not occupy instruction indices.
-        } else {
+        } else if str_len(item) > 0 and item[0] != "#" {
             pc += 1;
         }
         i += 1;
     }
+    pc = 0;
+    i = start;
+    while i < end {
+        let item: str = instructions[i];
+        if str_len(item) == 0 or item[0] == "@" or item[0] == "#" {
+            i += 1;
+            continue;
+        }
+        let separator: int = nbc_find(item, "|");
+        let op: str = separator < 0 ? item : substr(item, 0, separator);
+        mut rendered: str = separator < 0 ? "" :
+            substr(item, separator + 1, str_len(item));
+        let operand_separator: int = nbc_find(rendered, "|");
+        if operand_separator >= 0 {
+            let first: str = substr(rendered, 0, operand_separator);
+            let rest: str = substr(rendered, operand_separator + 1,
+                                   str_len(rendered));
+            rendered = nbc_resolve_operand(first, labels, positions) + "|" + rest;
+        } else if rendered != "" {
+            rendered = nbc_resolve_operand(rendered, labels, positions);
+        }
+        println("bc|" + to_str(pc) + "|" + op + "|" + rendered);
+        pc += 1;
+        i += 1;
+    }
+}
+
+func nbc_render(instructions: [str]) -> int {
     mut pool_index: int = 0;
-    i = 0;
+    mut i: int = 0;
     while i < array_len(instructions) {
         let item: str = instructions[i];
         if nbc_has_prefix(item, "#int|") {
@@ -521,30 +547,35 @@ func nbc_render(instructions: [str]) -> int {
         }
         i += 1;
     }
-    pc = 0;
+
+    mut current_name: str = "";
+    mut section_start: int = 0;
     i = 0;
     while i < array_len(instructions) {
         let item: str = instructions[i];
-        if str_len(item) == 0 or item[0] == "@" or item[0] == "#" {
-            i += 1;
-            continue;
+        if nbc_has_prefix(item, "#funcbody|") {
+            let header: str = substr(item, 10, str_len(item));
+            let bar: int = nbc_find(header, "|");
+            let name: str = bar < 0 ? header : substr(header, 0, bar);
+            let nparams: str = bar < 0 ? "0" :
+                substr(header, bar + 1, str_len(header));
+            if current_name != "" {
+                nbc_render_section(instructions, section_start, i);
+                println("funcend|" + current_name);
+            }
+            current_name = name;
+            section_start = i + 1;
+            println("funcstart|" + name + "|" + nparams);
         }
-        let separator: int = nbc_find(item, "|");
-        let op: str = separator < 0 ? item : substr(item, 0, separator);
-        mut rendered: str = separator < 0 ? "" :
-            substr(item, separator + 1, str_len(item));
-        let operand_separator: int = nbc_find(rendered, "|");
-        if operand_separator >= 0 {
-            let first: str = substr(rendered, 0, operand_separator);
-            let rest: str = substr(rendered, operand_separator + 1,
-                                   str_len(rendered));
-            rendered = nbc_resolve_operand(first, labels, positions) + "|" + rest;
-        } else if rendered != "" {
-            rendered = nbc_resolve_operand(rendered, labels, positions);
-        }
-        println("bc|" + to_str(pc) + "|" + op + "|" + rendered);
-        pc += 1;
         i += 1;
+    }
+    if current_name != "" {
+        nbc_render_section(instructions, section_start, array_len(instructions));
+        println("funcend|" + current_name);
+    } else if array_len(instructions) > 0 {
+        println("funcstart|main");
+        nbc_render_section(instructions, 0, array_len(instructions));
+        println("funcend|main");
     }
     return 0;
 }
@@ -568,6 +599,35 @@ func natural_emit_bytecode(source: str) -> int {
 
         if nbc_word(line) == "routine" or
            (nbc_word(line) == "expose" and nbc_word(nbc_after(line, "expose")) == "routine") {
+            let rline: str = (nbc_word(line) == "expose") ?
+                nbc_after(line, "expose") : line;
+            let rr: str = nbc_after(rline, "routine");
+            let ro: int = nbc_find(rr, "(");
+            if ro > 0 {
+                let rname: str = str_trim(substr(rr, 0, ro));
+                let rclose: int = nbc_find(rr, ")");
+                let params: str = str_trim(substr(rr, ro + 1, rclose - ro - 1));
+                mut nparams: int = 0;
+                if params != "" { nparams = array_len(str_split(params, ",")); }
+                instructions = array_concat(instructions,
+                    ["#funcbody|" + rname + "|" + to_str(nparams)]);
+                if params != "" {
+                    let plist: [str] = str_split(params, ",");
+                    mut pidx: int = 0;
+                    while pidx < array_len(plist) {
+                        let part: str = str_trim(plist[pidx]);
+                        let pcolon: int = nbc_find(part, ":");
+                        if pcolon > 0 {
+                            let pname: str = str_trim(substr(part, 0, pcolon));
+                            let ptype: str = str_trim(substr(part, pcolon + 1,
+                                                               str_len(part)));
+                            instructions = nbc_bind(instructions, pname);
+                            instructions = nbc_note_type(instructions, pname, ptype);
+                        }
+                        pidx += 1;
+                    }
+                }
+            }
             continue;
         }
         if nbc_word(line) == "repeat" {
