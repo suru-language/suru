@@ -163,3 +163,37 @@ Builtin calls and calls to collected routine declarations are emitted as
 `BC_BUILTIN` and `BC_CALL` records, respectively.
 `repeat while`, `when`, `otherwise when`, and `otherwise` now emit concrete
 `BC_JZ`/`BC_JMP` control flow with resolved numeric targets.
+
+### Bytecode serialization, verification, and bootstrap targets (Milestone A)
+
+The bytecode object-emitting half is now owned by SURU:
+
+- `selfhost/compiler/natural_bytecode.suru` exposes `nbc_collect(source) ->
+  [str]`; `natural_emit_bytecode` is a thin wrapper over it.
+- `selfhost/compiler/natural_module_writer.suru` serializes the module to the
+  `.sbc` wire format byte-for-byte identical to C `s_bc_write` (header, pools,
+  record table, per-function slot remap, frame sizing, opcode table, branch
+  target resolution, and `strtoul`/`strtod`-matching operand parsing).
+- `selfhost/compiler/natural_verifier.suru` ports `src/verify.c` (`s_verify_module`):
+  opcode/operand bounds, stack-depth BFS with merge-conflict detection, branch
+  ranges, terminal reachability, and frame/depth limits.
+- `src/vm.c`/`stdlib.h`/`stdlib.c` add an `f64_to_bytes` builtin so float pools
+  serialize identically; `suru exec` now passes trailing argv to a module so a
+  bootstrapped compiler can receive its source/output paths.
+- Drivers: `natural_compile_driver.suru` (bytecode -> writer), 
+  `natural_build_driver.suru` (frontend -> bytecode -> verifier -> writer), and
+  `natural_verify_driver.suru` / `natural_verify_cases_driver.suru`.
+- Gates wired into `make selfhost-test`: `natural_compile_run.sh` (differential
+  byte-identity, 58/58), `natural_verify_run.sh` (positive + injected invalid),
+  and `natural_build_run.sh` (full-pipeline acceptance all byte-identical).
+- Make targets: `selfhost-compare` runs the three gates; `selfhost-bootstrap`
+  compiles `natural_build_driver.suru` into `build/bin/natural_compiler.sbc`;
+  `selfhost-rebuild` runs it on the natural corpus and requires byte-identical
+  output to the C reassembly path.
+
+The deferred self-rebuild identity gate (rebuilding the compiler twice yields
+byte-identical bytecode) still depends on the compiler itself being written in
+Natural syntax; the current build driver is a legacy host program that the
+Natural frontend does not accept, so self-compilation of the driver is not yet
+possible. That gate, together with the SURU VM/runtime/memory/GC port
+(Stage 2 remainder) and the native ELF64 backend (Stages 3-4), remain open.
