@@ -11,7 +11,8 @@ use "../../selfhost/compiler/natural_verifier.suru";
 func main() {
     let source: str = source_load(args(0));
     if natural_frontend_check(source) != 0 { exit(2); }
-    let instructions: [str] = nbc_collect(source);
+    let clean: str = source_load(args(0));
+    let instructions: [str] = nbc_collect(clean);
     if array_len(instructions) == 1 and instructions[0] == "#emit-failed" {
         exit(3);
     }

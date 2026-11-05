@@ -296,13 +296,14 @@ func nw_serialize(instructions: [str]) -> str {
         } else if nbc_has_prefix(item, "#float|") {
             floats = array_concat(floats,
                 [nw_f64(substr(item, 7, str_len(item)))]);
-        } else if nbc_has_prefix(item, "#str|") {
+         } else if nbc_has_prefix(item, "#str|") {
             let raw: str = substr(item, 5, str_len(item));
             mut val: str = raw;
             if str_len(raw) >= 2 and raw[0] == "\"" and raw[str_len(raw) - 1] == "\"" {
                 val = substr(raw, 1, str_len(raw) - 2);
             }
-            strs = array_concat(strs, [val]);
+            let stable_val: str = substr(val, 0, str_len(val));
+            strs = array_concat(strs, [stable_val]);
         } else if nbc_has_prefix(item, "#record|") {
             let rline: str = substr(item, 8, str_len(item));
             let bar: int = nbc_find(rline, "|");
@@ -326,7 +327,8 @@ func nw_serialize(instructions: [str]) -> str {
     mut fn_cs: [[int]] = [];
     i = 0;
     while i < nfuncs {
-        let name: str = nw_func_name(instructions, i);
+        let name_raw: str = nw_func_name(instructions, i);
+        let name: str = substr(name_raw, 0, str_len(name_raw));
         let nparams: int = nw_func_nparams(instructions, i);
         mut items: [str] = [];
         if nfuncs > 1 or array_len(fns) > 0 { items = fns[i]; }

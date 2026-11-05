@@ -404,7 +404,7 @@ func natural_declaration_check(source: str) -> int {
             continue;
         }
         if nds_word(raw) == "give" {
-            if nds_top(stack) != "routine" { nds_error(line, "give is outside a routine"); return 1; }
+            if nss_has(stack, "routine") == false { nds_error(line, "give is outside a routine"); return 1; }
             routine_give[array_len(routine_give) - 1] = true;
             let value: str = str_trim(nds_after(raw, "give"));
             let result_type: str = routine_returns[array_len(routine_returns) - 1];

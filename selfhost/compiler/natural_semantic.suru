@@ -50,6 +50,16 @@ func nss_find_index(items: [str], name: str) -> int {
     return -1;
 }
 
+func nss_skip_nl(source: str, position: int) -> int {
+    mut p: int = position;
+    mut t = natural_next(source, p);
+    while t.kind == NT_NEWLINE {
+        p = t.next;
+        t = natural_next(source, p);
+    }
+    return p;
+}
+
 func nss_has(names: [str], name: str) -> bool {
     mut i: int = 0;
     while i < array_len(names) {
@@ -190,19 +200,20 @@ func nss_split(expression: str) -> [str] {
     return ["atom", inner];
 }
 
-func nss_expr_type(expression: str, names: [str], types: [str]) -> [str] {
+func nss_expr_type(expression: str, names: [str], types: [str],
+                   rt_names: [str], rt_types: [str]) -> [str] {
     let trimmed: str = str_trim(expression);
     if str_len(trimmed) >= 8 and substr(trimmed, 0, 8) == "routine(" {
         return ["ok", "routine"];
     }
     let parts: [str] = nss_split(expression);
     if parts[0] == "ternary" {
-        let condition: [str] = nss_expr_type(parts[1], names, types);
+        let condition: [str] = nss_expr_type(parts[1], names, types, rt_names, rt_types);
         if condition[0] == "error" { return condition; }
         if condition[1] != "Bool" { return ["error", "ternary condition requires Bool"]; }
-        let then_type: [str] = nss_expr_type(parts[2], names, types);
+        let then_type: [str] = nss_expr_type(parts[2], names, types, rt_names, rt_types);
         if then_type[0] == "error" { return then_type; }
-        let else_type: [str] = nss_expr_type(parts[3], names, types);
+        let else_type: [str] = nss_expr_type(parts[3], names, types, rt_names, rt_types);
         if else_type[0] == "error" { return else_type; }
         if then_type[1] != else_type[1] {
             return ["error", "ternary branches must have the same type"];
@@ -210,7 +221,7 @@ func nss_expr_type(expression: str, names: [str], types: [str]) -> [str] {
         return ["ok", then_type[1]];
     }
     if parts[0] == "unary" {
-        let operand: [str] = nss_expr_type(parts[2], names, types);
+        let operand: [str] = nss_expr_type(parts[2], names, types, rt_names, rt_types);
         if operand[0] == "error" { return operand; }
         if parts[1] == "not" {
             if operand[1] != "Bool" { return ["error", "not requires Bool"]; }
@@ -226,8 +237,8 @@ func nss_expr_type(expression: str, names: [str], types: [str]) -> [str] {
         return ["ok", operand[1]];
     }
     if parts[0] == "binary" {
-        let left: [str] = nss_expr_type(parts[2], names, types);
-        let right: [str] = nss_expr_type(parts[3], names, types);
+        let left: [str] = nss_expr_type(parts[2], names, types, rt_names, rt_types);
+        let right: [str] = nss_expr_type(parts[3], names, types, rt_names, rt_types);
         if left[0] == "error" { return left; }
         if right[0] == "error" { return right; }
         let op: str = parts[1];
@@ -259,11 +270,11 @@ func nss_expr_type(expression: str, names: [str], types: [str]) -> [str] {
         let inner: str = substr(atom, 1, str_len(atom) - 2);
         if inner == "" { return ["ok", "[]"]; }
         let elems: [str] = nss_split_top_level(inner, ",");
-        let elem_type: [str] = nss_expr_type(elems[0], names, types);
+        let elem_type: [str] = nss_expr_type(elems[0], names, types, rt_names, rt_types);
         if elem_type[0] == "error" { return elem_type; }
         mut elem_idx: int = 1;
         while elem_idx < array_len(elems) {
-            let et: [str] = nss_expr_type(elems[elem_idx], names, types);
+            let et: [str] = nss_expr_type(elems[elem_idx], names, types, rt_names, rt_types);
             if et[0] == "error" { return et; }
             if et[1] != elem_type[1] { return ["error", "array elements must share a type"]; }
             elem_idx += 1;
@@ -286,6 +297,10 @@ func nss_expr_type(expression: str, names: [str], types: [str]) -> [str] {
             let ctor_type: str = nss_lookup(names, types, ctor);
             if ctor_type != "" {
                 return ["ok", ctor_type];
+            }
+            let ridx: int = nss_find_index(rt_names, ctor);
+            if ridx >= 0 {
+                return ["ok", rt_types[ridx]];
             }
             if ctor == "Some" or ctor == "none" { return ["ok", "Option"]; }
             if ctor == "ok" or ctor == "error" { return ["ok", "Result"]; }
@@ -373,6 +388,8 @@ func natural_semantic_check(source: str) -> int {
     mut current_choice: str = "";
     mut choose_bound: [[str]] = [];
     mut routine_bound: [[str]] = [];
+    mut rt_names: [str] = [];
+    mut rt_types: [str] = [];
     mut rec_fields: [[str]] = [];
     mut rec_ftypes: [[str]] = [];
     mut rec_mut: [[bool]] = [];
@@ -493,6 +510,15 @@ func natural_semantic_check(source: str) -> int {
             } else {
                 p = rp.next;
             }
+            let arrow_pos: int = nss_skip_nl(source, p);
+            let arrow = natural_next(source, arrow_pos);
+            if arrow.text == "->" {
+                let rt = nas_parse_type(source, arrow.next);
+                if rt[0] != "ok" { nss_error(first.line, rt[2]); return 1; }
+                rt_names = array_concat(rt_names, [rname.text]);
+                rt_types = array_concat(rt_types, [rt[2]]);
+                p = int_from_str(rt[1]);
+            }
             position = nss_skip_statement(source, p);
             if position < 0 { nss_error(first.line, "expected routine body"); return 1; }
             continue;
@@ -568,7 +594,7 @@ func natural_semantic_check(source: str) -> int {
             if equals.text != "=" { nss_error(first.line, "binding requires an initializer"); return 1; }
             let expression = ne_parse_expression(source, equals.next, 0);
             if ne_is_ok(expression) == false { nss_error(first.line, ne_message(expression)); return 1; }
-            let inferred = nss_expr_type(ne_value(expression), names, types);
+            let inferred = nss_expr_type(ne_value(expression), names, types, rt_names, rt_types);
             if inferred[0] == "error" { nss_error(first.line, inferred[1]); return 1; }
             let declared_base: str = nss_base_type(declared);
             let inferred_base: str = nss_base_type(inferred[1]);
@@ -606,7 +632,7 @@ func natural_semantic_check(source: str) -> int {
                 }
                 let expression = ne_parse_expression(source, to_word.next, 0);
                 if ne_is_ok(expression) == false { nss_error(first.line, ne_message(expression)); return 1; }
-                let value_type = nss_expr_type(ne_value(expression), names, types);
+                let value_type = nss_expr_type(ne_value(expression), names, types, rt_names, rt_types);
                 if value_type[0] == "error" { nss_error(first.line, value_type[1]); return 1; }
                 position = nss_finish(source, ne_next(expression));
                 if position < 0 { nss_error(first.line, "expected statement terminator"); return 1; }
@@ -619,7 +645,7 @@ func natural_semantic_check(source: str) -> int {
             }
             let expression = ne_parse_expression(source, to_word.next, 0);
             if ne_is_ok(expression) == false { nss_error(first.line, ne_message(expression)); return 1; }
-            let value_type = nss_expr_type(ne_value(expression), names, types);
+            let value_type = nss_expr_type(ne_value(expression), names, types, rt_names, rt_types);
             if value_type[0] == "error" { nss_error(first.line, value_type[1]); return 1; }
             if value_type[1] != target_type { nss_error(first.line, "assignment type does not match target"); return 1; }
             position = nss_finish(source, ne_next(expression));
@@ -632,7 +658,7 @@ func natural_semantic_check(source: str) -> int {
             if nxt.kind != NT_NEWLINE and nxt.kind != NT_EOF {
                 let e = ne_parse_expression(source, first.next, 0);
                 if ne_is_ok(e) == false { nss_error(first.line, ne_message(e)); return 1; }
-                let et = nss_expr_type(ne_value(e), names, types);
+                let et = nss_expr_type(ne_value(e), names, types, rt_names, rt_types);
                 if et[0] == "error" { nss_error(first.line, et[1]); return 1; }
                 position = nss_finish(source, ne_next(e));
             } else {
@@ -651,7 +677,7 @@ func natural_semantic_check(source: str) -> int {
             }
             let expression = ne_parse_expression(source, expression_position, 0);
             if ne_is_ok(expression) == false { nss_error(first.line, ne_message(expression)); return 1; }
-            let condition = nss_expr_type(ne_value(expression), names, types);
+            let condition = nss_expr_type(ne_value(expression), names, types, rt_names, rt_types);
             if condition[0] == "error" { nss_error(first.line, condition[1]); return 1; }
             if condition[1] != "Bool" { nss_error(first.line, "condition requires Bool"); return 1; }
             position = nss_finish(source, ne_next(expression));

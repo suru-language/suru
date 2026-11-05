@@ -198,11 +198,18 @@ The bytecode object-emitting half is now owned by SURU:
   runs the interpreter against every fixture the C VM executes cleanly and
   requires identical output; it currently passes all 12 such fixtures.
   `natural_run_driver.suru` wires frontend -> bytecode -> verifier -> writer ->
-  interpreter into one end-to-end SURU program; its coverage is bounded by the
-  strict frontend (which rejects programs the bytecode-only path accepts), so
-  it is not gated until the frontend matures. This is the first execution step
-  of the Stage 2 VM port; closures (not produced by any frontend test) remain
-  unimplemented.
+  interpreter into one end-to-end SURU program. The frontend now resolves user
+  routine calls in expressions (return types are recorded per routine and
+  consulted by `nss_expr_type`), so recursive/multi-routine programs such as
+  Fibonacci compile and run end-to-end and match the reference. The declaration
+  pass also now accepts `give` inside `attempt`/`handle`/`ensure` blocks (the
+  routine frame remains on the control stack beneath the effect frames), so
+  exception programs run end-to-end as well. The full-pipeline
+  drivers re-read the source after the frontend check because running the
+  frontend first imposes GC pressure that corrupts aliasing source views (a
+  known SURU string-aliasing fragility); re-reading yields deterministic,
+  C-identical output. This is the first execution step of the Stage 2 VM port;
+  closures (not produced by any frontend test) remain unimplemented.
 - Gates wired into `make selfhost-test`: `natural_compile_run.sh` (differential
   byte-identity, 58/58), `natural_verify_run.sh` (positive + injected invalid),
   `natural_build_run.sh` (full-pipeline acceptance all byte-identical), and
