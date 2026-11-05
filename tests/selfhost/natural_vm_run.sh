@@ -52,6 +52,8 @@ run_case call 'routine double(x: Whole) -> Whole\n    give x * 2\nend routine\nr
 run_case fib 'routine fib(n: Whole) -> Whole\n    when n < 2\n        give n\n    otherwise\n        give fib(n - 1) + fib(n - 2)\n    end when\nend routine\nroutine main() -> Unit\n    show(to_str(fib(6)))\nend routine'
 run_case arr 'routine main() -> Unit\n    value xs: [Whole] = [10, 20, 30]\n    show(xs[1])\nend routine'
 run_case arrset 'routine main() -> Unit\n    value xs: [Whole] = [1, 2]\n    set xs[0] to 9\n    show(xs[0])\nend routine'
+run_case rec 'record Point\n    change x: Whole\n    change y: Whole\nend record\nroutine main() -> Unit\n    value p: Point = none\n    set p.x to 3\n    set p.y to 4\n    show(p.x + p.y)\nend routine'
+run_case recparam 'record Point\n    change x: Whole\nend record\nroutine f(n: Whole, p: Point) -> Whole\n    give p.x + n\nend routine\nroutine main() -> Unit\n    value p: Point = none\n    set p.x to 5\n    show(f(2, p))\nend routine'
 
 # Fixture: control_valid.suru (runs cleanly on the reference VM).
 if "$SURU" --syntax=natural compile "$ROOT/tests/natural/control_valid.suru" \

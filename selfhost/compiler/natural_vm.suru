@@ -58,6 +58,17 @@ func vm_arr_build(count: int, elems: [str]) -> str {
     return out;
 }
 
+func vm_rec_build(count: int, elems: [str]) -> str {
+    mut out: str = "R" + to_str(count) + ":";
+    mut i: int = 0;
+    while i < count {
+        if i > 0 { out = out + ";"; }
+        out = out + elems[i];
+        i += 1;
+    }
+    return out;
+}
+
 func natural_run_module(bytes: str) -> int {
     let ver: [int] = nr_u32_at(bytes, 4);
     let entry: [int] = nr_u32_at(bytes, ver[1]);
@@ -312,6 +323,42 @@ func natural_run_module(bytes: str) -> int {
             let ar: str = stack[n - 1];
             stack = vm_pop(stack);
             stack = vm_push(stack, "I" + to_str(vm_arr_count(ar)));
+        } else if op == 52 {
+            let n: int = array_len(stack);
+            let cnt: int = b;
+            mut elems: [str] = [];
+            mut k: int = 0;
+            while k < cnt {
+                elems = array_concat(elems, [stack[n - cnt + k]]);
+                k += 1;
+            }
+            let rec: str = vm_rec_build(cnt, elems);
+            k = 0;
+            while k < cnt { stack = vm_pop(stack); k += 1; }
+            stack = vm_push(stack, rec);
+        } else if op == 57 {
+            let n: int = array_len(stack);
+            let rec: str = stack[n - 1];
+            stack = vm_pop(stack);
+            let parts: [str] = vm_arr_parts(rec);
+            stack = vm_push(stack, parts[b]);
+        } else if op == 58 {
+            let n: int = array_len(stack);
+            let val: str = stack[n - 1];
+            let rec: str = stack[n - 2];
+            stack = vm_pop(stack);
+            stack = vm_pop(stack);
+            let parts: [str] = vm_arr_parts(rec);
+            let cnt: int = array_len(parts);
+            parts[b] = val;
+            let newrec: str = vm_rec_build(cnt, parts);
+            mut k: int = 0;
+            while k < array_len(locals) {
+                if locals[k] == rec { locals[k] = newrec; }
+                k += 1;
+            }
+            fr_locals[top] = locals;
+            stack = vm_push(stack, newrec);
         } else if op == 59 {
             let nargs: int = fn_nparams[a];
             mut callee: [str] = [];
