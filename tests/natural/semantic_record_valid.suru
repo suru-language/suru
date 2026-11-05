@@ -1,0 +1,6 @@
+record Counter
+    change count: Whole
+    label: Text
+end record
+value c: Counter = none
+set c.count to 7

@@ -21,6 +21,15 @@ func nss_mutable(names: [str], mutable: [bool], name: str) -> bool {
     return false;
 }
 
+func nss_find_index(items: [str], name: str) -> int {
+    mut i: int = 0;
+    while i < array_len(items) {
+        if items[i] == name { return i; }
+        i += 1;
+    }
+    return -1;
+}
+
 func nss_has(names: [str], name: str) -> bool {
     mut i: int = 0;
     while i < array_len(names) {
@@ -260,16 +269,85 @@ func nss_skip_statement(source: str, position: int) -> int {
     return p;
 }
 
+func nss_skip_routine(source: str, position: int) -> int {
+    mut depth: int = 1;
+    mut p: int = position;
+    while true {
+        let t = natural_next(source, p);
+        if t.error or t.kind == NT_EOF { return -1; }
+        if t.text == "routine" { depth += 1; }
+        else if t.text == "end" {
+            let k = natural_next(source, t.next);
+            depth -= 1;
+            if depth == 0 { return k.next; }
+            p = k.next;
+            continue;
+        }
+        p = t.next;
+    }
+    return -1;
+}
+
 func natural_semantic_check(source: str) -> int {
     mut names: [str] = [];
     mut types: [str] = [];
     mut mutable: [bool] = [];
+    mut rec_names: [str] = [];
+    mut rec_fields: [[str]] = [];
+    mut rec_mut: [[bool]] = [];
     mut position: int = 0;
     while true {
         let first = natural_next(source, position);
         if first.error { nss_error(first.line, "lexical error"); return 1; }
         if first.kind == NT_EOF { return 0; }
         if first.kind == NT_NEWLINE { position = first.next; continue; }
+
+        if first.text == "record" {
+            let rname = natural_next(source, first.next);
+            if rname.kind != NT_IDENT { nss_error(first.line, "expected record name"); return 1; }
+            if nss_has(names, rname.text) or nss_has(rec_names, rname.text) {
+                nss_error(first.line, "duplicate declaration '" + rname.text + "'"); return 1;
+            }
+            rec_names = array_concat(rec_names, [rname.text]);
+            mut fields: [str] = [];
+            mut muts: [bool] = [];
+            mut pos: int = rname.next;
+            mut closed: bool = false;
+            while not closed {
+                let t = natural_next(source, pos);
+                if t.error { nss_error(first.line, "lexical error"); return 1; }
+                if t.kind == NT_NEWLINE { pos = t.next; continue; }
+                if t.kind == NT_EOF { nss_error(first.line, "unterminated record"); return 1; }
+                if t.text == "end" {
+                    let k = natural_next(source, t.next);
+                    if k.text == "record" { pos = k.next; closed = true; continue; }
+                    nss_error(first.line, "mismatched end in record"); return 1;
+                }
+                if t.text == "routine" {
+                    let after = nss_skip_routine(source, t.next);
+                    if after < 0 { nss_error(first.line, "unterminated record method"); return 1; }
+                    pos = after;
+                    continue;
+                }
+                mut f_mut: bool = false;
+                mut field_tok = t;
+                if t.text == "change" {
+                    f_mut = true;
+                    field_tok = natural_next(source, t.next);
+                }
+                if field_tok.kind == NT_IDENT {
+                    fields = array_concat(fields, [field_tok.text]);
+                    muts = array_concat(muts, [f_mut]);
+                    pos = nss_skip_statement(source, field_tok.next);
+                    continue;
+                }
+                nss_error(first.line, "invalid record member"); return 1;
+            }
+            rec_fields = array_concat(rec_fields, [fields]);
+            rec_mut = array_concat(rec_mut, [muts]);
+            position = pos;
+            continue;
+        }
 
         if first.text == "value" or first.text == "change" or first.text == "constant" {
             let name = natural_next(source, first.next);
@@ -290,7 +368,7 @@ func natural_semantic_check(source: str) -> int {
             if ne_is_ok(expression) == false { nss_error(first.line, ne_message(expression)); return 1; }
             let inferred = nss_expr_type(ne_value(expression), names, types);
             if inferred[0] == "error" { nss_error(first.line, inferred[1]); return 1; }
-            if declared != "" and declared != inferred[1] {
+            if declared != "" and declared != inferred[1] and inferred[1] != "None" {
                 nss_error(first.line, "initializer type " + inferred[1] + " does not match " + declared);
                 return 1;
             }
@@ -309,6 +387,27 @@ func natural_semantic_check(source: str) -> int {
             let target_name: str = ne_value(target);
             let to_word = natural_next(source, ne_next(target));
             if to_word.text != "to" { nss_error(first.line, "set requires 'to'"); return 1; }
+            let dot: int = nss_find_top(target_name, ".");
+            if dot >= 0 {
+                let base: str = str_trim(substr(target_name, 0, dot));
+                let field: str = str_trim(substr(target_name, dot + 1, str_len(target_name)));
+                let base_type: str = nss_lookup(names, types, base);
+                if base_type == "" { nss_error(first.line, "unknown assignment target '" + base + "'"); return 1; }
+                let ri: int = nss_find_index(rec_names, base_type);
+                if ri < 0 { nss_error(first.line, "assignment target is not a record"); return 1; }
+                let fi: int = nss_find_index(rec_fields[ri], field);
+                if fi < 0 { nss_error(first.line, "unknown field '" + field + "'"); return 1; }
+                if rec_mut[ri][fi] == false {
+                    nss_error(first.line, "assignment target is immutable"); return 1;
+                }
+                let expression = ne_parse_expression(source, to_word.next, 0);
+                if ne_is_ok(expression) == false { nss_error(first.line, ne_message(expression)); return 1; }
+                let value_type = nss_expr_type(ne_value(expression), names, types);
+                if value_type[0] == "error" { nss_error(first.line, value_type[1]); return 1; }
+                position = nss_finish(source, ne_next(expression));
+                if position < 0 { nss_error(first.line, "expected statement terminator"); return 1; }
+                continue;
+            }
             let target_type: str = nss_lookup(names, types, target_name);
             if target_type == "" { nss_error(first.line, "unknown assignment target '" + target_name + "'"); return 1; }
             if nss_mutable(names, mutable, target_name) == false {

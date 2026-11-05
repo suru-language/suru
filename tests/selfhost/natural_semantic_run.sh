@@ -16,9 +16,12 @@ test ! -s "$tmp/ternary-valid.out"
 "$SURU" run "$DIR/natural_semantic_driver.suru" \
     "$ROOT/tests/natural/semantic_typed_array_valid.suru" >"$tmp/typed-array-valid.out"
 test ! -s "$tmp/typed-array-valid.out"
+"$SURU" run "$DIR/natural_semantic_driver.suru" \
+    "$ROOT/tests/natural/semantic_record_valid.suru" >"$tmp/record-valid.out"
+test ! -s "$tmp/record-valid.out"
 
 for input in semantic_invalid_type semantic_invalid_set semantic_invalid_condition \
-             semantic_invalid_ternary semantic_invalid_array; do
+             semantic_invalid_ternary semantic_invalid_array semantic_invalid_record_field; do
     if "$SURU" run "$DIR/natural_semantic_driver.suru" \
            "$ROOT/tests/natural/$input.suru" >"$tmp/$input.out"; then
         echo "natural semantic pass: $input was accepted" >&2

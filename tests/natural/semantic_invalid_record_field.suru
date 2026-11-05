@@ -1,0 +1,5 @@
+record Counter
+    label: Text
+end record
+value c: Counter = none
+set c.label to "hi"
