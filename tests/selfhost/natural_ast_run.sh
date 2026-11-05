@@ -15,6 +15,11 @@ grep -q '^ast|assignment|3|score to (score + 50)$' "$tmp/valid.out"
 grep -q '^ast|show|4|"ready"$' "$tmp/valid.out"
 grep -q '^ast|give|5|answer$' "$tmp/valid.out"
 
+"$SURU" run "$DIR/natural_ast_driver.suru" \
+    "$ROOT/tests/natural/ast_routine_expression_valid.suru" >"$tmp/routine.out"
+grep -q '^ast|binding|1|value f = routine(x: Whole) -> Whole$' "$tmp/routine.out"
+grep -q '^ast|binding|4|value g = routine() -> Unit$' "$tmp/routine.out"
+
 if "$SURU" run "$DIR/natural_ast_driver.suru" \
        "$ROOT/tests/natural/ast_statement_invalid.suru" >"$tmp/invalid.out"; then
     echo "natural AST parser: invalid binding was accepted" >&2

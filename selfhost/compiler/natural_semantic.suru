@@ -147,6 +147,10 @@ func nss_split(expression: str) -> [str] {
 }
 
 func nss_expr_type(expression: str, names: [str], types: [str]) -> [str] {
+    let trimmed: str = str_trim(expression);
+    if str_len(trimmed) >= 8 and substr(trimmed, 0, 8) == "routine(" {
+        return ["ok", "routine"];
+    }
     let parts: [str] = nss_split(expression);
     if parts[0] == "ternary" {
         let condition: [str] = nss_expr_type(parts[1], names, types);

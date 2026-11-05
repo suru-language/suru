@@ -1,0 +1,9 @@
+value f = routine(x: Whole) -> Whole
+    give x + 1
+end routine
+value g = routine() -> Unit
+    when true
+        show("hi")
+    end when
+    give
+end routine
