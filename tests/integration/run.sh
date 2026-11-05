@@ -149,6 +149,36 @@ else
 fi
 rm -f "$natprog"
 
+# Natural run: Real arithmetic.
+tests=$((tests + 1))
+natprog="$(mktemp)"
+printf 'routine main() -> Unit\n    value x: Real = 1.5\n    value y: Real = 2.5\n    show(x + y)\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "4" ]; then
+    echo "ok: nat-run-float"
+else
+    echo "FAIL: nat-run-float (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
+# Natural run: Text comparison.
+tests=$((tests + 1))
+natprog="$(mktemp)"
+printf 'routine main() -> Unit\n    value a: Text = "abc"\n    value b: Text = "abc"\n    when a == b\n        show("equal")\n    end when\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "equal" ]; then
+    echo "ok: nat-run-strcmp"
+else
+    echo "FAIL: nat-run-strcmp (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
 # Program arguments: run argtest.suru with two args.
 tests=$((tests + 1))
 actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"

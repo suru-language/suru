@@ -113,6 +113,29 @@ func nbc_is_digit(c: str) -> bool {
     return c >= "0" and c <= "9";
 }
 
+func nbc_is_float(text: str) -> bool {
+    if str_len(text) == 0 or text[0] == "\"" { return false; }
+    if not (str_contains(text, ".") or str_contains(text, "e") or
+            str_contains(text, "E")) { return false; }
+    mut has_digit: bool = false;
+    mut i: int = 0;
+    while i < str_len(text) {
+        if nbc_is_digit(text[i]) { has_digit = true; }
+        i += 1;
+    }
+    return has_digit;
+}
+
+func nbc_is_text(instructions: [str], expr: str) -> bool {
+    if str_len(expr) >= 2 and expr[0] == "\"" { return true; }
+    return nbc_find_type(instructions, expr) == "Text";
+}
+
+func nbc_is_real(instructions: [str], expr: str) -> bool {
+    if nbc_is_float(expr) { return true; }
+    return nbc_find_type(instructions, expr) == "Real";
+}
+
 func nbc_is_integer(text: str) -> bool {
     if str_len(text) == 0 { return false; }
     mut i: int = 0;
@@ -296,15 +319,22 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
     if int_from_str(comparison[0]) >= 0 {
         let at: int = int_from_str(comparison[0]);
         let op: str = comparison[1];
-        result = nbc_emit_expression(result, substr(text, 0, at));
-        result = nbc_emit_expression(result,
-            substr(text, at + str_len(op), str_len(text)));
-        mut byte_op: str = "BC_EQ_I";
-        if op == " != " { byte_op = "BC_NE_I"; }
-        if op == " < " { byte_op = "BC_LT_I"; }
-        if op == " <= " { byte_op = "BC_LE_I"; }
-        if op == " > " { byte_op = "BC_GT_I"; }
-        if op == " >= " { byte_op = "BC_GE_I"; }
+        let left: str = str_trim(substr(text, 0, at));
+        let right: str = str_trim(substr(text, at + str_len(op), str_len(text)));
+        result = nbc_emit_expression(result, left);
+        result = nbc_emit_expression(result, right);
+        mut suffix: str = "I";
+        if nbc_is_text(result, left) and nbc_is_text(result, right) {
+            suffix = "S";
+        } else if nbc_is_real(result, left) or nbc_is_real(result, right) {
+            suffix = "F";
+        }
+        mut byte_op: str = "BC_EQ_" + suffix;
+        if op == " != " { byte_op = "BC_NE_" + suffix; }
+        if op == " < " { byte_op = "BC_LT_" + suffix; }
+        if op == " <= " { byte_op = "BC_LE_" + suffix; }
+        if op == " > " { byte_op = "BC_GT_" + suffix; }
+        if op == " >= " { byte_op = "BC_GE_" + suffix; }
         return nbc_emit(result, byte_op, "");
     }
     let arithmetic = nbc_top_operator(text, [" + ", " - "]);
@@ -316,12 +346,16 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
         result = nbc_emit_expression(result, left);
         result = nbc_emit_expression(result, right);
         mut byte_op: str = "BC_ADD_I";
-        if op == " - " { byte_op = "BC_SUB_I"; }
-        else if (str_len(left) >= 2 and left[0] == "\"") or
-                (str_len(right) >= 2 and right[0] == "\"") or
-                (nbc_find_type(result, left) == "Text") or
-                (nbc_find_type(result, right) == "Text") {
+        if op == " - " {
+            if nbc_is_real(result, left) or nbc_is_real(result, right) {
+                byte_op = "BC_SUB_F";
+            } else {
+                byte_op = "BC_SUB_I";
+            }
+        } else if nbc_is_text(result, left) or nbc_is_text(result, right) {
             byte_op = "BC_CONCAT_S";
+        } else if nbc_is_real(result, left) or nbc_is_real(result, right) {
+            byte_op = "BC_ADD_F";
         }
         return nbc_emit(result, byte_op, "");
     }
@@ -329,16 +363,21 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
     if int_from_str(multiplicative[0]) >= 0 {
         let at: int = int_from_str(multiplicative[0]);
         let op: str = multiplicative[1];
-        result = nbc_emit_expression(result, substr(text, 0, at));
-        result = nbc_emit_expression(result,
-            substr(text, at + str_len(op), str_len(text)));
+        let left: str = str_trim(substr(text, 0, at));
+        let right: str = str_trim(substr(text, at + str_len(op), str_len(text)));
+        result = nbc_emit_expression(result, left);
+        result = nbc_emit_expression(result, right);
         mut byte_op: str = "BC_MUL_I";
-        if op == " / " { byte_op = "BC_DIV_I"; }
-        if op == " % " { byte_op = "BC_MOD_I"; }
+        let real_case: bool = nbc_is_real(result, left) or nbc_is_real(result, right);
+        if op == " / " { byte_op = real_case ? "BC_DIV_F" : "BC_DIV_I"; }
+        else if op == " % " { byte_op = "BC_MOD_I"; }
+        else if real_case { byte_op = "BC_MUL_F"; }
         return nbc_emit(result, byte_op, "");
     }
     if nbc_has_prefix(text, "-") {
-        result = nbc_emit_expression(result, substr(text, 1, str_len(text)));
+        let operand: str = substr(text, 1, str_len(text));
+        result = nbc_emit_expression(result, operand);
+        if nbc_is_float(operand) { return nbc_emit(result, "BC_NEG_F", ""); }
         return nbc_emit(result, "BC_NEG_I", "");
     }
     if nbc_has_prefix(text, "not ") {
@@ -365,6 +404,9 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
     }
     if nbc_is_integer(text) {
         return nbc_const(result, "int", "BC_CONST_INT", text);
+    }
+    if nbc_is_float(text) {
+        return nbc_const(result, "float", "BC_CONST_FLOAT", text);
     }
     if text == "true" or text == "false" {
         return nbc_const(result, "int", "BC_CONST_INT", text == "true" ? "1" : "0");
@@ -603,6 +645,9 @@ func natural_emit_bytecode(source: str) -> int {
             if current[0] != "when" {
                 println("bytecode-error|mismatched when terminator");
                 return 1;
+            }
+            if current[3] == "0" {
+                instructions = nbc_label(instructions, current[2]);
             }
             instructions = nbc_label(instructions, current[1]);
             controls = slice(controls, 0, array_len(controls) - 1);
