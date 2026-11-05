@@ -129,6 +129,8 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_effect_run.sh $(BINDIR)/suru
 	@tests/selfhost/effect_runtime_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_bytecode_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_compile_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_verify_run.sh $(BINDIR)/suru
 
 .PHONY: fuzz
 fuzz: $(BINDIR)/suru | $(UNITDIR)

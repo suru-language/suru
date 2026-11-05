@@ -1,0 +1,66 @@
+use "../../selfhost/compiler/natural_bytecode.suru";
+use "../../selfhost/compiler/natural_module_writer.suru";
+use "../../selfhost/compiler/natural_verifier.suru";
+
+func expect(name: str, instructions: [str], want: int) -> int {
+    let got: int = natural_verify(instructions);
+    if got == want {
+        println("ok: " + name);
+        return 0;
+    }
+    println("FAIL: " + name + " want=" + to_str(want) + " got=" + to_str(got));
+    return 1;
+}
+
+func main() {
+    mut fail: int = 0;
+
+    let ok: [str] = [
+        "#int|0",
+        "#funcbody|main|0",
+        "BC_CONST_INT|0",
+        "BC_POP|",
+        "BC_RET_UNIT|"
+    ];
+    fail += expect("valid-minimal", ok, 0);
+
+    let badop: [str] = [
+        "#funcbody|main|0",
+        "BC_BOGUS|0",
+        "BC_RET_UNIT|"
+    ];
+    fail += expect("bad-opcode", badop, 1);
+
+    let cb: [str] = [
+        "#int|0",
+        "#funcbody|main|0",
+        "BC_CONST_INT|7",
+        "BC_POP|",
+        "BC_RET_UNIT|"
+    ];
+    fail += expect("const-oob", cb, 1);
+
+    let uf: [str] = [
+        "#funcbody|main|0",
+        "BC_POP|",
+        "BC_RET_UNIT|"
+    ];
+    fail += expect("underflow", uf, 1);
+
+    let bo: [str] = [
+        "#funcbody|main|0",
+        "BC_JMP|99",
+        "BC_RET_UNIT|"
+    ];
+    fail += expect("branch-oob", bo, 1);
+
+    let nt: [str] = [
+        "#int|0",
+        "#funcbody|main|0",
+        "BC_CONST_INT|0",
+        "BC_POP|"
+    ];
+    fail += expect("no-terminal", nt, 1);
+
+    exit(fail > 0 ? 1 : 0);
+}
