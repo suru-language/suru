@@ -1,0 +1,21 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_frontend.suru";
+use "../../selfhost/compiler/natural_bytecode.suru";
+use "../../selfhost/compiler/natural_module_writer.suru";
+use "../../selfhost/compiler/natural_verifier.suru";
+
+// Full SURU-wired compiler driver: lex/parse/semantic/declaration/effect
+// frontend check -> bytecode lowering -> SURU verifier -> SURU module writer ->
+// .sbc file. The emitted module is byte-identical to the C reassembly path and
+// executes on the C VM.
+func main() {
+    let source: str = source_load(args(0));
+    if natural_frontend_check(source) != 0 { exit(2); }
+    let instructions: [str] = nbc_collect(source);
+    if array_len(instructions) == 1 and instructions[0] == "#emit-failed" {
+        exit(3);
+    }
+    if natural_verify(instructions) != 0 { exit(4); }
+    write_file(args(1), nw_serialize(instructions));
+    exit(0);
+}

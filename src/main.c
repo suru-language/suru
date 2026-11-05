@@ -32,7 +32,7 @@ static char *read_file(const char *path, s_size *len) {
     return text;
 }
 
-static int cmd_exec(const char *path);
+static int cmd_exec(const char *path, int argc, char **argv);
 
 static int cmd_run(const char *path, int argc, char **argv, int natural,
                    const char *argv0) {
@@ -40,7 +40,7 @@ static int cmd_run(const char *path, int argc, char **argv, int natural,
         char out[512];
         snprintf(out, sizeof out, "/tmp/suru_nat_%d.sbc", (int)getpid());
         if (cmd_compile_natural(path, out, argv0) != 0) return 1;
-        int rc = cmd_exec(out);
+        int rc = cmd_exec(out, argc, argv);
         remove(out);
         return rc;
     }
@@ -377,7 +377,7 @@ static int cmd_compile(const char *path, const char *outpath, int natural,
     return 0;
 }
 
-static int cmd_exec(const char *path) {
+static int cmd_exec(const char *path, int argc, char **argv) {
     s_size len;
     char *buf = read_file(path, &len);
     if (!buf) {
@@ -391,7 +391,7 @@ static int cmd_exec(const char *path) {
         return 1;
     }
     free(buf);
-    int rc = s_driver_run_module(&m);
+    int rc = s_driver_run_module_args(&m, argc, argv);
     s_bc_module_dispose(&m);
     return rc;
 }
@@ -456,7 +456,7 @@ int main(int argc, char **argv) {
         return cmd_compile(path, argv[3], natural, argv[0]);
     }
     if (strcmp(cmd, "exec") == 0) {
-        return cmd_exec(path);
+        return cmd_exec(path, argc - 3, argv + 3);
     }
     usage();
     return 2;

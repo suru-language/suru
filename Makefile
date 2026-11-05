@@ -131,6 +131,31 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_bytecode_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_compile_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_verify_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_build_run.sh $(BINDIR)/suru
+
+.PHONY: selfhost-compare
+selfhost-compare: $(BINDIR)/suru
+	@tests/selfhost/natural_compile_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_verify_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_build_run.sh $(BINDIR)/suru
+
+# Bootstrap: compile the SURU-written full compiler driver (natural_build_driver
+# .suru) into a .sbc object with the C17 toolchain, then rebuild a natural
+# program with that bootstrapped compiler and require the output to match the
+# C reassembly path byte-for-byte.
+.PHONY: selfhost-bootstrap selfhost-rebuild
+SELFHOST_COMPILER = $(BINDIR)/natural_compiler.sbc
+selfhost-bootstrap: $(BINDIR)/suru
+	@$(BINDIR)/suru --syntax=legacy compile \
+		tests/selfhost/natural_build_driver.suru $(SELFHOST_COMPILER)
+	@echo "selhost-bootstrap: wrote $(SELFHOST_COMPILER)"
+selfhost-rebuild: selfhost-bootstrap
+	@$(BINDIR)/suru exec $(SELFHOST_COMPILER) \
+		tests/natural/control_valid.suru /tmp/natural_rebuild.sbc
+	@$(BINDIR)/suru --syntax=natural compile \
+		tests/natural/control_valid.suru /tmp/natural_c.sbc
+	@cmp /tmp/natural_c.sbc /tmp/natural_rebuild.sbc
+	@echo "selfhost-rebuild: bootstrapped compiler output matches C byte-for-byte"
 
 .PHONY: fuzz
 fuzz: $(BINDIR)/suru | $(UNITDIR)
