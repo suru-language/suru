@@ -56,6 +56,11 @@ if compile_and_run arith 'routine main() -> Unit\n    show(1 + 2 * 3)\nend routi
 else
     fail=$((fail + 1))
 fi
+if compile_and_run local 'routine main() -> Unit\n    value x: Whole = 5\n    show(x + 2)\nend routine' "7"; then
+    tests=$((tests + 1))
+else
+    fail=$((fail + 1))
+fi
 
 echo "natural ELF compile: $tests tests, $fail failures"
 [ "$fail" -eq 0 ]

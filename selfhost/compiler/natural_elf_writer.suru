@@ -96,14 +96,37 @@ func nw_print_routine() -> str {
 
 func nw_emit_elf_int_expr(ops: [int], avs: [int]) -> str {
     // Header(64) + phdr(56) = 120; entry at file offset 120.
-    mut code: str = "";
+    // Frame: one 8-byte slot per local; locals live at [rbp - 8*(slot+1)].
+    mut nlocals: int = 0;
     mut i: int = 0;
     while i < array_len(ops) {
-        let op: int = ops[i];
+        if (ops[i] == 5 or ops[i] == 6) and avs[i] + 1 > nlocals {
+            nlocals = avs[i] + 1;
+        }
+        i += 1;
+    }
+
+    mut code: str = "";
+    // prologue
+    code = code + str_chr_byte(0x55);
+    code = code + str_chr_byte(0x48) + str_chr_byte(0x89) + str_chr_byte(0xE5);
+    code = code + str_chr_byte(0x48) + str_chr_byte(0x83) + str_chr_byte(0xEC) + str_chr_byte(nlocals * 8);
+
+    mut j: int = 0;
+    while j < array_len(ops) {
+        let op: int = ops[j];
         if op == 1 {
             code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) + str_chr_byte(0xC0);
-            code = code + nw_u32(avs[i]);
+            code = code + nw_u32(avs[j]);
             code = code + str_chr_byte(0x50);
+        } else if op == 5 {
+            let disp: int = 256 - 8 * (avs[j] + 1);
+            code = code + str_chr_byte(0x48) + str_chr_byte(0x8B) + str_chr_byte(0x45) + str_chr_byte(disp);
+            code = code + str_chr_byte(0x50);
+        } else if op == 6 {
+            let disp: int = 256 - 8 * (avs[j] + 1);
+            code = code + str_chr_byte(0x58);
+            code = code + str_chr_byte(0x48) + str_chr_byte(0x89) + str_chr_byte(0x45) + str_chr_byte(disp);
         } else if op == 11 {
             code = code + str_chr_byte(0x58);
             code = code + str_chr_byte(0x48) + str_chr_byte(0xF7) + str_chr_byte(0xD8);
@@ -122,7 +145,7 @@ func nw_emit_elf_int_expr(ops: [int], avs: [int]) -> str {
         } else {
             return "";
         }
-        i += 1;
+        j += 1;
     }
     code = code + str_chr_byte(0x58); // pop rax (result)
     code = code + nw_print_routine();

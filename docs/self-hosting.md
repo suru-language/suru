@@ -225,12 +225,12 @@ The bytecode object-emitting half is now owned by SURU:
   it runs and prints "hi". A minimal native-backend path
   (`natural_elf_compile_driver.suru`) compiles a trivial `show(x)` program
   end-to-end in SURU into a standalone x86-64 ELF64 executable that prints the
-  literal, a non-negative integer constant, or an integer expression over
-  const/neg/add/sub/mul/div (precedence is already baked into the bytecode;
-  values are printed via raw x86-64 decimal conversion)
+  literal, a non-negative integer constant, an integer expression over
+  const/neg/add/sub/mul/div, or a program with integer local variables
+  (`ld_local`/`st_local` over a stack frame; precedence is already baked into
+  the bytecode; values are printed via raw x86-64 decimal conversion)
   (`natural_elf_compile_run.sh`). This is the first step of the Stage 3
-  backend; emitting control flow, locals, and calls to machine code is later
-  work.
+  backend; emitting control flow and calls to machine code is later work.
 - Gates wired into `make selfhost-test`: `natural_compile_run.sh` (differential
   byte-identity, 58/58), `natural_verify_run.sh` (positive + injected invalid),
   `natural_build_run.sh` (full-pipeline acceptance all byte-identical), and
