@@ -25,6 +25,7 @@ array lengths are bounded by the heap/runtime limits.
 | `str_contains` | `(str, str) -> bool` | Substring search; the empty needle is present. |
 | `str_valid_utf8` | `(str) -> bool` | Validates UTF-8 scalar encoding, rejecting overlong forms, surrogates, and out-of-range code points. |
 | `str_utf8_len` | `(str) -> int` | Returns the Unicode scalar count; invalid UTF-8 traps. |
+| `str_from_codepoint` | `(int) -> str` | Encodes a Unicode scalar value as UTF-8; negatives, values above U+10FFFF, and surrogates trap. |
 | `int_from_str` | `(str) -> int` | Strict decimal parse with optional sign; malformed/trailing input returns 0, overflow traps. |
 | `abs` | `(int) -> int` | Absolute value; `INT64_MIN` traps. |
 | `min` | `(int, int) -> int` | Returns the smaller integer. |

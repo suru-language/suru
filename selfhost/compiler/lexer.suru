@@ -79,14 +79,22 @@ func decode_string(source: str, start: int, finish: int) -> str {
             i += 1;
         } else {
             let e: str = source[i + 1];
-            if e == "n" { out = out + "\n"; }
-            else if e == "t" { out = out + "\t"; }
-            else if e == "r" { out = out + "\r"; }
-            else if e == "0" { out = out + "\0"; }
-            else if e == "\\" { out = out + "\\"; }
-            else if e == "\"" { out = out + "\""; }
-            else { out = out + "'"; }
-            i += 2;
+            if e == "n" { out = out + "\n"; i += 2; }
+            else if e == "t" { out = out + "\t"; i += 2; }
+            else if e == "r" { out = out + "\r"; i += 2; }
+            else if e == "0" { out = out + "\0"; i += 2; }
+            else if e == "\\" { out = out + "\\"; i += 2; }
+            else if e == "\"" { out = out + "\""; i += 2; }
+            else if e == "u" {
+                mut cp: int = 0;
+                mut h: int = 0;
+                while h < 4 {
+                    cp = cp * 16 + hex_value(source[i + 2 + h]);
+                    h += 1;
+                }
+                out = out + str_from_codepoint(cp);
+                i += 6;
+            } else { out = out + "'"; i += 2; }
         }
     }
     return out;

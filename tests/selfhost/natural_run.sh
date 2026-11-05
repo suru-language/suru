@@ -17,9 +17,18 @@ done
 
 diff -u "$ROOT/tests/natural/lexical_valid.tokens" \
         "$tmp/lexical_valid.suru.tokens"
-grep -q '^KEYWORD|.*|.*|.*|value$' "$tmp/lexical_valid.suru.tokens"
-grep -q '^STRING|.*|.*|.*|.*{name}.*$' "$tmp/lexical_valid.suru.tokens"
+grep -q '^KEYWORD|.*|.*|.*|value|value$' "$tmp/lexical_valid.suru.tokens"
+grep -q '^STRING|.*|.*|.*|.*{name}.*|.*{name}.*$' "$tmp/lexical_valid.suru.tokens"
+grep -q '^NUMBER|.*|.*|.*|20|20$' "$tmp/lexical_valid.suru.tokens"
+grep -q '^STRING|.*|.*|.*"Amina"|Amina$' "$tmp/lexical_valid.suru.tokens"
 grep -q '^NEWLINE|' "$tmp/lexical_valid.suru.tokens"
+grep -q '^STRING|.*|.*|.*|.*\\u0041\\u0042"|.*AB$' "$tmp/escapes_valid.suru.tokens"
+grep -q '^NUMBER|.*|.*|.*|0xFF|255$' "$tmp/numeric_valid.suru.tokens"
+grep -q '^NUMBER|.*|.*|.*|0b1010|10$' "$tmp/numeric_valid.suru.tokens"
+grep -q '^NUMBER|.*|.*|.*|1_000|1000$' "$tmp/numeric_valid.suru.tokens"
+grep -q '^NUMBER|.*|.*|.*|1.5e3|1500$' "$tmp/numeric_valid.suru.tokens"
+grep -q '^OPERATOR|.*|.*|.*|==|==$' "$tmp/operators_valid.suru.tokens"
+grep -q '^OPERATOR|.*|.*|.*|<<|<<$' "$tmp/operators_valid.suru.tokens"
 for keyword in across and as attempt bring case change choose constant contract each \
               end ensure exception expose false from give handle if in not through \
               until otherwise or record repeat routine set show supports true value \
