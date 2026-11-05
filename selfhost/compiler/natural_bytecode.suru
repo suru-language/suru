@@ -293,11 +293,16 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
     if int_from_str(arithmetic[0]) >= 0 {
         let at: int = int_from_str(arithmetic[0]);
         let op: str = arithmetic[1];
-        result = nbc_emit_expression(result, substr(text, 0, at));
-        result = nbc_emit_expression(result,
-            substr(text, at + str_len(op), str_len(text)));
+        let left: str = str_trim(substr(text, 0, at));
+        let right: str = str_trim(substr(text, at + str_len(op), str_len(text)));
+        result = nbc_emit_expression(result, left);
+        result = nbc_emit_expression(result, right);
         mut byte_op: str = "BC_ADD_I";
         if op == " - " { byte_op = "BC_SUB_I"; }
+        else if (str_len(left) >= 2 and left[0] == "\"") or
+                (str_len(right) >= 2 and right[0] == "\"") {
+            byte_op = "BC_CONCAT_S";
+        }
         return nbc_emit(result, byte_op, "");
     }
     let multiplicative = nbc_top_operator(text, [" * ", " / ", " % "]);

@@ -122,6 +122,21 @@ else
 fi
 rm -f "$natprog"
 
+# Natural run: Text concatenation (literal + binding).
+tests=$((tests + 1))
+natprog="$(mktemp)"
+printf 'routine main() -> Unit\n    value n: Text = "world"\n    show("hello " + n)\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "hello world" ]; then
+    echo "ok: nat-run-concat"
+else
+    echo "FAIL: nat-run-concat (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
 # Program arguments: run argtest.suru with two args.
 tests=$((tests + 1))
 actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"
