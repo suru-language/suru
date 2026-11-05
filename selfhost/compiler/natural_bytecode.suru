@@ -909,13 +909,13 @@ func natural_emit_bytecode(source: str) -> int {
             let next: str = "choose-next-" + to_str(labels);
             labels += 1;
             instructions = nbc_emit(instructions, "BC_LD_LOCAL",
-                                    to_str(nbc_slot(instructions, current[1])));
+                                    to_str(nbc_slot(instructions, sel_name)));
             instructions = nbc_const(instructions, "int", "BC_CONST_INT",
                                      to_str(tag));
             instructions = nbc_emit(instructions, "BC_EQ_I", "");
             instructions = nbc_emit(instructions, "BC_JZ", "@" + next);
             controls[array_len(controls) - 1] = current[0] + "|" +
-                current[1] + "|" + current[2] + "|" + next;
+                sel_name + "|" + finish_name + "|" + next;
             continue;
         }
         if line == "end choose" {
