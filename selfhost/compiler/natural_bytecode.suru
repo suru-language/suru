@@ -347,8 +347,29 @@ func nbc_variant_tag(instructions: [str], choice: str, variant: str) -> int {
     return -1;
 }
 
-func nbc_collect_choices(instructions: [str], lines: [str]) -> [str] {
+func nbc_register_known_choices(instructions: [str]) -> [str] {
     mut result: [str] = instructions;
+    let known: [str] = ["Option", "Result"];
+    mut ki: int = 0;
+    while ki < array_len(known) {
+        let cname: str = known[ki];
+        if nbc_choice_index(result, cname) >= 0 { ki += 1; continue; }
+        let cidx: int = nbc_pool_count(result, "choice");
+        result = array_concat(result, ["#choice|" + cname + "|" + to_str(cidx)]);
+        if cname == "Option" {
+            result = array_concat(result, ["#variant|Option|none|0|0|"]);
+            result = array_concat(result, ["#variant|Option|Some|1|1|Whole"]);
+        } else {
+            result = array_concat(result, ["#variant|Result|ok|0|1|Whole"]);
+            result = array_concat(result, ["#variant|Result|error|1|1|Whole"]);
+        }
+        ki += 1;
+    }
+    return result;
+}
+
+func nbc_collect_choices(instructions: [str], lines: [str]) -> [str] {
+    mut result: [str] = nbc_register_known_choices(instructions);
     mut i: int = 0;
     while i < array_len(lines) {
         let line: str = str_trim(lines[i]);
@@ -991,6 +1012,7 @@ func natural_emit_bytecode(source: str) -> int {
                 println("bytecode-error|case outside choose");
                 return 1;
             }
+            let ctrl_kind: str = substr(current[0], 0, str_len(current[0]));
             let sel_name: str = substr(current[1], 0, str_len(current[1]));
             let prev_next: str = current[3] == "" ? "" :
                 substr(current[3], 0, str_len(current[3]));
@@ -1013,7 +1035,8 @@ func natural_emit_bytecode(source: str) -> int {
             let next: str = "choose-next-" + to_str(labels);
             labels += 1;
             let sel_slot: int = nbc_slot(instructions, sel_name);
-            if vnargs > 0 {
+            let known_choice: bool = choice == "Option" or choice == "Result";
+            if vnargs > 0 or known_choice {
                 instructions = nbc_emit(instructions, "BC_LD_LOCAL",
                                         to_str(sel_slot));
                 instructions = nbc_const(instructions, "int", "BC_CONST_INT", "0");
@@ -1037,7 +1060,7 @@ func natural_emit_bytecode(source: str) -> int {
                 instructions = nbc_emit(instructions, "BC_ST_LOCAL",
                                         to_str(nbc_slot(instructions, vbind)));
             }
-            let entry: str = current[0] + "|" + sel_name + "|" +
+            let entry: str = ctrl_kind + "|" + sel_name + "|" +
                 finish_name + "|" + next;
             controls[array_len(controls) - 1] = substr(entry, 0, str_len(entry));
             continue;
@@ -1264,6 +1287,19 @@ func natural_emit_bytecode(source: str) -> int {
                     }
                     instructions = nbc_emit(instructions, "BC_NEW_RECORD",
                         to_str(recidx) + "|" + to_str(nfields));
+                    instructions = nbc_emit(instructions, "BC_ST_LOCAL",
+                                            to_str(nbc_slot(instructions, name)));
+                    continue;
+                }
+                let init_text: str = str_trim(substr(rest, equals + 1,
+                                                     str_len(rest)));
+                let dt_lt: int = nbc_find(decl_type, "<");
+                let dt_base: str = dt_lt < 0 ? decl_type :
+                    str_trim(substr(decl_type, 0, dt_lt));
+                let known_choice: int = nbc_choice_index(instructions, dt_base);
+                if known_choice >= 0 and init_text == "none" {
+                    instructions = nbc_const(instructions, "int", "BC_CONST_INT", "0");
+                    instructions = nbc_emit(instructions, "BC_NEW_ARRAY", "1");
                     instructions = nbc_emit(instructions, "BC_ST_LOCAL",
                                             to_str(nbc_slot(instructions, name)));
                     continue;

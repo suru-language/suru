@@ -66,8 +66,10 @@ grammar.
     arithmetic, Text concatenation and comparison, array literals with index
     read/write, record construction with field read/write, choice variant
     dispatch via `choose`/`case` including payload variants with pattern
-    binding (including record-typed payloads), `attempt`/`handle`/`ensure`
-    exception handling, bindings,
+    binding (including record-typed payloads) and compiler-known generic
+    `Option<T>`/`Result<T,E>` choices with `Some`/`none`/`ok`/`error`
+    construction and unwrapping, `attempt`/`handle`/`ensure` exception
+    handling, bindings,
     `show`, `when`/`repeat` control flow, and multi-routine calls with
     parameters.
 4. Port parser productions in small feature groups with positive and negative

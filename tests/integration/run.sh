@@ -313,6 +313,35 @@ else
 fi
 rm -f "$natprog"
 
+# Natural run: compiler-known generic Option/Result choices with pattern binding.
+tests=$((tests + 2))
+natprog="$(mktemp)"
+printf 'routine main() -> Unit\n    value b: Option<Whole> = Some(5)\n    choose b\n    case Some(x)\n        show(x)\n    case none\n        show("n")\n    end choose\n    value a: Option<Whole> = none\n    choose a\n    case Some(x)\n        show(x)\n    case none\n        show("n")\n    end choose\n    value r: Result<Whole, Fault> = ok(7)\n    choose r\n    case ok(v)\n        show(v)\n    case error(e)\n        show("e")\n    end choose\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "5
+n
+7" ]; then
+    echo "ok: nat-run-generic-option"
+else
+    echo "FAIL: nat-run-generic-option (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+natprog="$(mktemp)"
+printf 'routine main() -> Unit\n    value r: Result<Whole, Fault> = error(9)\n    choose r\n    case ok(v)\n        show(v)\n    case error(e)\n        show("e")\n    end choose\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "e" ]; then
+    echo "ok: nat-run-generic-result"
+else
+    echo "FAIL: nat-run-generic-result (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
 # Program arguments: run argtest.suru with two args.
 tests=$((tests + 1))
 actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"
