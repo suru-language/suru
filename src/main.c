@@ -259,7 +259,11 @@ static int cmd_compile_natural(const char *path, const char *outpath,
     for (int fi = 0; fi < nfuncs; ++fi) {
         s_u32 nins = fnins[fi];
         /* Remap the global slot ids used by this function to a dense local
-         * 0-based space, so each function owns its own frame. */
+         * 0-based space, so each function owns its own frame. Within a
+         * function, parameters are bound before locals, so their global slot
+         * ids are always smaller; sorting the used ids ascending therefore
+         * preserves the parameter->slot contract (params occupy 0..nparams-1)
+         * regardless of the order slots are referenced in the body. */
         s_u32 slotmap[MAX_INS];
         s_u32 nslots = 0;
         for (s_u32 i = 0; i < nins; ++i) {
@@ -268,6 +272,13 @@ static int cmd_compile_natural(const char *path, const char *outpath,
                 s_u32 k = 0;
                 while (k < nslots && slotmap[k] != sid) k++;
                 if (k == nslots && nslots < MAX_INS) slotmap[nslots++] = sid;
+            }
+        }
+        for (s_u32 i = 0; i < nslots; ++i) {
+            for (s_u32 j = i + 1; j < nslots; ++j) {
+                if (slotmap[j] < slotmap[i]) {
+                    s_u32 t = slotmap[i]; slotmap[i] = slotmap[j]; slotmap[j] = t;
+                }
             }
         }
         s_u32 frame_size = nslots < fnparams[fi] ? fnparams[fi] : nslots;
