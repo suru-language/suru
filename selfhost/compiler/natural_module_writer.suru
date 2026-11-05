@@ -230,8 +230,10 @@ func nw_emit_ins(items: [str]) -> [str] {
         let av: int = nw_resolve_target(a, labels, positions);
         let bv: int = nw_resolve_target(b, labels, positions);
         let cv: int = nw_resolve_target(c, labels, positions);
-        out = array_concat(out, [op + "|" + to_str(av) + "|" +
-            to_str(bv) + "|" + to_str(cv)]);
+        let rec: str = op + "|" + to_str(av) + "|" +
+            to_str(bv) + "|" + to_str(cv);
+        let stable: str = substr(rec, 0, str_len(rec));
+        out = array_concat(out, [stable]);
         pc += 1;
         i += 1;
     }
