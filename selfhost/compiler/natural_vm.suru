@@ -191,6 +191,20 @@ func natural_run_module(bytes: str) -> int {
             else if op == 17 { res = iv / jv; }
             else { res = iv % jv; }
             stack = vm_push(stack, "I" + to_str(res));
+        } else if op == 19 or op == 20 or op == 21 or op == 22 {
+            let n: int = array_len(stack);
+            let y: str = stack[n - 1];
+            let x: str = stack[n - 2];
+            stack = vm_pop(stack);
+            stack = vm_pop(stack);
+            let fx: float = str_to_f64(substr(x, 1, str_len(x)));
+            let fy: float = str_to_f64(substr(y, 1, str_len(y)));
+            mut fr: float = 0.0;
+            if op == 19 { fr = fx + fy; }
+            else if op == 20 { fr = fx - fy; }
+            else if op == 21 { fr = fx * fy; }
+            else { fr = fx / fy; }
+            stack = vm_push(stack, "F" + f64_to_str(fr));
         } else if op == 29 or op == 30 or op == 31 or op == 32 or op == 33 or op == 34 {
             let n: int = array_len(stack);
             let y: str = stack[n - 1];
