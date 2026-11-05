@@ -1,0 +1,14 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_bytecode.suru";
+use "../../selfhost/compiler/natural_module_writer.suru";
+
+func main() {
+    let source: str = source_load(args(0));
+    let instructions: [str] = nbc_collect(source);
+    if array_len(instructions) == 1 and instructions[0] == "#emit-failed" {
+        exit(1);
+    }
+    let bytes: str = nw_serialize(instructions);
+    write_file(args(1), bytes);
+    exit(0);
+}

@@ -1,0 +1,387 @@
+// SURU-owned bytecode module writer.
+// Consumes the instruction-array produced by nbc_collect (see
+// natural_bytecode.suru) and emits the .sbc wire format byte-for-byte
+// identical to C s_bc_write (src/bc.c). The C VM (s_vm_run) can execute the
+// resulting module unchanged.
+//
+// Layout (little-endian):
+//   magic "SURU" | u32 version | u32 entry | u32 nints | u32 nfloats |
+//   u32 nstrings | u32 nrecords | u32 nfuncs
+//   ints:   i64 each
+//   floats:  f64 each
+//   strings: u32 length + raw bytes
+//   records: u32 nfields each
+//   funcs:  u32 namelen + name, u32 nparams, u32 frame_size,
+//            u32 max_operand_depth, u32 nins, then per ins:
+//            u8 op, u32 a, u32 b, u32 c
+
+use "natural_bytecode.suru";
+
+func nw_u32(n: int) -> str {
+    return str_chr_byte(n & 255) +
+           str_chr_byte((n >> 8) & 255) +
+           str_chr_byte((n >> 16) & 255) +
+           str_chr_byte((n >> 24) & 255);
+}
+
+func nw_i64(n: int) -> str {
+    return str_chr_byte(n & 255) +
+           str_chr_byte((n >> 8) & 255) +
+           str_chr_byte((n >> 16) & 255) +
+           str_chr_byte((n >> 24) & 255) +
+           str_chr_byte((n >> 32) & 255) +
+           str_chr_byte((n >> 40) & 255) +
+           str_chr_byte((n >> 48) & 255) +
+           str_chr_byte((n >> 56) & 255);
+}
+
+func nw_f64(literal: str) -> str {
+    return f64_to_bytes(str_to_f64(literal));
+}
+
+func nw_int_toll(text: str) -> int {
+    mut i: int = 0;
+    mut sign: int = 1;
+    while i < str_len(text) and text[i] == " " { i += 1; }
+    if i < str_len(text) and (text[i] == "+" or text[i] == "-") {
+        if text[i] == "-" { sign = -1; }
+        i += 1;
+    }
+    mut acc: int = 0;
+    mut started: bool = false;
+    while i < str_len(text) and text[i] >= "0" and text[i] <= "9" {
+        acc = acc * 10 + (nbc_find("0123456789", text[i]));
+        started = true;
+        i += 1;
+    }
+    return started ? sign * acc : 0;
+}
+
+func nw_norm(name: str) -> str {
+    if nbc_has_prefix(name, "BC_") {
+        return str_lower(substr(name, 3, str_len(name)));
+    }
+    return str_lower(name);
+}
+
+// Opcode names in enum order (index == s_bc_op id). Mirrors s_bc_op_table.
+func nw_op_id(name: str) -> int {
+    let norm: str = nw_norm(name);
+    mut ops: [str] = [
+        "nop", "const_int", "const_float", "const_str", "const_none",
+        "ld_local", "st_local", "pop", "dup", "swap", "not",
+        "neg_i", "neg_f", "conv_i_f",
+        "add_i", "sub_i", "mul_i", "div_i", "mod_i",
+        "add_f", "sub_f", "mul_f", "div_f",
+        "bit_and", "bit_or", "bit_xor", "shl", "shr", "bit_not",
+        "eq_i", "ne_i", "lt_i", "le_i", "gt_i", "ge_i",
+        "eq_f", "ne_f", "lt_f", "le_f", "gt_f", "ge_f",
+        "eq_s", "ne_s", "lt_s", "le_s", "gt_s", "ge_s",
+        "concat_s", "repeat_s", "eq_b", "ne_b",
+        "new_array", "new_record", "new_exception",
+        "idx_ld", "idx_st", "arr_len", "field_ld", "field_st",
+        "call", "mkclosure", "mkclosure_v", "call_v", "builtin",
+        "ret", "ret_unit", "jmp", "jz", "jnz",
+        "push_handler", "pop_handler", "throw", "trap"
+    ];
+    mut i: int = 0;
+    while i < array_len(ops) {
+        if ops[i] == norm { return i; }
+        i += 1;
+    }
+    return -1;
+}
+
+func nw_is_marker(item: str) -> bool {
+    return str_len(item) == 0 or item[0] == "#" or item[0] == "@";
+}
+
+func nw_collect_functions(instructions: [str]) -> [[str]] {
+    mut fns: [[str]] = [];
+    mut current: [str] = [];
+    mut flat: [str] = [];
+    mut in_func: bool = false;
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        let item: str = instructions[i];
+        if nbc_has_prefix(item, "#funcbody|") {
+            if in_func and array_len(current) > 0 { fns = array_concat(fns, [current]); }
+            current = slice(current, 0, 0);
+            in_func = true;
+        } else if str_len(item) > 0 and item[0] != "#" {
+            let stable: str = substr(item, 0, str_len(item));
+            if in_func { current = array_concat(current, [stable]); }
+            flat = array_concat(flat, [stable]);
+        }
+        i += 1;
+    }
+    if in_func {
+        if array_len(current) > 0 { fns = array_concat(fns, [current]); }
+    } else {
+        fns = array_concat(fns, [flat]);
+    }
+    return fns;
+}
+
+func nw_func_name(instructions: [str], index: int) -> str {
+    mut seen: int = 0;
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        let item: str = instructions[i];
+        if nbc_has_prefix(item, "#funcbody|") {
+            if seen == index {
+                let header: str = substr(item, 10, str_len(item));
+                let bar: int = nbc_find(header, "|");
+                return bar < 0 ? header : substr(header, 0, bar);
+            }
+            seen += 1;
+        }
+        i += 1;
+    }
+    return "main";
+}
+
+func nw_func_nparams(instructions: [str], index: int) -> int {
+    mut seen: int = 0;
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        let item: str = instructions[i];
+        if nbc_has_prefix(item, "#funcbody|") {
+            if seen == index {
+                let header: str = substr(item, 10, str_len(item));
+                let bar: int = nbc_find(header, "|");
+                if bar < 0 { return 0; }
+                return int_from_str(substr(header, bar + 1, str_len(header)));
+            }
+            seen += 1;
+        }
+        i += 1;
+    }
+    return 0;
+}
+
+func nw_split_ins(item: str) -> [str] {
+    let sep: int = nbc_find(item, "|");
+    let op: str = sep < 0 ? item : substr(item, 0, sep);
+    let rest: str = sep < 0 ? "" : substr(item, sep + 1, str_len(item));
+    let parts: [str] = str_split(rest, "|");
+    mut result: [str] = [op];
+    if array_len(parts) >= 1 and parts[0] != "" { result = array_concat(result, parts); }
+    return result;
+}
+
+func nw_op_uint(text: str) -> int {
+    mut i: int = 0;
+    mut sign: int = 1;
+    while i < str_len(text) and text[i] == " " { i += 1; }
+    if i < str_len(text) and (text[i] == "+" or text[i] == "-") {
+        if text[i] == "-" { sign = -1; }
+        i += 1;
+    }
+    mut acc: int = 0;
+    mut started: bool = false;
+    while i < str_len(text) and text[i] >= "0" and text[i] <= "9" {
+        acc = acc * 10 + (nbc_find("0123456789", text[i]));
+        started = true;
+        i += 1;
+    }
+    return started ? sign * acc : 0;
+}
+
+func nw_resolve_target(operand: str, labels: [str], positions: [int]) -> int {
+    if nbc_has_prefix(operand, "@") {
+        let name: str = substr(operand, 1, str_len(operand));
+        mut i: int = 0;
+        while i < array_len(labels) {
+            if labels[i] == name { return positions[i]; }
+            i += 1;
+        }
+        return -1;
+    }
+    return nw_op_uint(operand);
+}
+
+func nw_emit_ins(items: [str]) -> [str] {
+    mut labels: [str] = [];
+    mut positions: [int] = [];
+    mut pc: int = 0;
+    mut i: int = 0;
+    while i < array_len(items) {
+        let item: str = items[i];
+        if nbc_has_prefix(item, "@") {
+            labels = array_concat(labels, [substr(item, 1, str_len(item))]);
+            positions = array_concat(positions, [pc]);
+        } else if not nw_is_marker(item) {
+            pc += 1;
+        }
+        i += 1;
+    }
+    mut out: [str] = [];
+    pc = 0;
+    i = 0;
+    while i < array_len(items) {
+        let item: str = items[i];
+        if nw_is_marker(item) { i += 1; continue; }
+        let fields: [str] = nw_split_ins(item);
+        let op: str = fields[0];
+        mut a: str = array_len(fields) > 1 ? fields[1] : "0";
+        let b: str = array_len(fields) > 2 ? fields[2] : "0";
+        let c: str = array_len(fields) > 3 ? fields[3] : "0";
+        let av: int = nw_resolve_target(a, labels, positions);
+        let bv: int = nw_resolve_target(b, labels, positions);
+        let cv: int = nw_resolve_target(c, labels, positions);
+        out = array_concat(out, [op + "|" + to_str(av) + "|" +
+            to_str(bv) + "|" + to_str(cv)]);
+        pc += 1;
+        i += 1;
+    }
+    return out;
+}
+
+func nw_slotmap(ins: [str]) -> [int] {
+    mut used: [int] = [];
+    mut i: int = 0;
+    while i < array_len(ins) {
+        let fields: [str] = str_split(ins[i], "|");
+        let op: str = nw_norm(fields[0]);
+        if op == "ld_local" or op == "st_local" {
+            let slot: int = int_from_str(fields[1]);
+            mut found: bool = false;
+            mut k: int = 0;
+            while k < array_len(used) {
+                if used[k] == slot { found = true; }
+                k += 1;
+            }
+            if not found { used = array_concat(used, [slot]); }
+        }
+        i += 1;
+    }
+    mut s: int = 0;
+    while s < array_len(used) {
+        mut t: int = s + 1;
+        while t < array_len(used) {
+            if used[t] < used[s] {
+                let tmp: int = used[s]; used[s] = used[t]; used[t] = tmp;
+            }
+            t += 1;
+        }
+        s += 1;
+    }
+    return used;
+}
+
+func nw_slot_index(map: [int], slot: int) -> int {
+    mut i: int = 0;
+    while i < array_len(map) {
+        if map[i] == slot { return i; }
+        i += 1;
+    }
+    return -1;
+}
+
+func nw_serialize(instructions: [str]) -> str {
+    mut ints: [int] = [];
+    mut floats: [str] = [];
+    mut strs: [str] = [];
+    mut records: [int] = [];
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        let item: str = instructions[i];
+        if nbc_has_prefix(item, "#int|") {
+            ints = array_concat(ints, [nw_int_toll(substr(item, 5, str_len(item)))]);
+        } else if nbc_has_prefix(item, "#float|") {
+            floats = array_concat(floats, [substr(item, 7, str_len(item))]);
+        } else if nbc_has_prefix(item, "#str|") {
+            let raw: str = substr(item, 5, str_len(item));
+            mut val: str = raw;
+            if str_len(raw) >= 2 and raw[0] == "\"" and raw[str_len(raw) - 1] == "\"" {
+                val = substr(raw, 1, str_len(raw) - 2);
+            }
+            strs = array_concat(strs, [val]);
+        } else if nbc_has_prefix(item, "#record|") {
+            let rline: str = substr(item, 8, str_len(item));
+            let bar: int = nbc_find(rline, "|");
+            let rname: str = bar < 0 ? rline : substr(rline, 0, bar);
+            records = array_concat(records, [nbc_record_nfields(instructions, rname)]);
+        }
+        i += 1;
+    }
+
+    let fns: [[str]] = nw_collect_functions(instructions);
+    mut nfuncs: int = array_len(fns);
+    if nfuncs == 0 { nfuncs = 1; }
+
+    let nints: int = array_len(ints);
+    let nfloats: int = array_len(floats);
+    let nstrings: int = array_len(strs);
+    let nrecords: int = array_len(records);
+
+    mut entry: int = 0;
+    i = 0;
+    while i < nfuncs {
+        if nw_func_name(instructions, i) == "main" { entry = i; }
+        i += 1;
+    }
+
+    mut out: str = "";
+    out = out + "SURU";
+    out = out + nw_u32(1);
+    out = out + nw_u32(entry);
+    out = out + nw_u32(nints);
+    out = out + nw_u32(nfloats);
+    out = out + nw_u32(nstrings);
+    out = out + nw_u32(nrecords);
+    out = out + nw_u32(nfuncs);
+
+    i = 0;
+    while i < nints { out = out + nw_i64(ints[i]); i += 1; }
+    i = 0;
+    while i < nfloats { out = out + nw_f64(floats[i]); i += 1; }
+    i = 0;
+    while i < nstrings {
+        let len: int = str_len(strs[i]);
+        out = out + nw_u32(len);
+        out = out + strs[i];
+        i += 1;
+    }
+    i = 0;
+    while i < nrecords { out = out + nw_u32(records[i]); i += 1; }
+
+    i = 0;
+    while i < nfuncs {
+        let name: str = nw_func_name(instructions, i);
+        let nparams: int = nw_func_nparams(instructions, i);
+        mut items: [str] = [];
+        if nfuncs > 1 or array_len(fns) > 0 { items = fns[i]; }
+        let ins: [str] = nw_emit_ins(items);
+        let map: [int] = nw_slotmap(ins);
+        let nslots: int = array_len(map);
+        mut frame: int = nslots < nparams ? nparams : nslots;
+        if frame == 0 { frame = 1; }
+        let namelen: int = str_len(name);
+        out = out + nw_u32(namelen);
+        out = out + name;
+        out = out + nw_u32(nparams);
+        out = out + nw_u32(frame);
+        out = out + nw_u32(1024);
+        out = out + nw_u32(array_len(ins));
+        mut j: int = 0;
+        while j < array_len(ins) {
+            let fields: [str] = str_split(ins[j], "|");
+            let op: str = nw_norm(fields[0]);
+            let opid: int = nw_op_id(fields[0]);
+            let a: int = int_from_str(fields[1]);
+            let b: int = fields[2] == "" ? 0 : int_from_str(fields[2]);
+            let c: int = fields[3] == "" ? 0 : int_from_str(fields[3]);
+            let ra: int = (op == "ld_local" or op == "st_local") ?
+                nw_slot_index(map, a) : a;
+            out = out + str_chr_byte(opid);
+            out = out + nw_u32(ra);
+            out = out + nw_u32(b);
+            out = out + nw_u32(c);
+            j += 1;
+        }
+        i += 1;
+    }
+    return out;
+}

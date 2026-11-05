@@ -67,6 +67,7 @@ typedef enum s_builtin_id {
     S_BUILTIN_STR_UTF8_LEN,
     S_BUILTIN_STR_FROM_CODEPOINT,
     S_BUILTIN_STR_CHR_BYTE,
+    S_BUILTIN_F64_TO_BYTES,
     S_BUILTIN_COUNT
 } s_builtin_id;
 

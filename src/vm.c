@@ -509,6 +509,19 @@ static bool builtin_str_chr_byte(s_vm *vm) {
     return push_str_from_buf(vm, &ch, 1);
 }
 
+static bool builtin_f64_to_bytes(s_vm *vm) {
+    s_value v = pop(vm);
+    if (v.tag != S_VAL_FLOAT) {
+        vm_trap(vm, "f64_to_bytes expects a float");
+        return false;
+    }
+    s_u64 bits;
+    memcpy(&bits, &v.u.f, 8);
+    unsigned char buf[8];
+    for (int i = 0; i < 8; ++i) buf[i] = (unsigned char)(bits >> (8 * i));
+    return push_str_from_buf(vm, (const char *)buf, 8);
+}
+
 static bool builtin_read_line(s_vm *vm) {
     s_size len;
     char *line = s_rt_read_line(&len);
@@ -1355,6 +1368,7 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_STR_UTF8_LEN: return builtin_str_utf8_len(vm);
     case S_BUILTIN_STR_FROM_CODEPOINT: return builtin_str_from_codepoint(vm);
     case S_BUILTIN_STR_CHR_BYTE: return builtin_str_chr_byte(vm);
+    case S_BUILTIN_F64_TO_BYTES: return builtin_f64_to_bytes(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;

@@ -111,6 +111,8 @@ const s_builtin_sig s_builtin_table[S_BUILTIN_COUNT] = {
         "str_from_codepoint", 1, { S_SIG_INT }, S_SIG_STR },
     [S_BUILTIN_STR_CHR_BYTE] = {
         "str_chr_byte", 1, { S_SIG_INT }, S_SIG_STR },
+    [S_BUILTIN_F64_TO_BYTES] = {
+        "f64_to_bytes", 1, { S_SIG_FLOAT }, S_SIG_STR },
 };
 
 const s_builtin_sig *s_builtin_lookup(const char *name) {

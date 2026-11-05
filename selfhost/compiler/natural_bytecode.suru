@@ -928,7 +928,7 @@ func nbc_render(instructions: [str]) -> int {
     return 0;
 }
 
-func natural_emit_bytecode(source: str) -> int {
+func nbc_collect(source: str) -> [str] {
     let lines: [str] = str_split(source, "\n");
     mut instructions: [str] = [];
     instructions = nbc_collect_functions(instructions, lines);
@@ -1005,12 +1005,12 @@ func natural_emit_bytecode(source: str) -> int {
         if nbc_word(line) == "case" {
             if array_len(controls) == 0 {
                 println("bytecode-error|case outside choose");
-                return 1;
+                return ["#emit-failed"];
             }
             let current: [str] = str_split(controls[array_len(controls) - 1], "|");
             if current[0] != "choose" {
                 println("bytecode-error|case outside choose");
-                return 1;
+                return ["#emit-failed"];
             }
             let ctrl_kind: str = substr(current[0], 0, str_len(current[0]));
             let sel_name: str = substr(current[1], 0, str_len(current[1]));
@@ -1068,12 +1068,12 @@ func natural_emit_bytecode(source: str) -> int {
         if line == "end choose" {
             if array_len(controls) == 0 {
                 println("bytecode-error|end choose without choose");
-                return 1;
+                return ["#emit-failed"];
             }
             let current: [str] = str_split(controls[array_len(controls) - 1], "|");
             if current[0] != "choose" {
                 println("bytecode-error|mismatched choose terminator");
-                return 1;
+                return ["#emit-failed"];
             }
             if current[3] != "" {
                 instructions = nbc_label(instructions, current[3]);
@@ -1086,7 +1086,7 @@ func natural_emit_bytecode(source: str) -> int {
             let repeat_rest: str = nbc_after(line, "repeat");
             if nbc_word(repeat_rest) != "while" {
                 println("bytecode-error|repeat requires 'while'");
-                return 1;
+                return ["#emit-failed"];
             }
             let body: str = "repeat-body" + to_str(labels);
             let finish: str = "repeat-end" + to_str(labels);
@@ -1110,12 +1110,12 @@ func natural_emit_bytecode(source: str) -> int {
         if line == "otherwise" or nbc_has_prefix(line, "otherwise when ") {
             if array_len(controls) == 0 {
                 println("bytecode-error|otherwise outside when");
-                return 1;
+                return ["#emit-failed"];
             }
             let current: [str] = str_split(controls[array_len(controls) - 1], "|");
             if current[0] != "when" {
                 println("bytecode-error|otherwise outside when");
-                return 1;
+                return ["#emit-failed"];
             }
             instructions = nbc_emit(instructions, "BC_JMP", "@" + current[1]);
             instructions = nbc_label(instructions, current[2]);
@@ -1136,12 +1136,12 @@ func natural_emit_bytecode(source: str) -> int {
         if line == "end repeat" {
             if array_len(controls) == 0 {
                 println("bytecode-error|end repeat without repeat");
-                return 1;
+                return ["#emit-failed"];
             }
             let current: [str] = str_split(controls[array_len(controls) - 1], "|");
             if current[0] != "repeat" {
                 println("bytecode-error|mismatched repeat terminator");
-                return 1;
+                return ["#emit-failed"];
             }
             instructions = nbc_emit(instructions, "BC_JMP", "@" + current[1]);
             instructions = nbc_label(instructions, current[2]);
@@ -1151,12 +1151,12 @@ func natural_emit_bytecode(source: str) -> int {
         if line == "end when" {
             if array_len(controls) == 0 {
                 println("bytecode-error|end when without when");
-                return 1;
+                return ["#emit-failed"];
             }
             let current: [str] = str_split(controls[array_len(controls) - 1], "|");
             if current[0] != "when" {
                 println("bytecode-error|mismatched when terminator");
-                return 1;
+                return ["#emit-failed"];
             }
             if current[3] == "0" {
                 instructions = nbc_label(instructions, current[2]);
@@ -1183,7 +1183,7 @@ func natural_emit_bytecode(source: str) -> int {
             continue;
         }
         if nbc_word(line) == "handle" {
-            if array_len(attempts) == 0 { println("bytecode-error|handle outside attempt"); return 1; }
+            if array_len(attempts) == 0 { println("bytecode-error|handle outside attempt"); return ["#emit-failed"]; }
             let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
             instructions = nbc_emit(instructions, "BC_POP_HANDLER", "");
             instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[1]);
@@ -1205,7 +1205,7 @@ func natural_emit_bytecode(source: str) -> int {
             continue;
         }
         if line == "ensure" {
-            if array_len(attempts) == 0 { println("bytecode-error|ensure outside attempt"); return 1; }
+            if array_len(attempts) == 0 { println("bytecode-error|ensure outside attempt"); return ["#emit-failed"]; }
             let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
             if fields[3] == "1" {
                 instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[1]);
@@ -1216,7 +1216,7 @@ func natural_emit_bytecode(source: str) -> int {
             continue;
         }
         if line == "end exception" {
-            if array_len(attempts) == 0 { println("bytecode-error|end exception outside attempt"); return 1; }
+            if array_len(attempts) == 0 { println("bytecode-error|end exception outside attempt"); return ["#emit-failed"]; }
             let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
             if fields[3] == "1" and next_line == "ensure" {
                 instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[1]);
@@ -1228,7 +1228,7 @@ func natural_emit_bytecode(source: str) -> int {
             continue;
         }
         if line == "end attempt" {
-            if array_len(attempts) == 0 { println("bytecode-error|end attempt without attempt"); return 1; }
+            if array_len(attempts) == 0 { println("bytecode-error|end attempt without attempt"); return ["#emit-failed"]; }
             let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
             if fields[3] == "0" {
                 instructions = nbc_emit(instructions, "BC_POP_HANDLER", "");
@@ -1268,7 +1268,7 @@ func natural_emit_bytecode(source: str) -> int {
            nbc_word(line) == "constant" {
             let rest: str = nbc_after(line, nbc_word(line));
             let equals: int = nbc_find(rest, "=");
-            if equals < 0 { println("bytecode-error|binding requires '='"); return 1; }
+            if equals < 0 { println("bytecode-error|binding requires '='"); return ["#emit-failed"]; }
             let declaration: str = str_trim(substr(rest, 0, equals));
             let colon: int = nbc_find(declaration, ":");
             let name: str = colon < 0 ? declaration : str_trim(substr(declaration, 0, colon));
@@ -1314,7 +1314,7 @@ func natural_emit_bytecode(source: str) -> int {
         if nbc_word(line) == "set" {
             let rest: str = nbc_after(line, "set");
             let to_at: int = nbc_find(rest, " to ");
-            if to_at < 0 { println("bytecode-error|assignment requires 'to'"); return 1; }
+            if to_at < 0 { println("bytecode-error|assignment requires 'to'"); return ["#emit-failed"]; }
             let target: str = str_trim(substr(rest, 0, to_at));
             if str_contains(target, ".") {
                 let dot: int = nbc_find(target, ".");
@@ -1350,7 +1350,7 @@ func natural_emit_bytecode(source: str) -> int {
                 }
             }
             let slot: int = nbc_slot(instructions, target);
-            if slot < 0 { println("bytecode-error|unknown assignment target: " + target); return 1; }
+            if slot < 0 { println("bytecode-error|unknown assignment target: " + target); return ["#emit-failed"]; }
             instructions = nbc_emit_expression(instructions,
                 substr(rest, to_at + 4, str_len(rest)));
             instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(slot));
@@ -1359,7 +1359,13 @@ func natural_emit_bytecode(source: str) -> int {
         instructions = nbc_expression_statement(instructions, line);
         if not nbc_has_prefix(line, "show(") { instructions = nbc_emit(instructions, "BC_POP", ""); }
     }
-    if array_len(attempts) != 0 { println("bytecode-error|unterminated attempt"); return 1; }
-    if array_len(controls) != 0 { println("bytecode-error|unterminated control block"); return 1; }
-    return nbc_render(instructions);
+    if array_len(attempts) != 0 { println("bytecode-error|unterminated attempt"); return ["#emit-failed"]; }
+    if array_len(controls) != 0 { println("bytecode-error|unterminated control block"); return ["#emit-failed"]; }
+    return instructions;
+}
+
+func natural_emit_bytecode(source: str) -> int {
+    let code: [str] = nbc_collect(source);
+    if array_len(code) == 1 and code[0] == "#emit-failed" { return 1; }
+    return nbc_render(code);
 }
