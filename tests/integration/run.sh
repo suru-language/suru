@@ -107,6 +107,21 @@ else
     fail=$((fail + 1))
 fi
 
+# Natural run: execute a minimal Natural program end-to-end.
+tests=$((tests + 1))
+natprog="$(mktemp)"
+printf 'routine main() -> Unit\n    value x: Whole = 1 + 2\n    show(x)\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "3" ]; then
+    echo "ok: nat-run"
+else
+    echo "FAIL: nat-run (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
 # Program arguments: run argtest.suru with two args.
 tests=$((tests + 1))
 actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"
