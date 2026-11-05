@@ -3,9 +3,11 @@ use "../../selfhost/compiler/natural_bytecode.suru";
 use "../../selfhost/compiler/natural_module_writer.suru";
 use "../../selfhost/compiler/natural_elf_writer.suru";
 
-// Minimal native backend path: compiles a trivial Natural program whose body is
-// `show(x)` (string literal, integer constant, or integer expression over
-// const/neg/add/sub/mul/div) into a standalone x86-64 ELF64 executable.
+// Minimal native backend: compiles a Natural program whose bytecode uses only
+// the supported integer/control/print subset into a standalone x86-64 ELF64
+// executable. `show("literal")` uses the message emitter; everything else uses
+// the generic multi-function compiler (constants, locals, arithmetic, all
+// comparisons, jumps, calls, println, returns).
 func main() {
     let source: str = source_load(args(0));
     let instructions: [str] = nbc_collect(source);
@@ -13,96 +15,108 @@ func main() {
         exit(1);
     }
     let fns: [[str]] = nw_collect_functions(instructions);
-    if array_len(fns) != 1 { exit(2); }
-    let ins: [str] = nw_emit_ins(fns[0]);
-    let n: int = array_len(ins);
-    if n < 4 { exit(3); }
+    let nfuncs: int = array_len(fns);
+    if nfuncs == 0 { exit(2); }
 
-    let tail: [str] = str_split(ins[n - 3], "|");
-    if nw_norm(tail[0]) != "builtin" or tail[1] != "1" { exit(5); }
-
-    let first: [str] = str_split(ins[0], "|");
-    if nw_norm(first[0]) == "const_str" {
-        if n != 4 { exit(4); }
-        let sidx: int = int_from_str(first[1]);
-        mut found: int = -1;
-        mut val: str = "";
-        mut i: int = 0;
-        while i < array_len(instructions) {
-            if nbc_has_prefix(instructions[i], "#str|") {
-                found += 1;
-                if found == sidx {
-                    let raw: str = substr(instructions[i], 5, str_len(instructions[i]));
-                    if str_len(raw) >= 2 and raw[0] == "\"" and
-                       raw[str_len(raw) - 1] == "\"" {
-                        val = substr(raw, 1, str_len(raw) - 2);
-                    } else {
-                        val = raw;
+    // String special-case: single function of shape show("literal").
+    if nfuncs == 1 {
+        let ins0: [str] = nw_emit_ins(fns[0]);
+        if array_len(ins0) == 4 {
+            let h0: [str] = str_split(ins0[0], "|");
+            let h1: [str] = str_split(ins0[1], "|");
+            if nw_norm(h0[0]) == "const_str" and
+               nw_norm(h1[0]) == "builtin" and h1[1] == "1" {
+                let sidx: int = int_from_str(h0[1]);
+                mut found: int = -1;
+                mut val: str = "";
+                mut pi: int = 0;
+                while pi < array_len(instructions) {
+                    if nbc_has_prefix(instructions[pi], "#str|") {
+                        found += 1;
+                        if found == sidx {
+                            let raw: str = substr(instructions[pi], 5, str_len(instructions[pi]));
+                            if str_len(raw) >= 2 and raw[0] == "\"" and
+                               raw[str_len(raw) - 1] == "\"" {
+                                val = substr(raw, 1, str_len(raw) - 2);
+                            } else {
+                                val = raw;
+                            }
+                        }
                     }
+                    pi += 1;
+                }
+                if val != "" {
+                    write_file(args(1), nw_emit_elf_message(val + "\n"));
+                    exit(0);
                 }
             }
-            i += 1;
         }
-        if val == "" { exit(6); }
-        write_file(args(1), nw_emit_elf_message(val + "\n"));
-        exit(0);
     }
 
-    // Generic program compiler over the full instruction stream.
-    mut ops: [int] = [];
-    mut avs: [int] = [];
-    mut bvs: [int] = [];
-    mut cvs: [int] = [];
-    mut idx: int = 0;
-    while idx < n {
-        let f: [str] = str_split(ins[idx], "|");
-        let opname: str = nw_norm(f[0]);
-        mut id: int = 0;
-        if opname == "const_int" { id = 1; }
-        else if opname == "ld_local" { id = 5; }
-        else if opname == "st_local" { id = 6; }
-        else if opname == "neg_i" { id = 11; }
-        else if opname == "add_i" { id = 14; }
-        else if opname == "sub_i" { id = 15; }
-        else if opname == "mul_i" { id = 16; }
-        else if opname == "div_i" { id = 17; }
-        else if opname == "eq_i" { id = 29; }
-        else if opname == "ne_i" { id = 30; }
-        else if opname == "lt_i" { id = 31; }
-        else if opname == "le_i" { id = 32; }
-        else if opname == "gt_i" { id = 33; }
-        else if opname == "ge_i" { id = 34; }
-        else if opname == "jmp" { id = 66; }
-        else if opname == "jz" { id = 67; }
-        else if opname == "jnz" { id = 68; }
-        else if opname == "pop" { id = 7; }
-        else if opname == "ret" or opname == "ret_unit" { id = 65; }
-        else if opname == "builtin" { id = 63; }
-        else { exit(4); }
-        ops = array_concat(ops, [id]);
-        if id == 1 {
-            let sidx: int = int_from_str(f[1]);
-            mut found: int = -1;
-            mut ival: int = 0;
-            mut pi: int = 0;
-            while pi < array_len(instructions) {
-                if nbc_has_prefix(instructions[pi], "#int|") {
-                    found += 1;
-                    if found == sidx {
-                        ival = nw_int_toll(substr(instructions[pi], 5, str_len(instructions[pi])));
+    mut fn_ops: [[int]] = [];
+    mut fn_avs: [[int]] = [];
+    mut entry: int = 0;
+    mut fi: int = 0;
+    while fi < nfuncs {
+        let nm: str = nw_func_name(instructions, fi);
+        if nm == "main" { entry = fi; }
+        let ins: [str] = nw_emit_ins(fns[fi]);
+        mut ops: [int] = [];
+        mut avs: [int] = [];
+        mut idx: int = 0;
+        while idx < array_len(ins) {
+            let f: [str] = str_split(ins[idx], "|");
+            let opname: str = nw_norm(f[0]);
+            mut id: int = 0;
+            if opname == "const_int" { id = 1; }
+            else if opname == "ld_local" { id = 5; }
+            else if opname == "st_local" { id = 6; }
+            else if opname == "neg_i" { id = 11; }
+            else if opname == "add_i" { id = 14; }
+            else if opname == "sub_i" { id = 15; }
+            else if opname == "mul_i" { id = 16; }
+            else if opname == "div_i" { id = 17; }
+            else if opname == "eq_i" { id = 29; }
+            else if opname == "ne_i" { id = 30; }
+            else if opname == "lt_i" { id = 31; }
+            else if opname == "le_i" { id = 32; }
+            else if opname == "gt_i" { id = 33; }
+            else if opname == "ge_i" { id = 34; }
+            else if opname == "call" { id = 59; }
+            else if opname == "jmp" { id = 66; }
+            else if opname == "jz" { id = 67; }
+            else if opname == "jnz" { id = 68; }
+            else if opname == "pop" { id = 7; }
+            else if opname == "ret" or opname == "ret_unit" { id = 65; }
+            else if opname == "builtin" { id = 63; }
+            else { exit(4); }
+            ops = array_concat(ops, [id]);
+            if id == 1 {
+                let sidx: int = int_from_str(f[1]);
+                mut found: int = -1;
+                mut ival: int = 0;
+                mut pi: int = 0;
+                while pi < array_len(instructions) {
+                    if nbc_has_prefix(instructions[pi], "#int|") {
+                        found += 1;
+                        if found == sidx {
+                            ival = nw_int_toll(substr(instructions[pi], 5, str_len(instructions[pi])));
+                        }
                     }
+                    pi += 1;
                 }
-                pi += 1;
+                avs = array_concat(avs, [ival]);
+            } else {
+                avs = array_concat(avs, [int_from_str(f[1])]);
             }
-            avs = array_concat(avs, [ival]);
-        } else if id == 5 or id == 6 {
-            avs = array_concat(avs, [int_from_str(f[1])]);
-        } else {
-            avs = array_concat(avs, [int_from_str(f[1])]);
+            idx += 1;
         }
-        idx += 1;
+        fn_ops = array_concat(fn_ops, [ops]);
+        fn_avs = array_concat(fn_avs, [avs]);
+        fi += 1;
     }
-    let elf: str = nw_emit_elf_program(ops, avs, bvs, cvs);
+
+    let elf: str = nw_emit_elf_multifunc(fn_ops, fn_avs, entry);
     if elf == "" { exit(7); }
     write_file(args(1), elf);
     exit(0);

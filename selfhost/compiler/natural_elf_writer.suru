@@ -192,6 +192,152 @@ func nw_emit_minimal_elf() -> str {
     return nw_emit_elf_message("hi\n");
 }
 
+func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_entry: int) -> str {
+    let nfuncs: int = array_len(fn_ops);
+    mut nl: [int] = [];
+    mut f0: int = 0;
+    while f0 < nfuncs {
+        let ops: [int] = fn_ops[f0];
+        let avs: [int] = fn_avs[f0];
+        mut mx: int = 0;
+        mut p0: int = 0;
+        while p0 < array_len(ops) {
+            if (ops[p0] == 5 or ops[p0] == 6) and avs[p0] + 1 > mx {
+                mx = avs[p0] + 1;
+            }
+            p0 += 1;
+        }
+        nl = array_concat(nl, [mx]);
+        f0 += 1;
+    }
+
+    mut buf: [int] = [];
+    mut fn_start: [int] = [];
+    mut pc_all: [[int]] = [];
+    mut fx: [str] = [];
+
+    mut f: int = 0;
+    while f < nfuncs {
+        fn_start = array_concat(fn_start, [array_len(buf)]);
+        buf = array_concat(buf, [0x55, 0x48,0x89,0xE5, 0x48,0x83,0xEC,0x68]);
+        buf[array_len(buf) - 1] = (96 + nl[f] * 8) & 255;
+
+        let ops: [int] = fn_ops[f];
+        let avs: [int] = fn_avs[f];
+        let nins: int = array_len(ops);
+        mut pcrel: [int] = [];
+        mut pc: int = 0;
+        while pc < nins {
+            pcrel = array_concat(pcrel, [array_len(buf) - fn_start[f]]);
+            let op: int = ops[pc];
+            let a: int = avs[pc];
+            if op == 1 {
+                buf = array_concat(buf, [0x48,0xC7,0xC0]);
+                buf = array_concat(buf, [a & 255, (a >> 8) & 255, (a >> 16) & 255, (a >> 24) & 255, 0x50]);
+            } else if op == 5 {
+                let disp: int = 256 - 8 * (a + 1);
+                buf = array_concat(buf, [0x48,0x8B,0x45,disp, 0x50]);
+            } else if op == 6 {
+                let disp: int = 256 - 8 * (a + 1);
+                buf = array_concat(buf, [0x58, 0x48,0x89,0x45,disp]);
+            } else if op == 11 {
+                buf = array_concat(buf, [0x58, 0x48,0xF7,0xD8, 0x50]);
+            } else if op == 14 or op == 15 or op == 16 {
+                buf = array_concat(buf, [0x5B,0x58]);
+                if op == 14 { buf = array_concat(buf, [0x48,0x01,0xD8]); }
+                else if op == 15 { buf = array_concat(buf, [0x48,0x29,0xD8]); }
+                else { buf = array_concat(buf, [0x48,0x0F,0xAF,0xC3]); }
+                buf = array_concat(buf, [0x50]);
+            } else if op == 17 {
+                buf = array_concat(buf, [0x5B,0x58, 0x48,0x31,0xD2, 0x48,0xF7,0xF3, 0x50]);
+            } else if op == 29 or op == 30 or op == 31 or op == 32 or op == 33 or op == 34 {
+                buf = array_concat(buf, [0x5B,0x58, 0x48,0x39,0xD8]);
+                if op == 29 { buf = array_concat(buf, [0x0F,0x94,0xC0]); }
+                else if op == 30 { buf = array_concat(buf, [0x0F,0x95,0xC0]); }
+                else if op == 31 { buf = array_concat(buf, [0x0F,0x9C,0xC0]); }
+                else if op == 32 { buf = array_concat(buf, [0x0F,0x9E,0xC0]); }
+                else if op == 33 { buf = array_concat(buf, [0x0F,0x9F,0xC0]); }
+                else { buf = array_concat(buf, [0x0F,0x9D,0xC0]); }
+                buf = array_concat(buf, [0x48,0x0F,0xB6,0xC0, 0x50]);
+            } else if op == 63 {
+                if a != 1 { return ""; }
+                buf = array_concat(buf, [0x58]);
+                let pr: str = nw_print_routine();
+                mut k: int = 0;
+                while k < str_len(pr) {
+                    buf = array_concat(buf, [str_byte_at(pr, k)]);
+                    k += 1;
+                }
+                buf = array_concat(buf, [0x50]);
+            } else if op == 7 {
+                buf = array_concat(buf, [0x58]);
+            } else if op == 59 {
+                buf = array_concat(buf, [0xE8]);
+                mut d: int = array_len(buf);
+                buf = array_concat(buf, [0,0,0,0]);
+                fx = array_concat(fx, [to_str(d) + "|C|" + to_str(a)]);
+                buf = array_concat(buf, [0x50]);
+            } else if op == 64 or op == 65 {
+                if f != fn_entry {
+                    buf = array_concat(buf, [0xC9, 0xC3]);
+                }
+            } else if op == 66 {
+                buf = array_concat(buf, [0xE9]);
+                mut d: int = array_len(buf);
+                buf = array_concat(buf, [0,0,0,0]);
+                fx = array_concat(fx, [to_str(d) + "|" + to_str(f) + "|" + to_str(a)]);
+            } else if op == 67 {
+                buf = array_concat(buf, [0x58, 0x48,0x85,0xC0, 0x0F,0x84]);
+                mut d: int = array_len(buf);
+                buf = array_concat(buf, [0,0,0,0]);
+                fx = array_concat(fx, [to_str(d) + "|" + to_str(f) + "|" + to_str(a)]);
+            } else if op == 68 {
+                buf = array_concat(buf, [0x58, 0x48,0x85,0xC0, 0x0F,0x85]);
+                mut d: int = array_len(buf);
+                buf = array_concat(buf, [0,0,0,0]);
+                fx = array_concat(fx, [to_str(d) + "|" + to_str(f) + "|" + to_str(a)]);
+            } else {
+                return "";
+            }
+            pc += 1;
+        }
+        pc_all = array_concat(pc_all, [pcrel]);
+        f += 1;
+    }
+
+    buf = array_concat(buf, [0x48,0xC7,0xC0,0x3C,0,0,0, 0x48,0x31,0xFF, 0x0F,0x05]);
+
+    mut fi: int = 0;
+    while fi < array_len(fx) {
+        let entry: [str] = str_split(fx[fi], "|");
+        let d: int = int_from_str(entry[0]);
+        mut tpos: int = 0;
+        if entry[1] == "C" {
+            tpos = fn_start[int_from_str(entry[2])];
+        } else {
+            let fidx: int = int_from_str(entry[1]);
+            let tp: int = int_from_str(entry[2]);
+            tpos = fn_start[fidx] + pc_all[fidx][tp];
+        }
+        let disp: int = tpos - (d + 4);
+        buf[d] = disp & 255;
+        buf[d + 1] = (disp >> 8) & 255;
+        buf[d + 2] = (disp >> 16) & 255;
+        buf[d + 3] = (disp >> 24) & 255;
+        fi += 1;
+    }
+
+    mut s: str = "";
+    mut bi: int = 0;
+    while bi < array_len(buf) {
+        s = s + str_chr_byte(buf[bi]);
+        bi += 1;
+    }
+    let total: int = 120 + str_len(s);
+    let prog_entry: int = 0x400078 + fn_start[fn_entry];
+    return nw_elf_header(total, prog_entry) + s;
+}
+
 func nw_emit_elf_program(ops: [int], avs: [int], bs: [int], cs: [int]) -> str {
     let nins: int = array_len(ops);
     mut nlocals: int = 0;
@@ -260,17 +406,17 @@ func nw_emit_elf_program(ops: [int], avs: [int], bs: [int], cs: [int]) -> str {
             // fall through; final exit syscall terminates
         } else if op == 66 {
             buf = array_concat(buf, [0xE9]);
-            let d: int = array_len(buf);
+            mut d: int = array_len(buf);
             buf = array_concat(buf, [0,0,0,0]);
             fx = array_concat(fx, [to_str(d) + "|" + to_str(a)]);
         } else if op == 67 {
             buf = array_concat(buf, [0x58, 0x48,0x85,0xC0, 0x0F,0x84]);
-            let d: int = array_len(buf);
+            mut d: int = array_len(buf);
             buf = array_concat(buf, [0,0,0,0]);
             fx = array_concat(fx, [to_str(d) + "|" + to_str(a)]);
         } else if op == 68 {
             buf = array_concat(buf, [0x58, 0x48,0x85,0xC0, 0x0F,0x85]);
-            let d: int = array_len(buf);
+            mut d: int = array_len(buf);
             buf = array_concat(buf, [0,0,0,0]);
             fx = array_concat(fx, [to_str(d) + "|" + to_str(a)]);
         } else {

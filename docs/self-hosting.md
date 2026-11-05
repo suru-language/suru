@@ -233,8 +233,17 @@ The bytecode object-emitting half is now owned by SURU:
   (`natural_elf_compile_run.sh`). A micro-assembler (`nw_emit_elf_repeat`)
   emits a `repeat while` loop with a counter, comparison (`setl`/`test`), and
   resolved `jz`/`jmp` rel32 targets; it prints "012" and is gated by
-  `natural_elf_loop_run.sh`. This is the first control-flow step of the Stage 3
-  backend; general control flow, arrays/records, and native calls remain.
+  `natural_elf_loop_run.sh`. A generic bytecode->x86-64 compiler
+  (`nw_emit_elf_program`) now lowers constants, locals, all integer comparisons
+  (eq/ne/lt/le/gt/ge), arithmetic, `jmp`/`jz`/`jnz`, `println`, `pop`, and
+  returns, so `when`/`otherwise` branches also compile to standalone executables
+  (`natural_elf_when_run.sh`). A multi-function emitter
+  (`nw_emit_elf_multifunc`) compiles every routine with its own frame and
+  supports `BC_CALL` (call rel32, result returned in `rax`) with the ELF entry
+  set to `main`, so no-argument helper routines compile and run
+  (`natural_elf_call_run.sh`). This is the first control-flow and call step of
+  the Stage 3 backend; native argument passing, arrays/records, and recursion
+  remain.
 - Gates wired into `make selfhost-test`: `natural_compile_run.sh` (differential
   byte-identity, 58/58), `natural_verify_run.sh` (positive + injected invalid),
   `natural_build_run.sh` (full-pipeline acceptance all byte-identical), and
