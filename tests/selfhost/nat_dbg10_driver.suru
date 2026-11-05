@@ -1,0 +1,14 @@
+use "../../selfhost/compiler/natural_bytecode.suru";
+use "../../selfhost/compiler/source.suru";
+func main() {
+    let src: str = source_load(args(0));
+    let lines: [str] = str_split(src, "\n");
+    mut empty: [str] = [];
+    mut instructions: [str] = nbc_collect_functions(empty, lines);
+    instructions = nbc_collect_choices(instructions, lines);
+    let c: str = "Color";
+    let a: int = nbc_variant_tag(instructions, c, "Red");
+    let cc: int = nbc_variant_tag(instructions, c, "Blue");
+    let b: int = nbc_variant_tag(instructions, c, "Green");
+    println("Red=" + to_str(a) + " Green=" + to_str(b) + " Blue=" + to_str(cc));
+}
