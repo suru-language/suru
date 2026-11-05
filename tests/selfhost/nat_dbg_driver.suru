@@ -1,0 +1,57 @@
+use "../../selfhost/compiler/natural_bytecode.suru";
+use "../../selfhost/compiler/source.suru";
+func main() {
+    let src: str = source_load(args(0));
+    let lines: [str] = str_split(src, "\n");
+    mut instructions: [str] = [];
+    instructions = nbc_collect_functions(instructions, lines);
+    mut attempts: [str] = [];
+    mut controls: [str] = [];
+    mut labels: int = 0;
+    mut i: int = 0;
+    while i < array_len(lines) {
+        let line: str = str_trim(lines[i]);
+        mut next_line: str = "";
+        mut look: int = i + 1;
+        while look < array_len(lines) and str_trim(lines[look]) == "" { look += 1; }
+        if look < array_len(lines) { next_line = str_trim(lines[look]); }
+        i += 1;
+        if line == "" or nbc_word(line) == "//" or nbc_word(line) == "#!" { continue; }
+        if nbc_word(line) == "routine" or
+           (nbc_word(line) == "expose" and nbc_word(nbc_after(line, "expose")) == "routine") {
+            let rline: str = (nbc_word(line) == "expose") ?
+                nbc_after(line, "expose") : line;
+            let rr: str = nbc_after(rline, "routine");
+            let ro: int = nbc_find(rr, "(");
+            if ro > 0 {
+                let rname: str = str_trim(substr(rr, 0, ro));
+                let rclose: int = nbc_find(rr, ")");
+                let params: str = str_trim(substr(rr, ro + 1, rclose - ro - 1));
+                mut nparams: int = 0;
+                if params != "" { nparams = array_len(str_split(params, ",")); }
+                instructions = array_concat(instructions,
+                    ["#funcbody|" + rname + "|" + to_str(nparams)]);
+            }
+            continue;
+        }
+        if nbc_word(line) == "repeat" { let repeat_rest: str = nbc_after(line, "repeat"); let body: str = "repeat-body" + to_str(labels); let finish: str = "repeat-end" + to_str(labels); labels += 1; controls = array_concat(controls, ["repeat|" + body + "|" + finish]); instructions = nbc_label(instructions, body); instructions = nbc_emit_expression(instructions, nbc_after(repeat_rest, "while")); instructions = nbc_emit(instructions, "BC_JZ", "@" + finish); continue; }
+        if nbc_word(line) == "when" { let finish: str = "when-end" + to_str(labels); let next: str = "when-next" + to_str(labels); labels += 1; controls = array_concat(controls, ["when|" + finish + "|" + next + "|0"]); instructions = nbc_emit_expression(instructions, nbc_after(line, "when")); instructions = nbc_emit(instructions, "BC_JZ", "@" + next); continue; }
+        if line == "otherwise" or nbc_has_prefix(line, "otherwise when ") { let current: [str] = str_split(controls[array_len(controls) - 1], "|"); instructions = nbc_emit(instructions, "BC_JMP", "@" + current[1]); instructions = nbc_label(instructions, current[2]); if line == "otherwise" { controls[array_len(controls) - 1] = current[0] + "|" + current[1] + "||2"; } else { let next: str = "when-next" + to_str(labels); labels += 1; instructions = nbc_emit_expression(instructions, nbc_after(nbc_after(line, "otherwise"), "when")); instructions = nbc_emit(instructions, "BC_JZ", "@" + next); controls[array_len(controls) - 1] = current[0] + "|" + current[1] + "|" + next + "|1"; } continue; }
+        if line == "end repeat" { let current: [str] = str_split(controls[array_len(controls) - 1], "|"); instructions = nbc_emit(instructions, "BC_JMP", "@" + current[1]); instructions = nbc_label(instructions, current[2]); controls = slice(controls, 0, array_len(controls) - 1); continue; }
+        if line == "end when" { let current: [str] = str_split(controls[array_len(controls) - 1], "|"); if current[3] == "0" { instructions = nbc_label(instructions, current[2]); } instructions = nbc_label(instructions, current[1]); controls = slice(controls, 0, array_len(controls) - 1); continue; }
+        if line == "attempt" { let handler: str = "handler" + to_str(labels); let cleanup: str = "cleanup" + to_str(labels); let finish: str = "finish" + to_str(labels); labels += 1; attempts = array_concat(attempts, [handler + "|" + cleanup + "|" + finish + "|0"]); let handler_type: str = nbc_next_handler_type(lines, i); mut handler_operand: str = "4294967295"; if handler_type != "" { instructions = nbc_intern(instructions, "str", handler_type); handler_operand = to_str(nbc_pool_index(instructions, "str", handler_type)); } instructions = nbc_emit(instructions, "BC_PUSH_HANDLER", "@" + handler + "|" + handler_operand); continue; }
+        if nbc_word(line) == "handle" { let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|"); instructions = nbc_emit(instructions, "BC_POP_HANDLER", ""); instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[1]); let handler_rest: str = nbc_after(line, "handle"); let colon: int = nbc_find(handler_rest, ":"); let binding: str = str_trim(substr(handler_rest, 0, colon)); let effect: str = str_trim(substr(handler_rest, colon + 1, str_len(handler_rest))); instructions = nbc_label(instructions, fields[0]); if binding != "" { instructions = nbc_bind(instructions, binding); instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(nbc_slot(instructions, binding))); } else { instructions = nbc_emit(instructions, "BC_POP", ""); } instructions = nbc_emit(instructions, "BC_NOP", "handler:" + effect); attempts[array_len(attempts) - 1] = fields[0] + "|" + fields[1] + "|" + fields[2] + "|1"; continue; }
+        if line == "ensure" { let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|"); if fields[3] == "1" { instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[1]); } instructions = nbc_label(instructions, fields[1]); instructions = nbc_emit(instructions, "BC_NOP", "cleanup"); attempts[array_len(attempts) - 1] = fields[0] + "|" + fields[1] + "|" + fields[2] + "|2"; continue; }
+        if line == "end exception" { let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|"); if fields[3] == "1" and next_line == "ensure" { instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[1]); } else if fields[3] == "1" { instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[2]); } else if fields[3] == "2" { instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[2]); } continue; }
+        if line == "end attempt" { let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|"); if fields[3] == "0" { instructions = nbc_emit(instructions, "BC_POP_HANDLER", ""); instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[2]); } else if fields[3] == "2" { instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[2]); } instructions = nbc_label(instructions, fields[2]); attempts = slice(attempts, 0, array_len(attempts) - 1); continue; }
+        if nbc_word(line) == "give" { let value: str = str_trim(nbc_after(line, "give")); if value == "" { instructions = nbc_emit(instructions, "BC_RET_UNIT", ""); } else { instructions = nbc_emit_expression(instructions, value); instructions = nbc_emit(instructions, "BC_RET", ""); } continue; }
+        if line == "end routine" { instructions = nbc_emit(instructions, "BC_RET_UNIT", ""); continue; }
+        instructions = nbc_expression_statement(instructions, line);
+        if not nbc_has_prefix(line, "show(") { instructions = nbc_emit(instructions, "BC_POP", ""); }
+    }
+    mut k: int = 0;
+    while k < array_len(instructions) {
+        println(to_str(k) + "|" + instructions[k]);
+        k += 1;
+    }
+}

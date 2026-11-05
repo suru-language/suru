@@ -194,6 +194,33 @@ else
 fi
 rm -f "$natprog"
 
+# Natural run: array literal, index read, and index assignment.
+tests=$((tests + 2))
+natprog="$(mktemp)"
+printf 'routine main() -> Unit\n    value xs: [Whole] = [10, 20, 30]\n    show(xs[1])\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "20" ]; then
+    echo "ok: nat-run-array"
+else
+    echo "FAIL: nat-run-array (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+natprog="$(mktemp)"
+printf 'routine main() -> Unit\n    value xs: [Whole] = [1, 2]\n    set xs[0] to 9\n    show(xs[0])\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "9" ]; then
+    echo "ok: nat-run-array-set"
+else
+    echo "FAIL: nat-run-array-set (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
 # Program arguments: run argtest.suru with two args.
 tests=$((tests + 1))
 actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"

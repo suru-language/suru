@@ -226,6 +226,28 @@ func nbc_split_ternary(text: str) -> [str] {
             str_trim(substr(text, colon + 1, str_len(text)))];
 }
 
+func nbc_find_postfix(expression: str, open: str, close: str) -> [str] {
+    mut depth: int = 0;
+    mut quote: bool = false;
+    mut i: int = 0;
+    while i < str_len(expression) {
+        let c: str = expression[i];
+        if c == "\"" { quote = not quote; }
+        if not quote {
+            if c == open and depth == 0 {
+                let inner: str = substr(expression, i + 1,
+                                        str_len(expression) - i - 2);
+                return [to_str(i), str_trim(substr(expression, 0, i)),
+                        str_trim(inner)];
+            }
+            if c == open { depth += 1; }
+            if c == close { depth -= 1; }
+        }
+        i += 1;
+    }
+    return ["-1", "", ""];
+}
+
 func nbc_emit_arguments(instructions: [str], text: str) -> [str] {
     mut result: [str] = instructions;
     let comma = nbc_top_operator(text, [","]);
@@ -387,6 +409,26 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
     if nbc_has_prefix(text, "~") {
         result = nbc_emit_expression(result, substr(text, 1, str_len(text)));
         return nbc_emit(result, "BC_BIT_NOT", "");
+    }
+    if str_len(text) >= 2 and text[0] == "[" and text[str_len(text) - 1] == "]" {
+        let inner: str = substr(text, 1, str_len(text) - 2);
+        if inner == "" { return nbc_emit(result, "BC_NEW_ARRAY", "0"); }
+        let elems: [str] = str_split(inner, ",");
+        let count: int = array_len(elems);
+        mut ei: int = 0;
+        while ei < count {
+            result = nbc_emit_expression(result, str_trim(elems[ei]));
+            ei += 1;
+        }
+        return nbc_emit(result, "BC_NEW_ARRAY", to_str(count));
+    }
+    if str_contains(text, "[") {
+        let bracket = nbc_find_postfix(text, "[", "]");
+        if int_from_str(bracket[0]) >= 0 and bracket[1] != "" {
+            result = nbc_emit_expression(result, bracket[1]);
+            result = nbc_emit_expression(result, bracket[2]);
+            return nbc_emit(result, "BC_IDX_LD", "");
+        }
     }
     let open: int = nbc_find(text, "(");
     if open > 0 and text[str_len(text) - 1] == ")" {
@@ -836,9 +878,20 @@ func natural_emit_bytecode(source: str) -> int {
             let rest: str = nbc_after(line, "set");
             let to_at: int = nbc_find(rest, " to ");
             if to_at < 0 { println("bytecode-error|assignment requires 'to'"); return 1; }
-            let name: str = str_trim(substr(rest, 0, to_at));
-            let slot: int = nbc_slot(instructions, name);
-            if slot < 0 { println("bytecode-error|unknown assignment target: " + name); return 1; }
+            let target: str = str_trim(substr(rest, 0, to_at));
+            if str_contains(target, "[") {
+                let bracket = nbc_find_postfix(target, "[", "]");
+                if int_from_str(bracket[0]) >= 0 {
+                    instructions = nbc_emit_expression(instructions, bracket[1]);
+                    instructions = nbc_emit_expression(instructions, bracket[2]);
+                    instructions = nbc_emit_expression(instructions,
+                        substr(rest, to_at + 4, str_len(rest)));
+                    instructions = nbc_emit(instructions, "BC_IDX_ST", "");
+                    continue;
+                }
+            }
+            let slot: int = nbc_slot(instructions, target);
+            if slot < 0 { println("bytecode-error|unknown assignment target: " + target); return 1; }
             instructions = nbc_emit_expression(instructions,
                 substr(rest, to_at + 4, str_len(rest)));
             instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(slot));

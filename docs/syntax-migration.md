@@ -63,8 +63,9 @@ grammar.
     frontend gate (lex/parse/semantic/declaration/effect); `run` and `compile`
     emit executable bytecode modules via a selfhost module writer, which the
     VM runs and verifies. Natural execution covers typed integer/Real
-    arithmetic, Text concatenation and comparison, bindings, `show`, `when`/
-    `repeat` control flow, and multi-routine calls with parameters.
+    arithmetic, Text concatenation and comparison, array literals with index
+    read/write, bindings, `show`, `when`/`repeat` control flow, and
+    multi-routine calls with parameters.
 4. Port parser productions in small feature groups with positive and negative
    tests and reference-output comparisons.
 5. Port semantic and bytecode behavior only after each production is specified.
