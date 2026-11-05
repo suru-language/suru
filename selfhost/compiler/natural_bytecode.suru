@@ -886,6 +886,7 @@ func natural_emit_bytecode(source: str) -> int {
             continue;
         }
         if nbc_word(line) == "case" {
+            println("DBGX case line [" + line + "]");
             if array_len(controls) == 0 {
                 println("bytecode-error|case outside choose");
                 return 1;
