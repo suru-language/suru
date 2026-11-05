@@ -221,6 +221,21 @@ else
 fi
 rm -f "$natprog"
 
+# Natural run: record field write and read.
+tests=$((tests + 1))
+natprog="$(mktemp)"
+printf 'record Point\n    change x: Whole\n    change y: Whole\nend record\nroutine main() -> Unit\n    value p: Point = none\n    set p.x to 3\n    set p.y to 4\n    show(p.x + p.y)\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "7" ]; then
+    echo "ok: nat-run-record"
+else
+    echo "FAIL: nat-run-record (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
 # Program arguments: run argtest.suru with two args.
 tests=$((tests + 1))
 actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"

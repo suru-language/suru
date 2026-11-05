@@ -133,13 +133,26 @@ static int cmd_compile_natural(const char *path, const char *outpath,
     static s_bc_ins fins[MAX_FUNCS][MAX_INS];
     static s_u32 fnins[MAX_FUNCS];
     static s_u32 fnparams[MAX_FUNCS];
-    s_u32 nints = 0, nfl = 0, nstr = 0;
+    static char *rnames[65536];
+    static s_u32 rnfields[65536];
+    s_u32 nints = 0, nfl = 0, nstr = 0, nrecords = 0;
     int nfuncs = 0, cur_func = -1;
     s_u32 cur_nins = 0;
     char line[4096];
     while (fgets(line, sizeof line, p)) {
         line[strcspn(line, "\r\n")] = '\0';
-        if (strncmp(line, "pool|int|", 9) == 0) {
+        if (strncmp(line, "record|", 7) == 0) {
+            s_u32 ridx = (s_u32)strtoul(line + 7, NULL, 10);
+            char *save = NULL;
+            strtok_r(line + 7, "|", &save); /* idx */
+            const char *nm = strtok_r(NULL, "|", &save);
+            char *nf = strtok_r(NULL, "|", &save);
+            if (nm && nf && ridx < 65536) {
+                rnames[ridx] = strdup(nm);
+                rnfields[ridx] = (s_u32)strtoul(nf, NULL, 10);
+                if (ridx + 1 > nrecords) nrecords = ridx + 1;
+            }
+        } else if (strncmp(line, "pool|int|", 9) == 0) {
             s_u32 idx = (s_u32)strtoul(line + 9, NULL, 10);
             const char *v = strchr(line + 9, '|');
             if (v && idx < 65536) { ints[idx] = strtoll(v + 1, NULL, 10); if (idx >= nints) nints = idx + 1; }
@@ -230,6 +243,13 @@ static int cmd_compile_natural(const char *path, const char *outpath,
     m.strings = calloc(nstr ? nstr : 1, sizeof(char *));
     m.strlens = calloc(nstr ? nstr : 1, sizeof(s_u32));
     for (s_u32 i = 0; i < nstr; ++i) { m.strings[i] = strs[i]; m.strlens[i] = strlens[i]; }
+    m.nrecords = nrecords;
+    m.record_nfields = calloc(nrecords ? nrecords : 1, sizeof(s_u32));
+    m.record_names = calloc(nrecords ? nrecords : 1, sizeof(const char *));
+    for (s_u32 i = 0; i < nrecords; ++i) {
+        m.record_nfields[i] = rnfields[i];
+        m.record_names[i] = rnames[i];
+    }
     m.nfuncs = (s_u32)nfuncs;
     m.funcs = calloc((size_t)nfuncs, sizeof(s_bc_func));
     m.entry = 0;

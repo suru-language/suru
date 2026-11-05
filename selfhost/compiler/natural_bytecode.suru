@@ -239,6 +239,17 @@ func nbc_record_index(instructions: [str], name: str) -> int {
     return -1;
 }
 
+func nbc_record_nfields(instructions: [str], record: str) -> int {
+    let prefix: str = "#field|" + record + "|";
+    mut count: int = 0;
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], prefix) { count += 1; }
+        i += 1;
+    }
+    return count;
+}
+
 func nbc_field_index(instructions: [str], record: str, field: str) -> int {
     let wanted: str = "#field|" + record + "|" + field + "|";
     mut i: int = 0;
@@ -672,6 +683,22 @@ func nbc_render(instructions: [str]) -> int {
         i += 1;
     }
 
+    mut rec_idx: int = 0;
+    i = 0;
+    while i < array_len(instructions) {
+        let item: str = instructions[i];
+        if nbc_has_prefix(item, "#record|") {
+            let rline: str = substr(item, 8, str_len(item));
+            let bar: int = nbc_find(rline, "|");
+            let rname: str = bar < 0 ? rline : substr(rline, 0, bar);
+            let nfields: int = nbc_record_nfields(instructions, rname);
+            println("record|" + to_str(rec_idx) + "|" + rname + "|" +
+                    to_str(nfields));
+            rec_idx += 1;
+        }
+        i += 1;
+    }
+
     mut current_name: str = "";
     mut section_start: int = 0;
     i = 0;
@@ -755,7 +782,8 @@ func natural_emit_bytecode(source: str) -> int {
             }
             continue;
         }
-        if nbc_word(line) == "record" or line == "end record" {
+        if nbc_word(line) == "record" {
+            while i < array_len(lines) and str_trim(lines[i]) != "end record" { i += 1; }
             continue;
         }
         if nbc_word(line) == "repeat" {
@@ -953,6 +981,20 @@ func natural_emit_bytecode(source: str) -> int {
                 let decl_type: str = str_trim(substr(declaration, colon + 1,
                                                      str_len(declaration)));
                 instructions = nbc_note_type(instructions, name, decl_type);
+                let recidx: int = nbc_record_index(instructions, decl_type);
+                if recidx >= 0 {
+                    let nfields: int = nbc_record_nfields(instructions, decl_type);
+                    mut f: int = 0;
+                    while f < nfields {
+                        instructions = nbc_emit(instructions, "BC_CONST_NONE", "");
+                        f += 1;
+                    }
+                    instructions = nbc_emit(instructions, "BC_NEW_RECORD",
+                        to_str(recidx) + "|" + to_str(nfields));
+                    instructions = nbc_emit(instructions, "BC_ST_LOCAL",
+                                            to_str(nbc_slot(instructions, name)));
+                    continue;
+                }
             }
             instructions = nbc_emit_expression(instructions,
                 substr(rest, equals + 1, str_len(rest)));
