@@ -1,0 +1,32 @@
+use "../../selfhost/compiler/source.suru";
+
+func le_u32(n: int) -> str {
+    return str_chr_byte(n & 255) +
+           str_chr_byte((n >> 8) & 255) +
+           str_chr_byte((n >> 16) & 255) +
+           str_chr_byte((n >> 24) & 255);
+}
+
+func main() {
+    mut out: str = "";
+    out = out + "SURU";
+    out = out + le_u32(1);
+    out = out + le_u32(0);
+    out = out + le_u32(0);
+    out = out + le_u32(0);
+    out = out + le_u32(1);
+    out = out + le_u32(0);
+    out = out + le_u32(1);
+    out = out + le_u32(2);
+    out = out + "ok";
+    out = out + le_u32(4);
+    out = out + "main";
+    out = out + le_u32(0);
+    out = out + le_u32(1);
+    out = out + le_u32(1);
+    out = out + le_u32(3);
+    out = out + str_chr_byte(3) + le_u32(0) + le_u32(0) + le_u32(0);
+    out = out + str_chr_byte(63) + le_u32(1) + le_u32(0) + le_u32(0);
+    out = out + str_chr_byte(65) + le_u32(0) + le_u32(0) + le_u32(0);
+    write_file(args(0), out);
+}

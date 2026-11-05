@@ -91,6 +91,22 @@ else
     fail=$((fail + 1))
 fi
 
+# Natural module writer: build a bytecode module from the selfhost writer and exec it.
+tests=$((tests + 1))
+if "$SURU" run "$ROOT/tests/selfhost/module_write_driver.suru" "$tmp/nat.sbc" >/dev/null 2>&1 &&
+   [ -s "$tmp/nat.sbc" ]; then
+    actual="$("$SURU" exec "$tmp/nat.sbc" 2>"$tmp/stderr")"
+    if [ "$actual" = "ok" ]; then
+        echo "ok: nat-module-write"
+    else
+        echo "FAIL: nat-module-write (output '$actual')"
+        fail=$((fail + 1))
+    fi
+else
+    echo "FAIL: nat-module-write (write failed)"
+    fail=$((fail + 1))
+fi
+
 # Program arguments: run argtest.suru with two args.
 tests=$((tests + 1))
 actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"

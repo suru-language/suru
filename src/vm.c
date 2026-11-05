@@ -494,6 +494,21 @@ static bool builtin_str_from_codepoint(s_vm *vm) {
     return push_str_from_buf(vm, buf, n);
 }
 
+static bool builtin_str_chr_byte(s_vm *vm) {
+    s_value v = pop(vm);
+    if (v.tag != S_VAL_INT) {
+        vm_trap(vm, "str_chr_byte expects an integer");
+        return false;
+    }
+    s_i64 b = v.u.i;
+    if (b < 0 || b > 255) {
+        vm_trap(vm, "str_chr_byte out of range");
+        return false;
+    }
+    char ch = (char)b;
+    return push_str_from_buf(vm, &ch, 1);
+}
+
 static bool builtin_read_line(s_vm *vm) {
     s_size len;
     char *line = s_rt_read_line(&len);
@@ -1339,6 +1354,7 @@ static bool dispatch_builtin(s_vm *vm, s_u32 id) {
     case S_BUILTIN_STR_VALID_UTF8: return builtin_str_valid_utf8(vm);
     case S_BUILTIN_STR_UTF8_LEN: return builtin_str_utf8_len(vm);
     case S_BUILTIN_STR_FROM_CODEPOINT: return builtin_str_from_codepoint(vm);
+    case S_BUILTIN_STR_CHR_BYTE: return builtin_str_chr_byte(vm);
     default:
         vm_trap(vm, "unknown builtin %u", id);
         return false;
