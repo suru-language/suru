@@ -1,0 +1,95 @@
+use "../../selfhost/compiler/natural_bytecode.suru";
+use "../../selfhost/compiler/source.suru";
+func main() {
+    let src: str = source_load(args(0));
+    let lines: [str] = str_split(src, "\n");
+    mut empty: [str] = [];
+    mut instructions: [str] = nbc_collect_functions(empty, lines);
+    instructions = nbc_collect_records(instructions, lines);
+    instructions = nbc_collect_choices(instructions, lines);
+    mut attempts: [str] = [];
+    mut controls: [str] = [];
+    mut labels: int = 0;
+    mut i: int = 0;
+    while i < array_len(lines) {
+        let line: str = str_trim(lines[i]);
+        i += 1;
+        if line == "" { continue; }
+        if nbc_word(line) == "routine" { continue; }
+        if nbc_word(line) == "record" {
+            while i < array_len(lines) and str_trim(lines[i]) != "end record" { i += 1; }
+            continue;
+        }
+        if nbc_word(line) == "choice" {
+            while i < array_len(lines) and str_trim(lines[i]) != "end choice" { i += 1; }
+            continue;
+        }
+        if nbc_word(line) == "choose" {
+            let sel: str = "choose-sel-" + to_str(labels);
+            let finish: str = "choose-end-" + to_str(labels);
+            labels += 1;
+            instructions = nbc_bind(instructions, sel);
+            instructions = nbc_emit_expression(instructions, nbc_after(line, "choose"));
+            instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(nbc_slot(instructions, sel)));
+            controls = array_concat(controls, ["choose|" + sel + "|" + finish + "|"]);
+            continue;
+        }
+        if nbc_word(line) == "case" {
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            let sel_name: str = substr(current[1], 0, str_len(current[1]));
+            let prev_next: str = current[3] == "" ? "" : substr(current[3], 0, str_len(current[3]));
+            let finish_name: str = substr(current[2], 0, str_len(current[2]));
+            println("DBG finish_name=[" + finish_name + "]");
+            if prev_next != "" {
+                instructions = nbc_emit(instructions, "BC_JMP", "@" + finish_name);
+                instructions = nbc_label(instructions, prev_next);
+            }
+            let raw_variant: str = str_trim(nbc_after(line, "case"));
+            let vbind: str = "";
+            let vopen: int = nbc_find(raw_variant, "(");
+            let vname: str = vopen < 0 ? raw_variant : str_trim(substr(raw_variant, 0, vopen));
+            let variant: str = substr(vname, 0, str_len(vname));
+            let choice: str = nbc_variant_choice(instructions, variant);
+            let tag: int = nbc_variant_tag(instructions, choice, variant);
+            let vnargs: int = nbc_variant_nargs(instructions, choice, variant);
+            let next: str = "choose-next-" + to_str(labels);
+            labels += 1;
+            let sel_slot: int = nbc_slot(instructions, sel_name);
+            if vnargs > 0 {
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(sel_slot));
+                instructions = nbc_const(instructions, "int", "BC_CONST_INT", "0");
+                instructions = nbc_emit(instructions, "BC_IDX_LD", "");
+            } else {
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(sel_slot));
+            }
+            instructions = nbc_const(instructions, "int", "BC_CONST_INT", to_str(tag));
+            instructions = nbc_emit(instructions, "BC_EQ_I", "");
+            instructions = nbc_emit(instructions, "BC_JZ", "@" + next);
+            if vbind != "" and vnargs > 0 {
+                instructions = nbc_bind(instructions, vbind);
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(sel_slot));
+                instructions = nbc_const(instructions, "int", "BC_CONST_INT", "1");
+                instructions = nbc_emit(instructions, "BC_IDX_LD", "");
+                instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(nbc_slot(instructions, vbind)));
+            }
+            controls[array_len(controls) - 1] = current[0] + "|" + sel_name + "|" + finish_name + "|" + next;
+            continue;
+        }
+        if line == "end choose" {
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            println("DBG end-choose finish=[" + current[2] + "]");
+            if current[3] != "" { instructions = nbc_label(instructions, current[3]); }
+            instructions = nbc_label(instructions, current[2]);
+            controls = slice(controls, 0, array_len(controls) - 1);
+            continue;
+        }
+        if line == "end routine" { instructions = nbc_emit(instructions, "BC_RET_UNIT", ""); continue; }
+        instructions = nbc_expression_statement(instructions, line);
+        if not nbc_has_prefix(line, "show(") { instructions = nbc_emit(instructions, "BC_POP", ""); }
+    }
+    mut k: int = 0;
+    while k < array_len(instructions) {
+        println(to_str(k) + "|" + instructions[k]);
+        k += 1;
+    }
+}

@@ -106,7 +106,9 @@ func nbc_slot(instructions: [str], name: str) -> int {
 func nbc_bind(instructions: [str], name: str) -> [str] {
     if nbc_slot(instructions, name) >= 0 { return instructions; }
     let index: int = 0 + nbc_pool_count(instructions, "slot");
-    return array_concat(instructions, ["#slot|" + name + "|" + to_str(index)]);
+    let marker: str = "#slot|" + name + "|" + to_str(index);
+    let stable: str = substr(marker, 0, str_len(marker));
+    return array_concat(instructions, [stable]);
 }
 
 func nbc_is_digit(c: str) -> bool {
@@ -274,6 +276,26 @@ func nbc_choice_index(instructions: [str], name: str) -> int {
     return -1;
 }
 
+func nbc_variant_nargs(instructions: [str], choice: str, variant: str) -> int {
+    let prefix: str = "#variant|" + choice + "|";
+    let suffix: str = "|" + variant + "|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        let item: str = instructions[i];
+        if nbc_has_prefix(item, prefix) and str_contains(item, suffix) {
+            let after_name: str = substr(item, str_len(prefix) + str_len(variant) + 1,
+                                          str_len(item));
+            let bar: int = nbc_find(after_name, "|");
+            if bar >= 0 {
+                return int_from_str(str_trim(substr(after_name, bar + 1,
+                                                    str_len(after_name))));
+            }
+        }
+        i += 1;
+    }
+    return 0;
+}
+
 func nbc_variant_tag(instructions: [str], choice: str, variant: str) -> int {
     let prefix: str = "#variant|" + choice + "|";
     let suffix: str = "|" + variant + "|";
@@ -281,9 +303,12 @@ func nbc_variant_tag(instructions: [str], choice: str, variant: str) -> int {
     while i < array_len(instructions) {
         let item: str = instructions[i];
         if nbc_has_prefix(item, prefix) and str_contains(item, suffix) {
-            let tagpart: str = substr(item, str_len(prefix) + str_len(variant) + 1,
-                                      str_len(item));
-            return int_from_str(str_trim(tagpart));
+            let rest: str = substr(item, str_len(prefix), str_len(item));
+            let rest2: str = substr(rest, str_len(variant) + 1, str_len(rest));
+            let bar: int = nbc_find(rest2, "|");
+            let tagtext: str = bar < 0 ? rest2 :
+                substr(rest2, 0, bar);
+            return int_from_str(str_trim(tagtext));
         }
         i += 1;
     }
@@ -308,8 +333,18 @@ func nbc_collect_choices(instructions: [str], lines: [str]) -> [str] {
             let vl: str = substr(raw_vl, 0, str_len(raw_vl));
             if vl == "end choice" { i += 1; break; }
             if vl == "" or nbc_word(vl) == "//" { i += 1; continue; }
+            let vopen: int = nbc_find(vl, "(");
+            let vname: str = vopen < 0 ? vl : str_trim(substr(vl, 0, vopen));
+            let vclose: int = nbc_find(vl, ")");
+            mut vnargs: int = 0;
+            if vopen >= 0 and vclose > vopen {
+                let vparams: str = str_trim(substr(vl, vopen + 1,
+                                                    vclose - vopen - 1));
+                if vparams != "" { vnargs = array_len(str_split(vparams, ",")); }
+            }
             result = array_concat(result,
-                ["#variant|" + cname + "|" + vl + "|" + to_str(tag)]);
+                ["#variant|" + cname + "|" + vname + "|" + to_str(tag) +
+                 "|" + to_str(vnargs)]);
             tag += 1;
             i += 1;
         }
@@ -606,6 +641,16 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
         let callee: str = str_trim(substr(text, 0, open));
         let argument_text: str = str_trim(substr(text, open + 1,
                                                   str_len(text) - open - 2));
+        if nbc_is_variant(result, callee) {
+            let vchoice: str = nbc_variant_choice(result, callee);
+            let vtag: int = nbc_variant_tag(result, vchoice, callee);
+            let vnargs: int = nbc_variant_nargs(result, vchoice, callee);
+            result = nbc_const(result, "int", "BC_CONST_INT", to_str(vtag));
+            if argument_text != "" {
+                result = nbc_emit_arguments(result, argument_text);
+            }
+            return nbc_emit(result, "BC_NEW_ARRAY", to_str(vnargs + 1));
+        }
         if argument_text != "" {
             result = nbc_emit_arguments(result, argument_text);
         }
@@ -669,7 +714,9 @@ func nbc_next_handler_type(lines: [str], start: int) -> str {
 }
 
 func nbc_label(instructions: [str], name: str) -> [str] {
-    return array_concat(instructions, ["@" + name]);
+    let label: str = "@" + name;
+    let stable: str = substr(label, 0, str_len(label));
+    return array_concat(instructions, [stable]);
 }
 
 func nbc_lookup_label(labels: [str], positions: [int], name: str) -> int {
@@ -884,7 +931,8 @@ func natural_emit_bytecode(source: str) -> int {
             instructions = nbc_emit_expression(instructions, nbc_after(line, "choose"));
             instructions = nbc_emit(instructions, "BC_ST_LOCAL",
                                     to_str(nbc_slot(instructions, sel)));
-            controls = array_concat(controls, ["choose|" + sel + "|" + finish + "|"]);
+            let c0: str = "choose|" + sel + "|" + finish + "|";
+            controls = array_concat(controls, [substr(c0, 0, str_len(c0))]);
             continue;
         }
         if nbc_word(line) == "case" {
@@ -902,22 +950,48 @@ func natural_emit_bytecode(source: str) -> int {
                 substr(current[3], 0, str_len(current[3]));
             let finish_name: str = substr(current[2], 0, str_len(current[2]));
             if prev_next != "" {
+                instructions = nbc_emit(instructions, "BC_JMP", "@" + finish_name);
                 instructions = nbc_label(instructions, prev_next);
             }
             let raw_variant: str = str_trim(nbc_after(line, "case"));
-            let variant: str = substr(raw_variant, 0, str_len(raw_variant));
+            let vopen: int = nbc_find(raw_variant, "(");
+            let vclose: int = nbc_find(raw_variant, ")");
+            let vname: str = vopen < 0 ? raw_variant :
+                str_trim(substr(raw_variant, 0, vopen));
+            let vbind: str = vopen >= 0 and vclose > vopen ?
+                str_trim(substr(raw_variant, vopen + 1, vclose - vopen - 1)) : "";
+            let variant: str = substr(vname, 0, str_len(vname));
             let choice: str = nbc_variant_choice(instructions, variant);
             let tag: int = nbc_variant_tag(instructions, choice, variant);
+            let vnargs: int = nbc_variant_nargs(instructions, choice, variant);
             let next: str = "choose-next-" + to_str(labels);
             labels += 1;
-            instructions = nbc_emit(instructions, "BC_LD_LOCAL",
-                                    to_str(nbc_slot(instructions, sel_name)));
+            let sel_slot: int = nbc_slot(instructions, sel_name);
+            if vnargs > 0 {
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL",
+                                        to_str(sel_slot));
+                instructions = nbc_const(instructions, "int", "BC_CONST_INT", "0");
+                instructions = nbc_emit(instructions, "BC_IDX_LD", "");
+            } else {
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL",
+                                        to_str(sel_slot));
+            }
             instructions = nbc_const(instructions, "int", "BC_CONST_INT",
                                      to_str(tag));
             instructions = nbc_emit(instructions, "BC_EQ_I", "");
             instructions = nbc_emit(instructions, "BC_JZ", "@" + next);
-            controls[array_len(controls) - 1] = current[0] + "|" +
-                sel_name + "|" + finish_name + "|" + next;
+            if vbind != "" and vnargs > 0 {
+                instructions = nbc_bind(instructions, vbind);
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL",
+                                        to_str(sel_slot));
+                instructions = nbc_const(instructions, "int", "BC_CONST_INT", "1");
+                instructions = nbc_emit(instructions, "BC_IDX_LD", "");
+                instructions = nbc_emit(instructions, "BC_ST_LOCAL",
+                                        to_str(nbc_slot(instructions, vbind)));
+            }
+            let entry: str = current[0] + "|" + sel_name + "|" +
+                finish_name + "|" + next;
+            controls[array_len(controls) - 1] = substr(entry, 0, str_len(entry));
             continue;
         }
         if line == "end choose" {
@@ -1203,6 +1277,5 @@ func natural_emit_bytecode(source: str) -> int {
     }
     if array_len(attempts) != 0 { println("bytecode-error|unterminated attempt"); return 1; }
     if array_len(controls) != 0 { println("bytecode-error|unterminated control block"); return 1; }
-    let _r: int = nbc_render(instructions);
-    return _r;
+    return nbc_render(instructions);
 }

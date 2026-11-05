@@ -282,6 +282,21 @@ else
 fi
 rm -f "$natprog"
 
+# Natural run: choice variant with a payload, bound via the case pattern.
+tests=$((tests + 1))
+natprog="$(mktemp)"
+printf 'choice Shape\n    Circle(radius: Whole)\n    Square(side: Whole)\nend choice\nroutine main() -> Unit\n    value s: Shape = Circle(10)\n    choose s\n    case Circle(r)\n        show(r)\n    case Square(side)\n        show(side)\n    end choose\nend routine\n' > "$natprog"
+actual="$("$SURU" --syntax=natural run "$natprog" 2>"$tmp/stderr")"
+code=$?
+if [ "$code" -eq 0 ] && [ "$actual" = "10" ]; then
+    echo "ok: nat-run-choose-payload"
+else
+    echo "FAIL: nat-run-choose-payload (exit $code, output '$actual')"
+    sed 's/^/    stderr: /' "$tmp/stderr"
+    fail=$((fail + 1))
+fi
+rm -f "$natprog"
+
 # Program arguments: run argtest.suru with two args.
 tests=$((tests + 1))
 actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"

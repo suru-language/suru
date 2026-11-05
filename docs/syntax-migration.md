@@ -65,9 +65,10 @@ grammar.
     VM runs and verifies. Natural execution covers typed integer/Real
     arithmetic, Text concatenation and comparison, array literals with index
     read/write, record construction with field read/write, choice variant
-    dispatch via `choose`/`case`, `attempt`/`handle`/`ensure` exception
-    handling, bindings, `show`, `when`/`repeat` control flow, and
-    multi-routine calls with parameters.
+    dispatch via `choose`/`case` including payload variants with pattern
+    binding, `attempt`/`handle`/`ensure` exception handling, bindings,
+    `show`, `when`/`repeat` control flow, and multi-routine calls with
+    parameters.
 4. Port parser productions in small feature groups with positive and negative
    tests and reference-output comparisons.
 5. Port semantic and bytecode behavior only after each production is specified.
