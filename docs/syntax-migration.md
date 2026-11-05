@@ -62,9 +62,9 @@ grammar.
     `legacy` path is unchanged. Natural-mode `check` runs the unified selfhost
     frontend gate (lex/parse/semantic/declaration/effect); `run` and `compile`
     emit executable bytecode modules via a selfhost module writer, which the
-    VM runs and verifies. Natural execution currently covers the operator set
-    the lowering gate emits (e.g. integer arithmetic, bindings, `show`); the
-    bytecode lowerer's remaining operator coverage is the boundary.
+    VM runs and verifies. Natural execution covers typed integer/Real
+    arithmetic, Text concatenation and comparison, bindings, `show`, `when`/
+    `repeat` control flow, and multi-routine calls with parameters.
 4. Port parser productions in small feature groups with positive and negative
    tests and reference-output comparisons.
 5. Port semantic and bytecode behavior only after each production is specified.
