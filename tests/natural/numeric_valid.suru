@@ -1,0 +1,4 @@
+value x = 0xFF
+value y = 0b1010
+value z = 1_000
+value w = 1.5e3
