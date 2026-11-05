@@ -8,7 +8,8 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 for input in lexical_valid.suru control_valid.suru \
-             record_choice_valid.suru modules_valid.suru keywords_valid.suru; do
+             record_choice_valid.suru modules_valid.suru keywords_valid.suru \
+             escapes_valid.suru numeric_valid.suru operators_valid.suru; do
     "$SURU" run "$DIR/natural_lexer_driver.suru" \
         "$ROOT/tests/natural/$input" >"$tmp/$input.tokens"
     grep -q '^EOF|' "$tmp/$input.tokens"
@@ -55,5 +56,23 @@ if "$SURU" run "$DIR/natural_lexer_driver.suru" \
 fi
 tail -n 1 "$tmp/invalid-utf8.out" | diff -u \
     "$ROOT/tests/natural/lexical_invalid_utf8.diag" -
+
+if "$SURU" run "$DIR/natural_lexer_driver.suru" \
+       "$ROOT/tests/natural/resource_comment_deep.suru" \
+       >"$tmp/resource_comment_deep.out"; then
+    echo "natural lexer: comment nesting too deep was accepted" >&2
+    exit 1
+fi
+tail -n 1 "$tmp/resource_comment_deep.out" | diff -u \
+    "$ROOT/tests/natural/resource_comment_deep.diag" -
+
+if "$SURU" run "$DIR/natural_lexer_driver.suru" \
+       "$ROOT/tests/natural/resource_interp_deep.suru" \
+       >"$tmp/resource_interp_deep.out"; then
+    echo "natural lexer: interpolation nesting too deep was accepted" >&2
+    exit 1
+fi
+tail -n 1 "$tmp/resource_interp_deep.out" | diff -u \
+    "$ROOT/tests/natural/resource_interp_deep.diag" -
 
 echo "natural lexer: approved lexical corpus passed"
