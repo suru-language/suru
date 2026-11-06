@@ -27,7 +27,8 @@ typedef struct s_value {
         s_i64 i;
         double f;
         bool b;
-        s_gcobj *o;
+        s_gcobj *o;   /* pointer-based object reference (C-heap path) */
+        s_u64 idx;    /* generation-protected object handle (objmodel path) */
     } u;
 } s_value;
 

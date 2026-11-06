@@ -425,6 +425,36 @@ changes and a documented residual risk:
 13. Native platform implementation.
 14. Remove the C collector from normal execution.
 
+### Stage 11–12 migration plan (VM integration / collector replacement)
+This is the remaining, separately-approved phase: move the VM/runtime from the
+pointer-based C heap (`s_gcobj*` in `s_value.u.o`) to the generation-protected
+object model (`s_om_ref` handles in `s_value.u.idx`). It must land as one
+coherent value-plane transition; it cannot be half-migrated:
+
+1. **Value layer:** add `s_u64 idx` to the `s_value` union (done); introduce
+   `s_val_obj_handle(...)` accessor and tag semantics for `S_VAL_OBJ` carrying a
+   handle. Bytecode format and Natural syntax are unchanged — this is a runtime
+   value representation change only.
+2. **Object access translation:** replace every `v.u.o->kind`,
+   `s_obj_str_data/array_data/record_fields/exception_fields(o)`, and
+   `s_obj_str_len(o)` in `src/vm.c`, `src/runtime.c`, `src/stdlib.c` with
+   objmodel-equivalent access (handles + bounds-checked payload read/write via the
+   `s_om_*` surface). String/array payloads are accessed through the checked
+   runtime surface (no raw pointers escape the object model).
+3. **Allocation/roots:** route `s_heap_alloc` / `s_heap_new_*` and stack/root
+   registration through `objmodel`/`objgc`; keep the VM's root range contract.
+4. **Collection:** drive `objgc` (full and incremental) from the VM GC slice,
+   replacing `s_heap_collect`/`s_heap_collect_incremental`/write-barrier calls;
+   the `objgc` stop-the-world lock enforces the collection lifecycle.
+5. **Remove C heap:** drop `src/mem.c` from `LIBSRC` and retire the pointer-based
+   path, keeping `test_gc.c` coverage equivalent via the new heap.
+6. **Verification gates at every step:** `make unit`, `make test`, `make analyze`,
+   `make asan-test`, and byte-for-byte `selfhost-rebuild`.
+
+Risk gates: each step keeps the suite green; the collector swap is the final,
+gated step. This phase deliberately does not change bytecode format, Natural
+syntax, or the language semantics.
+
 ## 11. First production component (recommendation)
 
 Implement **Stage 1 + Stage 2 first**: the minimal trusted platform interface and
