@@ -616,7 +616,9 @@ static bool builtin_type_of(s_vm *vm) {
         }
         break;
     }
+    s_heap_add_root(vm->heap, &v);
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
+    s_heap_remove_root(vm->heap, &v);
     if (!o) return false;
     if (len) memcpy(s_obj_str_data(o), s, len);
     return push(vm, s_val_obj(o));
@@ -975,6 +977,8 @@ static bool builtin_str_split(s_vm *vm) {
         if (memcmp(data + i, sp, pl) == 0) { n++; i += pl; }
         else i++;
     }
+    s_heap_add_root(vm->heap, &s);
+    s_heap_add_root(vm->heap, &sep);
     s_gcobj *arr = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)n, 0);
     if (!arr) return false;
     s_value *dst = s_obj_array_data(arr);
@@ -999,6 +1003,8 @@ static bool builtin_str_split(s_vm *vm) {
         if (ln) memcpy(s_obj_str_data(o), data + start, ln);
         dst[k++] = s_val_obj(o);
     }
+    s_heap_remove_root(vm->heap, &sep);
+    s_heap_remove_root(vm->heap, &s);
     return push(vm, s_val_obj(arr));
 }
 
@@ -1024,7 +1030,11 @@ static bool builtin_str_join(s_vm *vm) {
         if (i + 1 < n) total += pl;
     }
     if (total > (1u << 24)) { vm_trap(vm, "str_join too large"); return false; }
+    s_heap_add_root(vm->heap, &arr);
+    s_heap_add_root(vm->heap, &sep);
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
+    s_heap_remove_root(vm->heap, &sep);
+    s_heap_remove_root(vm->heap, &arr);
     if (!o) return false;
     char *d = s_obj_str_data(o);
     s_size off = 0;
@@ -1055,7 +1065,9 @@ static bool builtin_array_slice(s_vm *vm) {
     s_i64 end = b + l;
     if (end > n) end = n;
     s_size m = (s_size)(end - b);
+    s_heap_add_root(vm->heap, &arr);
     s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)m, 0);
+    s_heap_remove_root(vm->heap, &arr);
     if (!o) return false;
     if (m) memcpy(s_obj_array_data(o), s_obj_array_data(arr.u.o) + b,
                   sizeof(s_value) * m);
@@ -1070,7 +1082,9 @@ static bool builtin_str_map(s_vm *vm, int mode) {
     }
     s_size n = s_obj_str_len(s.u.o);
     const char *src = s_obj_str_data(s.u.o);
+    s_heap_add_root(vm->heap, &s);
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
+    s_heap_remove_root(vm->heap, &s);
     if (!o) return false;
     char *dst = s_obj_str_data(o);
     if (mode == 0) {
@@ -1105,7 +1119,9 @@ static bool builtin_array_reverse(s_vm *vm) {
         return false;
     }
     s_u32 n = v.u.o->count;
+    s_heap_add_root(vm->heap, &v);
     s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, n, 0);
+    s_heap_remove_root(vm->heap, &v);
     if (!o) return false;
     s_value *src = s_obj_array_data(v.u.o);
     s_value *dst = s_obj_array_data(o);
@@ -1182,7 +1198,9 @@ static bool builtin_read_file(s_vm *vm) {
     if (fseek(f, 0, SEEK_SET) != 0) { fclose(f); vm_trap(vm, "read_file: seek failed"); return false; }
     s_size n = (s_size)sz;
     if (n > (1u << 26)) { fclose(f); vm_trap(vm, "read_file too large"); return false; }
+    s_heap_add_root(vm->heap, &p);
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
+    s_heap_remove_root(vm->heap, &p);
     if (!o) { fclose(f); return false; }
     size_t got = n ? fread(s_obj_str_data(o), 1, n, f) : 0;
     fclose(f);
@@ -1276,7 +1294,11 @@ static bool builtin_str_pad(s_vm *vm) {
     char fc = ' ';
     if (s_obj_str_len(fill.u.o) > 0) fc = s_obj_str_data(fill.u.o)[0];
     s_size total = slen + pad;
+    s_heap_add_root(vm->heap, &s);
+    s_heap_add_root(vm->heap, &fill);
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
+    s_heap_remove_root(vm->heap, &fill);
+    s_heap_remove_root(vm->heap, &s);
     if (!o) return false;
     memset(s_obj_str_data(o), fc, pad);
     memcpy(s_obj_str_data(o) + pad, s_obj_str_data(s.u.o), slen);
@@ -1293,7 +1315,11 @@ static bool builtin_array_concat(s_vm *vm) {
     }
     s_u32 na = a.u.o->count, nb = b.u.o->count;
     s_u32 n = na + nb;
+    s_heap_add_root(vm->heap, &a);
+    s_heap_add_root(vm->heap, &b);
     s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, n, 0);
+    s_heap_remove_root(vm->heap, &b);
+    s_heap_remove_root(vm->heap, &a);
     if (!o) return false;
     s_value *dst = s_obj_array_data(o);
     memcpy(dst, s_obj_array_data(a.u.o), sizeof(s_value) * na);
@@ -1345,7 +1371,9 @@ static bool builtin_array_sort(s_vm *vm) {
             return false;
         }
     }
+    s_heap_add_root(vm->heap, &v);
     s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, n, 0);
+    s_heap_remove_root(vm->heap, &v);
     if (!o) return false;
     if (n) {
         memcpy(s_obj_array_data(o), el, sizeof(s_value) * n);
@@ -1916,7 +1944,9 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             vm->sp -= ncap;
             memcpy(s_obj_array_data(env), vm->st + vm->sp,
                    sizeof(s_value) * ncap);
+            s_heap_add_root(vm->heap, &env);
             s_gcobj *o = vm_alloc(vm, S_OBJ_CLOSURE, 2, 0);
+            s_heap_remove_root(vm->heap, &env);
             if (!o) return 1;
             s_obj_array_data(o)[0] = s_val_int((s_i64)in->a);
             s_obj_array_data(o)[1] = s_val_obj(env);
