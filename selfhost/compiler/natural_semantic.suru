@@ -321,6 +321,23 @@ func nss_expr_type(expression: str, names: [str], types: [str],
             if ctor == "ok" or ctor == "error" { return ["ok", "Result"]; }
             let btype: str = nss_builtin_type(ctor);
             if btype != "" { return ["ok", btype]; }
+            if ctor == "array_concat" or ctor == "slice" {
+                let args: str = substr(atom, open_idx + 1,
+                                       str_len(atom) - open_idx - 2);
+                let comma: int = nss_find_top(args, ",");
+                if comma > 0 {
+                    let first: str = str_trim(substr(args, 0, comma));
+                    let ft: [str] = nss_expr_type(first, names, types,
+                                                  rt_names, rt_types);
+                    if ft[0] == "ok" and str_len(ft[1]) >= 2 and ft[1][0] == "[" {
+                        return ["ok", ft[1]];
+                    }
+                }
+                return ["ok", "[]"];
+            }
+            if ctor == "range" or ctor == "make_array" {
+                return ["ok", "[Whole]"];
+            }
         }
     }
     let dot: int = nss_find_top(atom, ".");
@@ -334,6 +351,16 @@ func nss_expr_type(expression: str, names: [str], types: [str],
             if ftype != "" { return ["ok", ftype]; }
         }
         return ["error", "unknown field '" + atom + "'"];
+    }
+    let obr: int = nss_find(atom, "[");
+    if obr > 0 and atom[str_len(atom) - 1] == "]" {
+        let base: str = str_trim(substr(atom, 0, obr));
+        let base_type: str = nss_lookup(names, types, base);
+        if base_type != "" and str_len(base_type) >= 3 and
+           base_type[0] == "[" and base_type[str_len(base_type) - 1] == "]" {
+            return ["ok", substr(base_type, 1, str_len(base_type) - 2)];
+        }
+        return ["error", "unknown array '" + base + "'"];
     }
     let known: str = nss_lookup(names, types, atom);
     if known == "" { return ["error", "unknown name '" + atom + "'"]; }
