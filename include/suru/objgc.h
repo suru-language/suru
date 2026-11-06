@@ -44,8 +44,21 @@ s_u32 s_om_gc_nroots(const s_om_gc *g);
  * Live objects reachable from the roots are preserved and reset to the white
  * colour for the next cycle. Unreachable live objects are freed back to the
  * allocator's freelists.
+ *
+ * Equivalent to mark_begin + repeated mark_step until marking completes +
+ * sweep.
  */
 s_u32 s_om_gc_collect(s_om_gc *g);
+
+/* Incremental marking. The marking phase can be budget-sliced across many
+ * calls; each step examines at most `budget` live objects. The scan is a
+ * bounded, non-recursive fixpoint over the slot table (no unbounded
+ * worklist). Returns true while marking is still in progress, false when it
+ * has completed (a full pass with no newly-shaded objects). Sweep after
+ * marking completes. */
+s_om_err s_om_gc_mark_begin(s_om_gc *g);
+bool s_om_gc_mark_step(s_om_gc *g, s_size budget);
+s_u32 s_om_gc_sweep(s_om_gc *g);
 
 #ifdef __cplusplus
 }

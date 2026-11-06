@@ -342,17 +342,20 @@ This module is additive and trusted-runtime-only; it does not change
 `src/mem.c`, the VM, or bytecode.
 
 A mark-sweep collector (`include/suru/objgc.h`, `src/objgc.c`,
-`tests/unit/test_objgc.c`, 273 checks) implements the root/traversal/marking/
+`tests/unit/test_objgc.c`, 934 checks) implements the root/traversal/marking/
 sweep stages on top of the object model. It registers roots, walks child
 references (tri-color via slot colour), and reclaims unreachable objects back
 to the allocator. Marking is a bounded, non-recursive scan (no explicit
-unbounded worklist), matching the approved collector design. The child-reference
-encoding used by the collector (payload word i = child object index i) is the
-graph model for this stage; mapping it to the future value-layer reference
+unbounded worklist), matching the approved collector design. The collector also
+exposes budget-sliced incremental marking (`s_om_gc_mark_begin/step`, `sweep`),
+and its tests cover repeated collection under allocation pressure. The
+child-reference encoding (payload word i = child object index i) is the graph
+model for this stage; mapping it to the future value-layer reference
 representation is a separate, later transition.
 
-Remaining future work (stages 9–12): allocation-pressure handling, incremental
-marking, VM/bytecode integration, and replacing the C collector in `src/mem.c`.
+Remaining future work (stages 11–12): VM/bytecode integration and replacing the
+C collector in `src/mem.c`. These require the value-layer `u.o`→`u.idx`
+transition and are scoped as separate, later approved work.
 
 ## 10. Implementation roadmap (each stage has tests)
 

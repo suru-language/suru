@@ -238,6 +238,101 @@ static void test_collect_preserves_content(void) {
     s_om_gc_destroy(g);
 }
 
+static void test_incremental_reachable_vs_unreachable(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    s_u32 a = arr_with_kids(h, NULL, 0);
+    s_u32 b = 0;
+    { s_u32 k[1] = {a}; b = arr_with_kids(h, k, 1); }
+    s_u32 c = arr_with_kids(h, NULL, 0);
+
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_add_root(g, b), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_mark_begin(g), S_OM_OK);
+    while (s_om_gc_mark_step(g, 1)) {
+    }
+    CHECK_EQ_INT((int)s_om_gc_sweep(g), 1); /* only c reclaimed */
+    CHECK_EQ_INT((int)s_om_validate(h, a), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_validate(h, b), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_validate(h, c), S_OM_ENOENT);
+    CHECK_EQ_INT((int)s_om_live_objects(h), 2);
+    s_om_gc_destroy(g);
+}
+
+static void test_incremental_eventual_completion(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    s_u32 root = arr_with_kids(h, NULL, 0);
+    s_u32 junk = arr_with_kids(h, NULL, 0);
+
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_add_root(g, root), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_mark_begin(g), S_OM_OK);
+    int steps = 0;
+    while (s_om_gc_mark_step(g, 1)) {
+        steps++;
+        if (steps > 100000) break; /* safety */
+    }
+    CHECK(steps < 100000);
+    CHECK_EQ_INT((int)s_om_gc_sweep(g), 1);
+    CHECK_EQ_INT((int)s_om_validate(h, root), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_validate(h, junk), S_OM_ENOENT);
+    s_om_gc_destroy(g);
+}
+
+static void test_incremental_under_pressure(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(256, 65536, &h), S_OM_OK);
+    s_u32 root = arr_with_kids(h, NULL, 0);
+
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_add_root(g, root), S_OM_OK);
+
+    int cycle;
+    for (cycle = 0; cycle < 30; ++cycle) {
+        s_u32 junk = arr_with_kids(h, NULL, 0);
+        CHECK_EQ_INT((int)s_om_gc_mark_begin(g), S_OM_OK);
+        while (s_om_gc_mark_step(g, 3)) {
+        }
+        CHECK_EQ_INT((int)s_om_gc_sweep(g), 1); /* junk reclaimed */
+        CHECK_EQ_INT((int)s_om_validate(h, root), S_OM_OK);
+        CHECK_EQ_INT((int)s_om_validate(h, junk), S_OM_ENOENT);
+        CHECK_EQ_INT((int)s_om_live_objects(h), 1);
+    }
+    s_om_gc_destroy(g);
+}
+
+static void test_allocation_pressure(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(256, 65536, &h), S_OM_OK);
+    s_u32 root = arr_with_kids(h, NULL, 0);
+
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_add_root(g, root), S_OM_OK);
+
+    int cycle;
+    for (cycle = 0; cycle < 50; ++cycle) {
+        s_u32 c = arr_with_kids(h, NULL, 0);
+        s_u32 d = arr_with_kids(h, NULL, 0);
+        s_u32 e = arr_with_kids(h, NULL, 0);
+        CHECK_EQ_INT((int)s_om_gc_collect(g), 3); /* all garbage reclaimed */
+        CHECK_EQ_INT((int)s_om_validate(h, root), S_OM_OK);
+        CHECK_EQ_INT((int)s_om_validate(h, c), S_OM_ENOENT);
+        CHECK_EQ_INT((int)s_om_validate(h, d), S_OM_ENOENT);
+        CHECK_EQ_INT((int)s_om_validate(h, e), S_OM_ENOENT);
+        CHECK_EQ_INT((int)s_om_live_objects(h), 1);
+    }
+    s_om_gc_destroy(g);
+}
+
 TEST_MAIN_BEGIN()
     test_gc_lifecycle();
     test_reachable_vs_unreachable();
@@ -250,4 +345,8 @@ TEST_MAIN_BEGIN()
     test_repeated_collect();
     test_freelist_reuse_after_collect();
     test_collect_preserves_content();
+    test_incremental_reachable_vs_unreachable();
+    test_incremental_eventual_completion();
+    test_incremental_under_pressure();
+    test_allocation_pressure();
 TEST_MAIN_END()
