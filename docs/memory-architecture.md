@@ -227,6 +227,96 @@ Stage 3 will build a SURU-owned object model and allocator on top of this
 interface. Ordinary SURU programs will only see an approved, checked surface
 that the trusted runtime exposes for them, never raw RawBlock handles.
 
+## 9.6 Phase 3E — SURU-owned object model & allocation architecture (design)
+
+This section records the Phase 3E design for a SURU-owned object model and managed
+allocation on top of the Stage 1–2 platform interface. It extends the approved
+Sections 2–5 (heap / object / reference / root / platform) without replacing them.
+It is architecture-only: no production heap/GC code is written in this phase. At
+approval the baseline stays clean at HEAD `7069f2f` (91/91 integration, 31/31
+gates, 12/12 reference model, 34 GC units, 482 platform units).
+
+### D1 — Object representation (SURU-owned)
+- An object is a fixed-format header at a known offset inside a managed region
+  (one region per heap, or a set of regions). Object identity is a **flat object
+  index** (u32) into the heap, not a native address.
+- Header: `kind` (u8), `flags` (u8), `colour` (u8), `size/rounded` (u32),
+  `magic` (u32), `count` (u32), `next_free`/linkage as needed. Payload follows
+  the header, 8-aligned; overall 16-byte alignment. This maps onto the existing
+  `s_gcobj` layout.
+- Kinds preserved: str / array / record / closure / exception. Closure carries
+  captured values in its child-slot array (no separate environment kind yet).
+- Keep the **wire-compatible** mapping to the existing `s_gcobj` during the
+  bootstrap transition, but express identity as index, not pointer.
+
+### D2 — Reference representation
+- A managed reference is a tagged value carrying a **heap index** (opaque), not
+  a raw pointer: `S_VAL_OBJ` with `u.idx` (u32) instead of `u.o` pointer in the
+  SURU-owned representation.
+- Validation: an index is valid iff it is < heap object count and its header
+  magic matches. Stale/dup/invalid indices are rejected by the lookup.
+- Object identity = heap index. This permits future relocation (compaction)
+  without invalidating externally visible handles (only the runtime layer sees
+  addresses).
+- Ordinary SURU programs never obtain raw addresses; they only use the checked
+  runtime surface.
+- **Future transition (not this phase):** the pointer-based `S_VAL_OBJ`
+  (`u.o`) → index-based (`u.idx`) change touches the VM/bytecode value layer
+  across `include/suru/value.h` and every consumer of `u.o`. That is a separate,
+  later approved transition; this phase commits only the index-based identity and
+  validation semantics documented here.
+
+### D3 — Allocation responsibilities (separation)
+- SURU-controlled: object layout, metadata, validation, allocation policy,
+  free-space tracking, registration, bookkeeping, canary/poison in debug.
+- Trusted platform (`platform_mem`): raw acquire/release, checked low-level
+  access only.
+- The C adapter is replaceable without redesigning the object model: the model
+  only asks the platform for RawBlock regions plus checked byte access.
+
+### D4 — Allocation algorithm (design only)
+- Evaluate bump + free-list and segregated small-bucket allocator; recommend a
+  segregated small-bucket freelist (aligned chunks) with a bump allocation for
+  the first version, because it is simple, checkable, and matches the existing C
+  small-bucket scheme. Do not implement now.
+- OOM/failure path: deterministic error return, no partial object registration,
+  never corrupt existing objects.
+
+### D5 — Bootstrap initialization (no self-dependency)
+- The first SURU-owned allocator initializes from one or more RawBlocks acquired
+  via `s_pm_acquire`. It must not use the managed heap to build its own metadata:
+  metadata (free lists, header slots) lives inside the RawBlock region or in
+  dedicated RawBlocks acquired for bookkeeping. This keeps the collector/allocator
+  non-recursive.
+- Accept: the initial allocator (and the VM bridge) may remain C-hosted for now;
+  only object layout/policy are SURU-authored in this phase.
+
+### D6 — Safety invariants (each mapped to a future test)
+1. Valid reference → allocated object with valid magic.
+2. Header describes valid object (magic, size, kind).
+3. Size/alignment valid; object fits inside its region.
+4. Allocation arithmetic overflow-checked.
+5. Metadata cannot silently diverge (debug canary/poison).
+6. Invalid/stale references rejected.
+7. Allocation failure leaves existing objects intact.
+8. Free-space bookkeeping never overlaps live objects.
+9. No allocation path silently loses ownership.
+10. Object-model initialization does not require recursive managed allocation.
+
+### D7 — Reference-model test gaps to plan (not implement here)
+Future additions to `selfhost/memory/ref_gc.suru` (append as scenario 13+; its
+current numbering skips 10):
+- deep/wide graphs, alias multiplicity, mutation during marking, write-barrier
+  correctness, stale/corrupt metadata, repeated collection under pressure, large
+  objects, root removal mid-collection, OOM and alignment/overflow of offsets.
+
+### Staged roadmap
+This phase commits only the architecture. Production implementation begins only
+after approval of this section:
+object layout → reference representation → metadata → allocator initialization →
+bookkeeping → free-space → validation → VM integration → roots → marking/collection
+→ reclamation → replace the C collector. Each stage has tests.
+
 ## 10. Implementation roadmap (each stage has tests)
 
 1. Minimal trusted platform interface (C adapter, tests).
