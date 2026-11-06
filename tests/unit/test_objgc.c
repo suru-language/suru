@@ -381,6 +381,7 @@ static void test_begin_twice_and_collect_while_active_refused(void) {
     }
     CHECK_EQ_INT((int)s_om_gc_sweep(g), 1); /* junk reclaimed */
     CHECK_EQ_INT((int)s_om_validate(h, root), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_validate(h, junk), S_OM_ENOENT);
     s_om_gc_destroy(g);
 }
 
@@ -422,4 +423,7 @@ TEST_MAIN_BEGIN()
     test_incremental_eventual_completion();
     test_incremental_under_pressure();
     test_allocation_pressure();
+    test_stw_blocks_mutation_during_marking();
+    test_begin_twice_and_collect_while_active_refused();
+    test_sweep_before_completion_noop();
 TEST_MAIN_END()

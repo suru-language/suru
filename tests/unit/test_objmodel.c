@@ -290,6 +290,33 @@ static void test_cleanup_and_leak(void) {
     CHECK_EQ_INT((int)s_pm_active_count(), 0);
 }
 
+static void test_small_large_boundary(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    /* Exactly S_OM_SMALL_MAX rounded bytes => last small bucket (index 256). */
+    s_size p = S_OM_SMALL_MAX - S_OM_HEADER_SIZE;
+    s_u32 o1 = 0;
+    CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, (s_u32)p, p, &o1), S_OM_OK);
+    s_size sz1 = 0;
+    CHECK_EQ_INT((int)s_om_size(h, o1, &sz1), S_OM_OK);
+    CHECK_EQ_INT((int)sz1, S_OM_SMALL_MAX);
+    /* Just above the small threshold => large-object path. */
+    s_size q = S_OM_SMALL_MAX + 16;
+    s_u32 o2 = 0;
+    CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, (s_u32)q, q, &o2), S_OM_OK);
+    s_size sz2 = 0;
+    CHECK_EQ_INT((int)s_om_size(h, o2, &sz2), S_OM_OK);
+    CHECK((s_size)sz2 >= S_OM_HEADER_SIZE + q);
+    CHECK_EQ_INT((int)s_om_validate(h, o1), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_validate(h, o2), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_free(h, o1), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_free(h, o2), S_OM_OK);
+    /* freeing and reallocating at the exact boundary reuses the slot */
+    CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, (s_u32)p, p, &o1), S_OM_OK);
+    CHECK_EQ_INT((int)o1, 1);
+}
+
 static void test_next_live(void) {
     om_reset();
     s_om_heap h = 0;
@@ -352,4 +379,5 @@ TEST_MAIN_BEGIN()
     test_cleanup_and_leak();
     test_zero_len_str_and_array0();
     test_next_live();
+    test_small_large_boundary();
 TEST_MAIN_END()
