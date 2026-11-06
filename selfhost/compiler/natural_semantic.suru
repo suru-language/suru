@@ -200,6 +200,21 @@ func nss_split(expression: str) -> [str] {
     return ["atom", inner];
 }
 
+func nss_builtin_type(name: str) -> str {
+    if name == "str_len" { return "Whole"; }
+    if name == "array_len" { return "Whole"; }
+    if name == "substr" { return "Text"; }
+    if name == "str_contains" { return "Bool"; }
+    if name == "to_str" { return "Text"; }
+    if name == "str_compare" { return "Whole"; }
+    if name == "int_from_str" { return "Whole"; }
+    if name == "abs" { return "Whole"; }
+    if name == "str_lower" { return "Text"; }
+    if name == "str_upper" { return "Text"; }
+    if name == "str_trim" { return "Text"; }
+    return "";
+}
+
 func nss_expr_type(expression: str, names: [str], types: [str],
                    rt_names: [str], rt_types: [str]) -> [str] {
     let trimmed: str = str_trim(expression);
@@ -304,6 +319,8 @@ func nss_expr_type(expression: str, names: [str], types: [str],
             }
             if ctor == "Some" or ctor == "none" { return ["ok", "Option"]; }
             if ctor == "ok" or ctor == "error" { return ["ok", "Result"]; }
+            let btype: str = nss_builtin_type(ctor);
+            if btype != "" { return ["ok", btype]; }
         }
     }
     let dot: int = nss_find_top(atom, ".");
