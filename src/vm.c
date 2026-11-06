@@ -79,6 +79,11 @@ s_vm *s_vm_create(const s_bc_module *m) {
 
 void s_vm_destroy(s_vm *vm) {
     if (!vm) return;
+    if (vm->gc) {
+        /* invalidate the borrowed stack-root registration before freeing the
+         * stack, so the collector never retains a dangling address */
+        (void)s_om_gc_set_svalue_root(vm->gc, NULL, 0);
+    }
     free(vm->st);
     free(vm->calls);
     free(vm->handlers);
@@ -103,6 +108,23 @@ void s_vm_set_args(s_vm *vm, int argc, char **argv) {
 
 bool s_vm_trapped(const s_vm *vm) { return vm->trapped; }
 const char *s_vm_error(const s_vm *vm) { return vm->err; }
+
+void s_vm_gc_bind(s_vm *vm, s_om_gc *gc) {
+    if (vm) vm->gc = gc;
+}
+
+void s_vm_gc_unbind(s_vm *vm) {
+    if (vm) vm->gc = NULL;
+}
+
+s_om_err s_vm_gc_sync(s_vm *vm) {
+    if (!vm) return S_OM_ENOENT;
+    if (!vm->gc) return S_OM_OK;
+    /* Register the current live operand-stack range. Called again after every
+     * grow_stack (which may relocate vm->st) so the collector never holds a
+     * stale address. */
+    return s_om_gc_set_svalue_root(vm->gc, vm->st, vm->sp);
+}
 
 static bool grow_stack(s_vm *vm, s_size need) {
     if (need <= vm->st_cap) return true;
