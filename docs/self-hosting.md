@@ -271,7 +271,12 @@ The bytecode object-emitting half is now owned by SURU:
   string/boolean builtins this program uses (`str_len`, `substr`,
   `str_contains`, `bit_and`, `bit_or`, `eq_s`), and the tokenizer now also
   **executes on the SURU VM** matching the C path; it is included in the VM
-  corpus-parity gate (13/0).   Executing it on the SURU VM is still unstable due to
+  corpus-parity gate (13/0). The frontend also gained array-builtin typing
+  (`array_concat`/`slice`/`range` return the first argument's array type;
+  `range`/`make_array` return `[Whole]`), regression-locked by the frontend
+  gate; this unblocks array-based Natural programs, a prerequisite for a
+  SURU-managed heap/GC. (Array indexing typing was attempted but regressed a
+  fixture and was dropped.) Executing it on the SURU VM is still unstable due to
   the host GC aliasing bug, which remains the main blocker for running a
   compiler written in Natural end-to-end. A root cause for one execution
   failure was diagnosed: the legacy bytecode emitter uses a **global slot
