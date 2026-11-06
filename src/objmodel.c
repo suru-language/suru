@@ -34,6 +34,7 @@ typedef struct s_om_heap_ {
     s_u32 live_objects;
     s_u64 live_bytes;
     bool in_use;
+    bool collecting;      /* stop-the-world collection lock */
 } s_om_heap_;
 
 static s_om_heap_ heaps[S_OM_MAX_HEAPS];
@@ -211,6 +212,7 @@ s_om_err s_om_alloc(s_om_heap h, s_obj_kind kind, s_u32 count,
     *out_obj = 0;
     s_om_heap_ *hp = heap_of(h);
     if (!hp) return S_OM_ENOENT;
+    if (hp->collecting) return S_OM_ECOLLECT;
     if (kind < S_OBJ_STR || kind > S_OBJ_EXCEPTION) return S_OM_EINVAL;
     if (fail_alloc || (alloc_fail_after > 0 && alloc_count >= alloc_fail_after)) {
         return S_OM_ENOMEM;
@@ -244,6 +246,10 @@ s_om_err s_om_alloc(s_om_heap h, s_obj_kind kind, s_u32 count,
         s_om_slot sl;
         s_om_err e = slot_load(hp, obj, &sl);
         if (e != S_OM_OK) return e;
+        /* A freelist entry must point at a free slot. A live magic here means
+         * the list is corrupt (e.g. duplicate registration), so refuse rather
+         * than hand the same slot out twice. */
+        if (sl.magic != 0) return S_OM_EINVAL;
         *head = sl.next_free;
         off = sl.off;
     } else {
@@ -295,6 +301,7 @@ s_om_err s_om_alloc(s_om_heap h, s_obj_kind kind, s_u32 count,
 s_om_err s_om_free(s_om_heap h, s_u32 obj) {
     s_om_heap_ *hp = heap_of(h);
     if (!hp) return S_OM_ENOENT;
+    if (hp->collecting) return S_OM_ECOLLECT;
     s_om_slot sl;
     s_om_err e = slot_live(hp, obj, &sl);
     if (e != S_OM_OK) return e;
@@ -318,11 +325,50 @@ s_om_err s_om_free(s_om_heap h, s_u32 obj) {
     return S_OM_OK;
 }
 
+static s_om_err slot_check_metadata(s_om_heap_ *hp, const s_om_slot *sl) {
+    /* Registry invariants. */
+    if (sl->size_rounded < S_OM_HEADER_SIZE) return S_OM_EINVAL;
+    if ((sl->size_rounded & (S_OM_ALIGN - 1u)) != 0) return S_OM_EINVAL;
+    if ((sl->off & (S_OM_ALIGN - 1u)) != 0) return S_OM_EINVAL;
+    if ((s_size)sl->off + sl->size_rounded > (s_size)hp->obj_bytes) {
+        return S_OM_EINVAL;
+    }
+    if (sl->kind > S_OBJ_EXCEPTION) return S_OM_EINVAL;
+    if (sl->colour > S_GC_BLACK) return S_OM_EINVAL;
+    if (sl->flags != 0) return S_OM_EINVAL;
+    /* Cross-check the inline object header in the object region. */
+    s_u32 hsize = 0, hmagic = 0;
+    s_u8 hkind = 0, hcol = 0, hfl = 0;
+    if (s_pm_read_u32(hp->obj_blk, sl->off + 0, &hsize) != S_PM_OK) {
+        return S_OM_EINVAL;
+    }
+    if (s_pm_read_u32(hp->obj_blk, sl->off + 8, &hmagic) != S_PM_OK) {
+        return S_OM_EINVAL;
+    }
+    if (s_pm_read_u8(hp->obj_blk, sl->off + 12, &hkind) != S_PM_OK) {
+        return S_OM_EINVAL;
+    }
+    if (s_pm_read_u8(hp->obj_blk, sl->off + 13, &hcol) != S_PM_OK) {
+        return S_OM_EINVAL;
+    }
+    if (s_pm_read_u8(hp->obj_blk, sl->off + 14, &hfl) != S_PM_OK) {
+        return S_OM_EINVAL;
+    }
+    if (hmagic != S_OBJ_MAGIC) return S_OM_EINVAL;
+    if (hsize != sl->size_rounded) return S_OM_EINVAL;
+    if (hkind != sl->kind) return S_OM_EINVAL;
+    if (hcol != sl->colour) return S_OM_EINVAL;
+    if (hfl != sl->flags) return S_OM_EINVAL;
+    return S_OM_OK;
+}
+
 s_om_err s_om_validate(s_om_heap h, s_u32 obj) {
     s_om_heap_ *hp = heap_of(h);
     if (!hp) return S_OM_ENOENT;
     s_om_slot sl;
-    return slot_live(hp, obj, &sl);
+    s_om_err e = slot_live(hp, obj, &sl);
+    if (e != S_OM_OK) return e;
+    return slot_check_metadata(hp, &sl);
 }
 
 s_om_err s_om_next_live(s_om_heap h, s_u32 *cursor, s_u32 *out_obj) {
@@ -488,4 +534,16 @@ void s_om_set_fail_alloc(bool enabled) {
 void s_om_set_alloc_fail_after(s_u32 n_ok) {
     alloc_fail_after = n_ok;
     alloc_count = 0;
+}
+
+s_om_err s_om_set_collection_lock(s_om_heap h, bool on) {
+    s_om_heap_ *hp = heap_of(h);
+    if (!hp) return S_OM_ENOENT;
+    hp->collecting = on;
+    return S_OM_OK;
+}
+
+bool s_om_is_collecting(s_om_heap h) {
+    s_om_heap_ *hp = heap_of(h);
+    return hp ? hp->collecting : false;
 }

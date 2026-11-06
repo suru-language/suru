@@ -40,6 +40,7 @@ void s_om_gc_destroy(s_om_gc *g) {
 
 s_om_err s_om_gc_add_root(s_om_gc *g, s_u32 obj) {
     if (!g) return S_OM_ENOENT;
+    if (g->marking_active) return S_OM_ECOLLECT;
     if (obj == 0) return S_OM_EINVAL;
     s_size i;
     for (i = 0; i < g->nroots; ++i) {
@@ -59,6 +60,7 @@ s_om_err s_om_gc_add_root(s_om_gc *g, s_u32 obj) {
 
 s_om_err s_om_gc_remove_root(s_om_gc *g, s_u32 obj) {
     if (!g) return S_OM_ENOENT;
+    if (g->marking_active) return S_OM_ECOLLECT;
     s_size i;
     for (i = 0; i < g->nroots; ++i) {
         if (g->roots[i] == obj) {
@@ -131,6 +133,9 @@ static void gc_seed_roots(s_om_gc *g) {
 
 s_om_err s_om_gc_mark_begin(s_om_gc *g) {
     if (!g) return S_OM_ENOENT;
+    if (g->marking_active) return S_OM_ECOLLECT;
+    if (s_om_is_collecting(g->h)) return S_OM_ECOLLECT;
+    (void)s_om_set_collection_lock(g->h, true);
     gc_reset_all_white(g->h);
     gc_seed_roots(g);
     g->marking_active = true;
@@ -155,6 +160,7 @@ bool s_om_gc_mark_step(s_om_gc *g, s_size budget) {
                 continue;
             }
             g->marking_active = false;
+            (void)s_om_set_collection_lock(h, false);
             break;
         }
         s_u8 col = 0;
@@ -170,6 +176,10 @@ bool s_om_gc_mark_step(s_om_gc *g, s_size budget) {
 
 s_u32 s_om_gc_sweep(s_om_gc *g) {
     if (!g) return 0;
+    /* Sweep is only valid once marking has completed; if marking is still in
+     * progress this is a contract violation and is a no-op so that an
+     * incomplete pass is never treated as completed. */
+    if (g->marking_active) return 0;
     s_om_heap h = g->h;
     /* 1. Sweep white (unreachable) live objects. */
     s_u32 reclaimed = 0;

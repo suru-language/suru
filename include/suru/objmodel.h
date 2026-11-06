@@ -28,6 +28,7 @@ typedef enum s_om_err {
     S_OM_EOOB,       /* payload access outside the object bounds */
     S_OM_EOVERFLOW,  /* arithmetic overflow in size/count computation */
     S_OM_ENOMEM,     /* heap region exhausted or allocation failed */
+    S_OM_ECOLLECT,   /* operation forbidden while a collection is in progress */
 } s_om_err;
 
 /*
@@ -47,6 +48,18 @@ s_om_err s_om_heap_create(s_u32 max_objects, s_size obj_bytes, s_om_heap *out);
  * fails with S_OM_ENOENT. */
 s_om_err s_om_heap_destroy(s_om_heap h);
 s_om_err s_om_heap_validate(s_om_heap h);
+
+/*
+ * Stop-the-world collection lock (trusted runtime only). While a collection is
+ * active (lock on), structural mutations of the heap are forbidden: object
+ * allocation and free fail with S_OM_ECOLLECT, and the GC's own root add/remove
+ * are refused. This makes incremental marking safe by precluding graph mutation
+ * during collection. Ordinary payload reads are unaffected; payload writes
+ * during collection are also part of the prohibited (unwritten) mutation set
+ * and must not occur under the stop-the-world contract.
+ */
+s_om_err s_om_set_collection_lock(s_om_heap h, bool on);
+bool s_om_is_collecting(s_om_heap h);
 
 /*
  * Allocate an object of `kind` with `count` units and `payload_bytes` bytes
@@ -117,7 +130,8 @@ void s_om_set_alloc_fail_after(s_u32 n_ok);
 #define S_OM_ALIGN 16u
 #define S_OM_HEADER_SIZE 16u
 #define S_OM_SMALL_MAX 4096u
-#define S_OM_SMALL_BUCKETS (S_OM_SMALL_MAX / S_OM_ALIGN)
+/* One bucket per 16-byte size class up to and including S_OM_SMALL_MAX. */
+#define S_OM_SMALL_BUCKETS (S_OM_SMALL_MAX / S_OM_ALIGN + 1u)
 
 #ifdef __cplusplus
 }

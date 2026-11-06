@@ -59,6 +59,20 @@ s_u32 s_om_gc_collect(s_om_gc *g);
 s_om_err s_om_gc_mark_begin(s_om_gc *g);
 bool s_om_gc_mark_step(s_om_gc *g, s_size budget);
 s_u32 s_om_gc_sweep(s_om_gc *g);
+bool s_om_gc_marking(const s_om_gc *g);
+
+/*
+ * Stop-the-world lifecycle contract. From mark_begin until marking completes,
+ * the collector takes the heap's collection lock (see s_om_set_collection_lock)
+ * and the following are forbidden and fail with S_OM_ECOLLECT:
+ *   - object allocation and free (s_om_alloc / s_om_free),
+ *   - root add/remove (s_om_gc_add_root / s_om_gc_remove_root).
+ * Payload writes to objects during marking are likewise prohibited by the
+ * contract (no write barrier is provided); violating this can leave a black
+ * object pointing at a white object that is later reclaimed. A new collection
+ * cannot start while one is active (mark_begin returns S_OM_ECOLLECT), and
+ * sweep must only be called after marking completes (it is a no-op otherwise).
+ */
 
 #ifdef __cplusplus
 }
