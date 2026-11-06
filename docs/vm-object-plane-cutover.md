@@ -96,12 +96,16 @@ Prohibited during active collection: allocation, free, payload writes (enforced 
 `S_OM_ECOLLECT`), and root/svalue changes.
 
 ## 7. Legacy compatibility strategy
-- Keep `src/mem.c` and the legacy collector intact and compiled.
-- Execution-mode selection at build/runtime (e.g., separate `SURU_HEAP` config or separate
-  build) selects exactly one consistent platform per VM instance; no mixed mode.
-- Differential testing runs the same `.suru` sources on both modes and compares exit
-  status/stdout/errors.
-- Rollback: revert selection default; legacy remains fully operational.
+- **Decision (approved): C2 — big-bang cutover.** The new handle VM replaces the pointer
+  VM directly; the legacy runtime is retained only as historical git reference, not as a
+  live selectable mode. `src/mem.c` remains compiled until retirement review but is not a
+  differential baseline.
+- A single, coherent `S_VAL_OBJ` handle representation is used throughout; no dual mode,
+  no discriminator.
+- Differential (T7) compares the new runtime against the pre-cutover legacy behavior as a
+  frozen snapshot (git baseline), not a live sibling runtime.
+- Rollback: the pre-cutover commit (git) is the restore point; `src/mem.c` is not removed
+  before the retirement assessment.
 
 ## 8. Dependency-ordered implementation roadmap
 Milestones (renumbered to avoid collision/ the 11D-B; map to the original plan):
