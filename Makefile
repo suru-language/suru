@@ -41,6 +41,7 @@ LIBSRC = \
 	src/bcc.c \
 	src/verify.c \
 	src/mem.c \
+	src/platform_mem.c \
 	src/runtime.c \
 	src/stdlib.c \
 	src/vm.c \
