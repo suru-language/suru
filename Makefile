@@ -44,6 +44,7 @@ LIBSRC = \
 	src/platform_mem.c \
 	src/objmodel.c \
 	src/objgc.c \
+	src/vmobj.c \
 	src/runtime.c \
 	src/stdlib.c \
 	src/vm.c \
