@@ -346,20 +346,51 @@ This module is additive and trusted-runtime-only; it does not change
 `src/mem.c`, the VM, or bytecode.
 
 A mark-sweep collector (`include/suru/objgc.h`, `src/objgc.c`,
-`tests/unit/test_objgc.c`, 934 checks) implements the root/traversal/marking/
-sweep stages on top of the object model. It registers roots, walks child
-references (tri-color via slot colour), and reclaims unreachable objects back
-to the allocator. Marking is a bounded, non-recursive scan (no explicit
-unbounded worklist), matching the approved collector design. The collector also
-exposes budget-sliced incremental marking (`s_om_gc_mark_begin/step`, `sweep`),
-and its tests cover repeated collection under allocation pressure. The
-child-reference encoding (payload word i = child object index i) is the graph
-model for this stage; mapping it to the future value-layer reference
-representation is a separate, later transition.
+`tests/unit/test_objgc.c`) implements the root/traversal/marking/sweep stages
+on top of the object model. It registers roots, walks child references
+(tri-color via slot colour), and reclaims unreachable objects back to the
+allocator. Marking is a bounded, non-recursive scan (no explicit unbounded
+worklist), matching the approved collector design. The collector also exposes
+budget-sliced incremental marking (`s_om_gc_mark_begin/step`, `sweep`), and its
+tests cover repeated collection under allocation pressure. The child-reference
+encoding (payload word i = child object index i) is the graph model for this
+stage; mapping it to the future value-layer reference representation is a
+separate, later transition.
 
 Remaining future work (stages 11–12): VM/bytecode integration and replacing the
 C collector in `src/mem.c`. These require the value-layer `u.o`→`u.idx`
 transition and are scoped as separate, later approved work.
+
+### Audit & hardening (Phase 3F)
+A safety audit of the object model/allocator/collector led to the following
+changes and a documented residual risk:
+
+- **Stop-the-world lifecycle enforced.** Incremental marking previously allowed
+  mutation (allocation/free/root changes, payload writes) with no write barrier
+  or root-rescan, which could leave a black object pointing at a reclaimed white
+  object. The collector now takes a heap collection lock during marking
+  (`s_om_set_collection_lock`); object allocation/free and root add/remove fail
+  with `S_OM_ECOLLECT` while a collection is active, and payload writes during
+  marking are prohibited by contract. `mark_begin` refuses a nested collection;
+  `sweep` is a no-op while marking is in progress, so an incomplete pass is never
+  treated as complete.
+- **Metadata integrity validation.** `s_om_validate` now cross-checks the slot
+  registry against the inline object header (magic, size, kind, colour, flags)
+  and rejects impossible sizes/alignment/kinds/colours/offsets, so metadata
+  corruption cannot silently pass a live-object check. Colour mutations now
+  update both the slot and the inline header (they were drifting).
+- **Freelist corruption guard.** Allocation now refuses to pop a freelist entry
+  whose slot is still marked live (duplicate registration / corrupt list).
+- **Bucket-boundary bug fixed.** Size exactly `S_OM_SMALL_MAX` (4096 B) indexed
+  `small_head[256]`, out of bounds; the count now includes the 4096 B bucket.
+- **Residual risk — reference identity has no generation.** Object handles are
+  bare slot indices; when a slot is freed and reused, a stale handle aliases the
+  new occupant (verified by probe). The smallest correct fix is to encode a
+  generation/epoch in the handle (e.g. `(epoch << IDX_BITS) | idx`) and bump it
+  on reuse, validating the epoch on lookup. That changes the reference
+  representation, the payload child encoding, and every handle comparison/test,
+  so it is deliberately left as a separate, documented design change rather than
+  silently applied.
 
 ## 10. Implementation roadmap (each stage has tests)
 

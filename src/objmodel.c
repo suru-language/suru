@@ -442,7 +442,11 @@ s_om_err s_om_set_colour(s_om_heap h, s_u32 obj, s_u8 colour) {
     if (e != S_OM_OK) return e;
     if (colour > S_GC_BLACK) return S_OM_EINVAL;
     sl.colour = colour;
-    return slot_store(hp, obj, &sl);
+    s_om_err se = slot_store(hp, obj, &sl);
+    if (se != S_OM_OK) return se;
+    /* Keep the inline object-header colour consistent with the slot (colour
+     * is the one mutable field; everything else is written at allocation). */
+    return hdr_write_u8(hp, sl.off, 13, colour);
 }
 
 /* ------------------------------------------------------------------ */
