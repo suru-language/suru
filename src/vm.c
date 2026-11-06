@@ -918,12 +918,6 @@ static bool builtin_str_repeat(s_vm *vm) {
 static bool builtin_str_trim(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
-        fprintf(stderr, "TRIM: fid=%u tag=%d kind=%d count=%u sp=%d\n",
-                (unsigned)vm->cur_fid, s.tag,
-                (s.tag==S_VAL_OBJ?(int)s.u.o->kind:-1),
-                (s.tag==S_VAL_OBJ?(unsigned)s.u.o->count:0),
-                (int)vm->sp);
-        fflush(stderr);
         vm_trap(vm, "str_trim expects a string");
         return false;
     }
@@ -1848,12 +1842,6 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                         (r.tag==S_VAL_OBJ&&r.u.o->kind==S_OBJ_STR?(unsigned)r.u.o->count:0));
             }
             if (!push(vm, s_obj_array_data(arr.u.o)[i])) return 1;
-            pc++; break;
-        }
-        case BC_IDX_ST: {
-            s_value val = pop(vm);
-            s_value idx = pop(vm);
-            s_value arr = pop(vm);
             if (arr.tag != S_VAL_OBJ || arr.u.o->kind != S_OBJ_ARRAY ||
                 idx.tag != S_VAL_INT) {
                 vm_trap(vm, "index store type error");
