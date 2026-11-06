@@ -50,6 +50,16 @@ s_u32 s_om_gc_nroots(const s_om_gc *g);
 s_om_err s_om_gc_set_stack_root(s_om_gc *g, const s_om_ref *base, s_size n);
 
 /*
+ * Register a contiguous range of s_value slots as roots (borrowed, not
+ * copied). Only entries whose tag is S_VAL_OBJ are interpreted as generation-
+ * protected handles; all other tags (int/float/bool/none) are ignored, so an
+ * immediate can never be mistaken for a handle and become an accidental root.
+ * The range must stay valid and unchanged until the next collection completes.
+ * base==NULL with n==0 clears the range. This is the VM operand-stack variant.
+ */
+s_om_err s_om_gc_set_svalue_root(s_om_gc *g, const s_value *base, s_size n);
+
+/*
  * Run a full mark-sweep collection. Returns the number of objects reclaimed.
  * Live objects reachable from the roots are preserved and reset to the white
  * colour for the next cycle. Unreachable live objects are freed back to the

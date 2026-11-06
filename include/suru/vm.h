@@ -5,6 +5,7 @@
 #include "suru/value.h"
 #include "suru/bc.h"
 #include "suru/mem.h"
+#include "suru/objgc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,6 +25,19 @@ int s_vm_run(s_vm *vm, s_heap *heap);
 
 bool s_vm_trapped(const s_vm *vm);
 const char *s_vm_error(const s_vm *vm);
+
+/*
+ * Stage 11C: optional stop-the-world collector binding. The VM does not own the
+ * collector; bind()/unbind() only attach/clear an external objgc collector.
+ * sync() re-registers the VM's CURRENT live operand-stack range [0, sp) with the
+ * bound collector (value-aware: only S_VAL_OBJ entries become roots). It must be
+ * called at every collection boundary and after any stack growth/relocation. It
+ * is a no-op (S_OM_OK) when no collector is bound. These are inert until the VM's
+ * object values are objmodel handles; they do not change legacy behavior.
+ */
+void s_vm_gc_bind(s_vm *vm, s_om_gc *gc);
+void s_vm_gc_unbind(s_vm *vm);
+s_om_err s_vm_gc_sync(s_vm *vm);
 
 #ifdef __cplusplus
 }
