@@ -264,9 +264,16 @@ The bytecode object-emitting half is now owned by SURU:
   emitter maps those builtins to their ids, and the SURU VM implements
   `str_len`/`substr`/`str_contains`. The program passes the unified frontend
   and is accepted by the full container pipeline (writer/build/verifier/reader
-  gates all include it). Executing it on the SURU VM is still unstable due to
+  gates all include it).   Executing it on the SURU VM is still unstable due to
   the host GC aliasing bug, which remains the main blocker for running a
-  compiler written in Natural end-to-end. The bootstrap/rebuild loop
+  compiler written in Natural end-to-end. A root cause for one execution
+  failure was diagnosed: the legacy bytecode emitter uses a **global slot
+  namespace** (`#slot|name|`), so two routines that use the same local/param
+  name collide on one frame slot (e.g. `tokenize`'s local `c` aliases
+  `is_letter`'s parameter). A per-function slot-scoping fix was implemented but
+  exposed a separate latent writer bug (unresolved `@label` jumps in
+  exception-heavy bodies with `PUSH_HANDLER`), so it was reverted to keep the
+  suite green; fixing both is follow-up work. The bootstrap/rebuild loop
   (`selfhost-bootstrap` builds the SURU-written compiler driver into
   `build/bin/natural_compiler.sbc`; `selfhost-rebuild` runs it and requires
   output byte-identical to the C reassembly path) is now part of `make test`. (A native array attempt required a second loadable segment, which
