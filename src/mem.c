@@ -114,15 +114,16 @@ static s_gcobj *take_free(s_heap *h, s_size rounded) {
         }
         return NULL;
     }
-    /* large: use first large chunk of sufficient size */
+    /* large: use first large chunk of sufficient size. free_object stores the
+     * free-list link in the object's first word; traverse it the same way. */
     s_gcobj **pp = &h->large_free;
     while (*pp) {
-        if ((*pp)->chunk_size >= rounded) {
-            s_gcobj *o = *pp;
+        s_gcobj *o = *pp;
+        if (o->chunk_size >= rounded) {
             *pp = *(s_gcobj **)o;
             return o;
         }
-        pp = &(*pp)->next_all; /* reuse link as linked-list next */
+        pp = (s_gcobj **)o;
     }
     return NULL;
 }
