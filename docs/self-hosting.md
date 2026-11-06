@@ -267,9 +267,11 @@ The bytecode object-emitting half is now owned by SURU:
   all include it), and now **executes** on the default C path, emitting the
   expected comma-separated token stream (`natural_tokenizer_run.sh`). Local
   variable names in the seed are unique across routines to avoid a known
-  emitter limitation (global slot namespace). It is excluded from the SURU VM
-  corpus-parity gate because that VM does not yet cover the string builtins it
-  exercises.   Executing it on the SURU VM is still unstable due to
+  emitter limitation (global slot namespace). The SURU VM was extended with the
+  string/boolean builtins this program uses (`str_len`, `substr`,
+  `str_contains`, `bit_and`, `bit_or`, `eq_s`), and the tokenizer now also
+  **executes on the SURU VM** matching the C path; it is included in the VM
+  corpus-parity gate (13/0).   Executing it on the SURU VM is still unstable due to
   the host GC aliasing bug, which remains the main blocker for running a
   compiler written in Natural end-to-end. A root cause for one execution
   failure was diagnosed: the legacy bytecode emitter uses a **global slot
