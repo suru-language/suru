@@ -55,6 +55,7 @@ func main() {
 
     mut fn_ops: [[int]] = [];
     mut fn_avs: [[int]] = [];
+    mut fn_bs: [[int]] = [];
     mut fn_nparams: [int] = [];
     mut entry: int = 0;
     mut fi: int = 0;
