@@ -918,6 +918,18 @@ static bool builtin_str_repeat(s_vm *vm) {
 static bool builtin_str_trim(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+        fprintf(stderr, "STR_TRIM_A: fid=%u kind=%d count=%u elems=",
+                (unsigned)vm->cur_fid, s.u.o->kind, (unsigned)s.u.o->count);
+        if (s.u.o->kind == S_OBJ_ARRAY) {
+            s_value *el = s_obj_array_data(s.u.o);
+            for (s_u32 qi=0; qi<s.u.o->count && qi<4; ++qi) {
+                if (el[qi].tag==S_VAL_OBJ && el[qi].u.o->kind==S_OBJ_STR)
+                    fprintf(stderr, "'%.*s' ", (int)el[qi].u.o->count,
+                            s_obj_str_data(el[qi].u.o));
+                else fprintf(stderr, "(tag=%d) ", el[qi].tag);
+            }
+        }
+        fprintf(stderr, "\n"); fflush(stderr);
         vm_trap(vm, "str_trim expects a string");
         return false;
     }
