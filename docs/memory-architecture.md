@@ -487,6 +487,34 @@ implemented):
   tests — the prerequisite for VM root enumeration — before any `vm.c`
   translation.
 
+### Stage 11C — VM root-enumeration integration (implemented)
+The VM now carries an optional `objgc` collector binding (`s_vm_gc_bind/`
+`unbind`, `s_vm_gc_sync`). `sync()` re-registers the VM's current live operand-
+stack range `[0, sp)` with the bound collector at every collection boundary. The
+registration is **value-aware** (`s_om_gc_set_svalue_root`): only genuine
+`S_VAL_OBJ` entries become roots, so immediates cannot be mistaken for handles.
+Because `grow_stack` uses `realloc` (the stack may relocate), `sync()` always
+passes the current `vm->st`/`vm->sp` — the collector never retains a stale base.
+`destroy()` invalidates the registration before freeing the stack. These calls
+are inert until the VM's object values become objmodel handles (no legacy
+behavior change).
+
+- **Root-lifetime contract:** the operand stack `[0, sp)` is the sole bulk root;
+  it is authoritative only from a sync point until the next collection completes.
+  C-local temporaries during migration must be explicitly rooted (the legacy
+  `s_heap_add_root` sites are the exact places that become `objgc` add_root on a
+  handle in the new model).
+- **Remaining unrooted/uncertain paths:** every legacy builtin C-local that holds
+  an `s_value` across allocation (the 14 `add_root/remove_root` sites and the
+  `MKCLOSURE_V` environment) — these are unrooted *for objmodel* until the
+  corresponding allocation is converted; they are currently safe only because the
+  legacy collector runs. No new unrooted path was introduced.
+- **STW enforcement gaps:** the VM-side collection trigger is not yet wired to
+  `objgc` (deliberate: `s_vm_gc_sync` registers; collection is driven post-
+  migration). Object mutation (array/record stores) is not yet mechanically
+  guarded by an `!s_om_is_collecting` assertion because no objmodel objects exist
+  in the VM yet. These become enforceable at Stage 11D.
+
 ## 11. First production component (recommendation)
 
 Implement **Stage 1 + Stage 2 first**: the minimal trusted platform interface and
