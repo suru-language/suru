@@ -256,15 +256,20 @@ The bytecode object-emitting half is now owned by SURU:
   --backend=native compile|run` (shells out to the SURU native compiler driver),
   gated by `natural_exec_native_run.sh`. This is the first control-flow, call,
   and array/record step of the Stage 3 backend; the SURU-managed GC/memory port
-  and   the C-independent self-rebuild remain. A Stage 4 seed now exists:
+  and   the C-independent self-rebuild remain.   A Stage 4 seed now exists:
   `tests/natural/selfhost_tokenizer.suru` is a compiler-like component (a
   character classifier / tokenizer) written in **Natural syntax** and making
   use of `str_len`/`substr`/`str_contains`/`str_compare`. To support it the
   frontend gained a builtin signature table (`nss_builtin_type`), the bytecode
   emitter maps those builtins to their ids, and the SURU VM implements
-  `str_len`/`substr`/`str_contains`. The program passes the unified frontend
-  and is accepted by the full container pipeline (writer/build/verifier/reader
-  gates all include it).   Executing it on the SURU VM is still unstable due to
+  `str_len`/`substr`/`str_contains`. The program passes the unified frontend,
+  is accepted by the full build pipeline (writer/build/verifier/reader gates
+  all include it), and now **executes** on the default C path, emitting the
+  expected comma-separated token stream (`natural_tokenizer_run.sh`). Local
+  variable names in the seed are unique across routines to avoid a known
+  emitter limitation (global slot namespace). It is excluded from the SURU VM
+  corpus-parity gate because that VM does not yet cover the string builtins it
+  exercises.   Executing it on the SURU VM is still unstable due to
   the host GC aliasing bug, which remains the main blocker for running a
   compiler written in Natural end-to-end. A root cause for one execution
   failure was diagnosed: the legacy bytecode emitter uses a **global slot
