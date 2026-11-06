@@ -1944,9 +1944,10 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             vm->sp -= ncap;
             memcpy(s_obj_array_data(env), vm->st + vm->sp,
                    sizeof(s_value) * ncap);
-            s_heap_add_root(vm->heap, &env);
+            s_value envv = s_val_obj(env);
+            s_heap_add_root(vm->heap, &envv);
             s_gcobj *o = vm_alloc(vm, S_OBJ_CLOSURE, 2, 0);
-            s_heap_remove_root(vm->heap, &env);
+            s_heap_remove_root(vm->heap, &envv);
             if (!o) return 1;
             s_obj_array_data(o)[0] = s_val_int((s_i64)in->a);
             s_obj_array_data(o)[1] = s_val_obj(env);
