@@ -144,7 +144,8 @@ static void obj_poison(s_om_heap_ *hp, s_u32 abs_off, s_size len) {
 /* ------------------------------------------------------------------ */
 
 s_om_err s_om_heap_create(s_u32 max_objects, s_size obj_bytes, s_om_heap *out) {
-    if (out) *out = 0;
+    if (!out) return S_OM_EINVAL;
+    *out = 0;
     if (max_objects == 0 || max_objects > S_OM_MAX_OBJECTS) return S_OM_EINVAL;
     if (obj_bytes < S_OM_HEADER_SIZE) return S_OM_EINVAL;
     if (obj_bytes > (s_size)UINT32_MAX) return S_OM_EOVERFLOW;
@@ -206,7 +207,8 @@ s_om_err s_om_heap_validate(s_om_heap h) {
 
 s_om_err s_om_alloc(s_om_heap h, s_obj_kind kind, s_u32 count,
                     s_size payload_bytes, s_u32 *out_obj) {
-    if (out_obj) *out_obj = 0;
+    if (!out_obj) return S_OM_EINVAL;
+    *out_obj = 0;
     s_om_heap_ *hp = heap_of(h);
     if (!hp) return S_OM_ENOENT;
     if (kind < S_OBJ_STR || kind > S_OBJ_EXCEPTION) return S_OM_EINVAL;
