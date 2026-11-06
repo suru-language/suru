@@ -137,6 +137,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_corpus_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_closure_run.sh $(BINDIR)/suru
+	@tests/selfhost/ref_gc_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_exec_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_compile_run.sh $(BINDIR)/suru
@@ -157,6 +158,7 @@ selfhost-compare: $(BINDIR)/suru
 	@tests/selfhost/natural_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_corpus_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_closure_run.sh $(BINDIR)/suru
+	@tests/selfhost/ref_gc_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_exec_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_compile_run.sh $(BINDIR)/suru
