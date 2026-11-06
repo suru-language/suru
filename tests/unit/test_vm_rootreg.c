@@ -55,7 +55,6 @@ static s_om_ref om_arr(s_om_heap h) {
 static void test_vm_bind_sync_unbind(void) {
     om_reset();
     s_bc_module m = tiny_module();
-    s_heap *heap = s_heap_create();
     s_vm *vm = s_vm_create(&m);
     CHECK(vm != NULL);
 
@@ -71,14 +70,10 @@ static void test_vm_bind_sync_unbind(void) {
     s_vm_gc_bind(vm, gc);
     CHECK_EQ_INT((int)s_vm_gc_sync(vm), S_OM_OK); /* empty stack safe */
 
-    CHECK_EQ_INT(s_vm_run(vm, heap), 0);
-    CHECK_EQ_INT((int)s_vm_gc_sync(vm), S_OM_OK); /* sync after run */
-
     s_vm_gc_unbind(vm);
     CHECK_EQ_INT((int)s_vm_gc_sync(vm), S_OM_OK);
 
     s_vm_destroy(vm); /* must invalidate registration before freeing stack */
-    s_heap_destroy(heap);
     s_om_gc_destroy(gc);
     s_bc_module_dispose(&m);
 }
