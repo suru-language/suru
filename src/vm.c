@@ -925,7 +925,11 @@ static bool builtin_str_trim(s_vm *vm) {
     while (e > b && (data[e - 1] == ' ' || data[e - 1] == '\t' ||
                      data[e - 1] == '\n' || data[e - 1] == '\r')) e--;
     s_size n = e - b;
+    /* The popped source `s` lives only in this C local; keep it rooted while
+     * we allocate, or the collector may free and reuse its chunk. */
+    s_heap_add_root(vm->heap, &s);
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
+    s_heap_remove_root(vm->heap, &s);
     if (!o) return false;
     if (n) memcpy(s_obj_str_data(o), data + b, n);
     return push(vm, s_val_obj(o));
