@@ -1695,7 +1695,11 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 vm_trap(vm, "concat overflow");
                 return 1;
             }
+            s_heap_add_root(vm->heap, &a);
+            s_heap_add_root(vm->heap, &b);
             s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
+            s_heap_remove_root(vm->heap, &b);
+            s_heap_remove_root(vm->heap, &a);
             if (!o) return 1;
             char *d = s_obj_str_data(o);
             memcpy(d, s_obj_str_data(a.u.o), la);
