@@ -174,6 +174,7 @@ static void test_differential_ref_model(void) {
         s_gcobj *n0 = s_heap_new_array(h, 1);
         s_gcobj *n1 = s_heap_new_array(h, 0);
         s_gcobj *n2 = s_heap_new_array(h, 0);
+        (void)n2;
         s_obj_array_data(n0)[0] = s_val_obj(n1);
         s_value root[1] = { s_val_obj(n0) };
         s_heap_set_stack_root(h, root, 1);
