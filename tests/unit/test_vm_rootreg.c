@@ -130,6 +130,7 @@ static void test_stack_root_relocation(void) {
     buf[0] = keep;
     CHECK_EQ_INT((int)s_om_gc_set_stack_root(g, buf, 1), S_OM_OK);
     CHECK_EQ_INT((int)s_om_gc_collect(g), 1); /* junk reclaimed; keep survives */
+    CHECK_EQ_INT((int)s_om_validate(h, junk), S_OM_ENOENT);
 
     /* simulate grow_stack relocation */
     s_om_ref *nbuf = realloc(buf, 64 * sizeof(s_om_ref));
