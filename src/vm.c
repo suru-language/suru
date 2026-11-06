@@ -930,27 +930,19 @@ static bool builtin_str_trim(s_vm *vm) {
     while (e > b && (data[e - 1] == ' ' || data[e - 1] == '\t' ||
                      data[e - 1] == '\n' || data[e - 1] == '\r')) e--;
     s_size n = e - b;
-    /* The popped source `s` lives only in this C local; keep it rooted while
-     * we allocate, or the collector may free and reuse its chunk. */
-    s_heap_add_root(vm->heap, &s);
+    /* Copy trimmed text to a temp buffer BEFORE allocating, so we don't
+     * depend on s.u.o remaining valid across the allocator call. */
+    char tmp[1024];
+    if (n > 0) {
+        if (n > sizeof(tmp)) {
+            vm_trap(vm, "str_trim result too large");
+            return false;
+        }
+        memcpy(tmp, data + b, n);
+    }
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
-    s_heap_remove_root(vm->heap, &s);
     if (!o) return false;
-    fprintf(stderr, "STR_TRIM_DEBUG: s.u.o=%p data=%p data+b=%p o=%p s_obj_str_data(o)=%p n=%zu b=%zu len=%zu\n",
-            (void *)s.u.o, data, data + b, (void *)o, s_obj_str_data(o), n, b, len);
-    if (n) {
-        char *d = s_obj_str_data(o);
-        const char *s = data + b;
-        if ((char *)o <= d && d < (char *)o + n) {
-            fprintf(stderr, "OVERLAP: d=%p o=%p n=%zu s.u.o=%p\n", d, o, n, (void *)s.u.o);
-            abort();
-        }
-        if (s >= (char *)o && s < (char *)o + n) {
-            fprintf(stderr, "OVERLAP2: s=%p o=%p n=%zu\n", s, o, n);
-            abort();
-        }
-        memcpy(s_obj_str_data(o), data + b, n);
-    return push(vm, s_val_obj(o));
+    if (n) memcpy(s_obj_str_data(o), tmp, n);
 }
 
 static bool builtin_args_len(s_vm *vm) {
