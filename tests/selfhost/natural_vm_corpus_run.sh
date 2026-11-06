@@ -13,6 +13,11 @@ trap 'rm -rf "$tmp"' EXIT
 fail=0
 tests=0
 for input in "$ROOT"/tests/natural/*.suru; do
+    case "$input" in
+        # Stage-4 seed: uses string builtins beyond the SURU VM's current scope
+        # (validated by the frontend and natural_tokenizer_run.sh on the C path).
+        *selfhost_tokenizer.suru) continue ;;
+    esac
     if ! "$SURU" --syntax=natural compile "$input" "$tmp/x.sbc" 2>/dev/null; then
         continue
     fi

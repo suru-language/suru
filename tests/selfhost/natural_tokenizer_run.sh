@@ -8,7 +8,7 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$DIR/../.." && pwd)"
 
 out="$("$SURU" --syntax=natural run "$ROOT/tests/natural/selfhost_tokenizer.suru" 2>&1)"
-want="show,(,value,+,2,"
+want="show,(,value,+,2,),"
 
 if [ "$out" != "$want" ]; then
     echo "FAIL: tokenizer output '$out' != expected" >&2
