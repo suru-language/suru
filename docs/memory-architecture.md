@@ -198,6 +198,35 @@ manager; it only validates traversal/reachability rules.
 Final target: no C compiler or C runtime required to build/execute ordinary SURU
 applications.
 
+## 9.5 Implemented so far — Stage 1–2 (bootstrap adapter)
+
+The trusted platform interface and RawBlock abstraction are implemented behind the
+approved API (`include/suru/platform_mem.h`, `src/platform_mem.c`) in the C17
+bootstrap. Key properties:
+
+- Opaque `RawBlock` handle (`s_pm_handle`); raw pointers never escape this module.
+- `s_pm_acquire(size, align, &h)` / `s_pm_release(h)`, validated handle checks.
+- Region queries: size, align, validate; failure codes for invalid/stale handles,
+  out-of-bounds access, arithmetic overflow, and allocation failure.
+- `s_pm_read`/`s_pm_write` check offsets and lengths before any copy; typed
+  u8/u32/u64 accessors are thin wrappers over the checked operations.
+- Zero-length regions are valid; length-0 accesses succeed, any non-zero access
+  fails. Alignments are power-of-two (0 => default 16). Request sizes are
+  overflow-checked before allocation.
+- Fault injection (`s_pm_set_fail_alloc`, `s_pm_set_alloc_fail_after`) and
+  leak/test helpers (`s_pm_active_count`, `s_pm_dispose_all`) are provided.
+- This module never triggers garbage collection and is **trusted-runtime-only**:
+  no SURU language primitive exposes raw memory or RawBlock handles yet.
+
+Tests (tests/unit/test_platform_mem.c, 474 checks): acquire/release, zero-size,
+allocation failure + fail-after, invalid/stale handles, double release, bounds
+reads/writes (start and final byte), OOB read/write, offset/length overflow,
+invalid alignment, repeated cycles, and cleanup/leak. ASan+UBSan clean.
+
+Stage 3 will build a SURU-owned object model and allocator on top of this
+interface. Ordinary SURU programs will only see an approved, checked surface
+that the trusted runtime exposes for them, never raw RawBlock handles.
+
 ## 10. Implementation roadmap (each stage has tests)
 
 1. Minimal trusted platform interface (C adapter, tests).
