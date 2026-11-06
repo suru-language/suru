@@ -153,9 +153,11 @@ func main() {
     }
 
     // ---- 8. Bounded worklist overflow is detected, not silently abandoned ----
+    // A wide node (0 -> 1,2,3) with a worklist cap of 2 forces the worklist
+    // to exceed capacity, which must be reported, never silently abandoned.
     {
         let kinds: [int] = [1, 1, 1, 1];
-        let refs: [[int]] = [[1], [2], [3], empty_ints()];
+        let refs: [[int]] = [[1, 2, 3], empty_ints(), empty_ints(), empty_ints()];
         let r: [int] = simulate([0], kinds, refs, 4, 2);
         fails += expect("worklist-overflow-detected", r[0], 1);
     }
