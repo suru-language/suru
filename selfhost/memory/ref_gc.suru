@@ -1,0 +1,184 @@
+// SURU GC Reference Model (Phase 3C).
+//
+// A tri-color mark-and-sweep collector over a *modeled* object graph, written
+// entirely in SURU using only supported facilities (arrays of ints, nested
+// arrays, slice, array_concat). This is deliberately a reference model — it
+// runs on the C17 bootstrap's values, not on a production heap. It validates
+// the collector's graph-traversal and reachability rules and serves as a spec
+// oracle for the future SURU-owned runtime memory manager.
+//
+// Objects are small integers. The "heap" is a set of parallel arrays:
+//   kinds[i]  object kind
+//   refs[i]   array of child object indices (graph edges)
+//   n         number of objects
+// Colours (white/grey/black) are maintained per mark. Marking is
+// non-recursive and uses a bounded worklist; if the worklist exceeds its cap,
+// simulate() reports an overflow instead of silently abandoning marking.
+
+const WHITE = 0;
+const GREY = 1;
+const BLACK = 2;
+
+func all_white(n: int) -> [int] {
+    mut c: [int] = empty_ints();
+    mut i: int = 0;
+    while i < n { c = array_concat(c, [WHITE]); i += 1; }
+    return c;
+}
+
+// Is the graph of `n` objects (kinds/refs) with the given roots fully marked
+// within workcap grey-slot budget? Returns [overflow, survivors].
+func empty_ints() -> [int] {
+    return slice([0], 0, 0);
+}
+
+func empty_intss() -> [[int]] {
+    return slice([empty_ints()], 0, 0);
+}
+
+func simulate(roots: [int], kinds: [int], refs: [[int]], n: int, workcap: int) -> [int] {
+    mut cols: [int] = all_white(n);
+    mut wl: [int] = empty_ints();
+    mut ri: int = 0;
+    while ri < array_len(roots) {
+        let r: int = roots[ri];
+        if r >= 0 and r < n and cols[r] == WHITE {
+            cols[r] = GREY;
+            wl = array_concat(wl, [r]);
+            if array_len(wl) > workcap { return [1, 0]; }
+        }
+        ri += 1;
+    }
+    while array_len(wl) > 0 {
+        let last: int = array_len(wl) - 1;
+        let u: int = wl[last];
+        wl = slice(wl, 0, last);
+        let ch: [int] = refs[u];
+        mut k: int = 0;
+        while k < array_len(ch) {
+            let c: int = ch[k];
+            if c >= 0 and c < n and cols[c] == WHITE {
+                cols[c] = GREY;
+                wl = array_concat(wl, [c]);
+                if array_len(wl) > workcap { return [1, 0]; }
+            }
+            k += 1;
+        }
+        cols[u] = BLACK;
+    }
+    mut survivors: int = 0;
+    mut i: int = 0;
+    while i < n {
+        if cols[i] != WHITE { survivors += 1; }
+        i += 1;
+    }
+    return [0, survivors];
+}
+
+// Append an object with the given child edges. Returns [ok, new_n, id].
+func add_obj(kinds: [int], refs: [[int]], n: int, cap: int, kind: int, ch: [int]) -> [int] {
+    if n >= cap { return [0, n, -1]; }
+    let k2: [int] = array_concat(kinds, [kind]);
+    let r2: [[int]] = array_concat(refs, [ch]);
+    return [1, n + 1, n];
+}
+
+func expect(name: str, got: int, want: int) -> int {
+    if got == want {
+        println("ok: " + name);
+        return 0;
+    }
+    println("FAIL: " + name + " got=" + to_str(got) + " want=" + to_str(want));
+    return 1;
+}
+
+func main() {
+    mut fails: int = 0;
+    let N: int = 32; // heap capacity for model
+
+    // ---- 1. Single reachable chain: root -> A -> B ----
+    {
+        let kinds: [int] = [1, 1, 1];
+        let refs: [[int]] = [[1], [2], empty_ints()];
+        let r: [int] = simulate([0], kinds, refs, 3, 8);
+        fails += expect("chain-reachable", r[1], 3);
+    }
+
+    // ---- 2. Unreachable garbage: B is orphaned ----
+    {
+        let kinds: [int] = [1, 1, 1];
+        let refs: [[int]] = [[1], empty_ints(), empty_ints()];
+        let r: [int] = simulate([0], kinds, refs, 3, 8);
+        fails += expect("unreachable-reclaimed", r[1], 2);
+    }
+
+    // ---- 3. Cycle with no roots -> both reclaimed ----
+    {
+        let kinds: [int] = [1, 1];
+        let refs: [[int]] = [[1], [0]];
+        let r: [int] = simulate(empty_ints(), kinds, refs, 2, 8);
+        fails += expect("cycle-no-root-reclaimed", r[1], 0);
+    }
+
+    // ---- 4. Cycle reachable from a root -> survives ----
+    {
+        let kinds: [int] = [1, 1, 1];
+        let refs: [[int]] = [[1], [2], [1]];
+        let r: [int] = simulate([0], kinds, refs, 3, 8);
+        fails += expect("cycle-root-survives", r[1], 3);
+    }
+
+    // ---- 5. Multiple roots ----
+    {
+        let kinds: [int] = [1, 1, 1, 1];
+        let refs: [[int]] = [[1], empty_ints(), [3], empty_ints()];
+        let r: [int] = simulate([0, 2], kinds, refs, 4, 8);
+        fails += expect("multiple-roots", r[1], 4);
+    }
+
+    // ---- 6. Root removal -> orphan becomes unreachable ----
+    {
+        let kinds: [int] = [1, 1];
+        let refs: [[int]] = [[1], empty_ints()];
+        let r: [int] = simulate(empty_ints(), kinds, refs, 2, 8);
+        fails += expect("root-removal-reclaims", r[1], 0);
+    }
+
+    // ---- 7. Nested graph: root -> array -> object ----
+    {
+        let kinds: [int] = [1, 2, 1];
+        let refs: [[int]] = [[1], [2], empty_ints()];
+        let r: [int] = simulate([0], kinds, refs, 3, 8);
+        fails += expect("nested-graph", r[1], 3);
+    }
+
+    // ---- 8. Bounded worklist overflow is detected, not silently abandoned ----
+    {
+        let kinds: [int] = [1, 1, 1, 1];
+        let refs: [[int]] = [[1], [2], [3], empty_ints()];
+        let r: [int] = simulate([0], kinds, refs, 4, 2);
+        fails += expect("worklist-overflow-detected", r[0], 1);
+    }
+
+    // ---- 9. Allocation limit: refusing beyond cap returns failure sentinel ----
+    {
+        mut kinds: [int] = empty_ints();
+        mut refs: [[int]] = empty_intss();
+        mut n: int = 0;
+        let cap: int = 3;
+        mut i: int = 0;
+        while i < cap {
+            let r: [int] = add_obj(kinds, refs, n, cap, 1, empty_ints());
+            kinds = array_concat(kinds, [1]);
+            refs = array_concat(refs, [empty_ints()]);
+            n = n + 1;
+            i += 1;
+        }
+        let over: [int] = add_obj(kinds, refs, n, cap, 1, empty_ints());
+        fails += expect("alloc-cap-refuses", over[0], 0);
+        fails += expect("alloc-cap-returns-minus1", over[2], -1);
+    }
+
+    if fails == 0 { println("REF-GC: all tests passed"); }
+    exit(fails > 0 ? 1 : 0);
+}
