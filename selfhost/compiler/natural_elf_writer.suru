@@ -296,7 +296,7 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_bs: [[int]], fn_
                 mut ei: int = cnt - 1;
                 while ei >= 0 {
                     buf = array_concat(buf, [0x58]);
-                    buf = array_concat(buf, [0x48,0x89,0x52, ei * 8]);
+                    buf = array_concat(buf, [0x48,0x89,0x42, ei * 8]);
                     ei -= 1;
                 }
                 buf = array_concat(buf, [0x48,0x8D,0x4A, cnt * 8]);
@@ -415,7 +415,7 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_bs: [[int]], fn_
     }
     let total: int = 120 + str_len(s);
     let prog_entry: int = 0x400078 + fn_start[fn_entry];
-    mut data: str = nw_i64(8);
+    mut data: str = nw_i64(data_vaddr + 8);
     while str_len(data) < 512 {
         data = data + str_chr_byte(0);
     }
