@@ -943,7 +943,7 @@ static bool builtin_str_trim(s_vm *vm) {
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
     if (!o) return false;
     if (n) memcpy(s_obj_str_data(o), tmp, n);
-}
+    return push(vm, s_val_obj(o));}
 
 static bool builtin_args_len(s_vm *vm) {
     return push(vm, s_val_int((s_i64)vm->argc));
