@@ -46,7 +46,6 @@ func natural_effect_check(source: str) -> int {
 
     // Declaration pass: establish the effect signature of every routine.
     while i < array_len(lines) {
-        println("MARK_24 i="+to_str(i));
     let line: str = str_trim(lines[i]);
         i += 1;
         let open: str = nds_open_word(line);
@@ -64,8 +63,7 @@ func natural_effect_check(source: str) -> int {
     mut handled: [str] = [];
     i = 0;
     while i < array_len(lines) {
-        println("MARK_66 i="+to_str(i));
-    let raw: str = str_trim(lines[i]);
+        let raw: str = str_trim(lines[i]);
         let line: int = i + 1;
         i += 1;
         if raw == "" or nds_word(raw) == "//" or nds_word(raw) == "#!" { continue; }
@@ -100,7 +98,6 @@ func natural_effect_check(source: str) -> int {
             }
             let colon: int = nds_find(raw, ":", 0);
             if colon < 0 { nes_error(line, "handle requires an exception type"); return 1; }
-            println("MARK_101");
             let rest: str = str_trim(substr(raw, colon + 1, str_len(raw)));
             handled[array_len(handled) - 1] = rest;
             continue;
