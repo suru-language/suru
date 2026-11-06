@@ -1834,14 +1834,13 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 vm_trap(vm, "index out of bounds (%lld of %u)", (long long)i, arr.u.o->count);
                 return 1;
             }
-            {
-                s_value r = s_obj_array_data(arr.u.o)[i];
-                fprintf(stderr, "IDX: i=%lld arrkind=%d arrcount=%u res tag=%d kind=%d len=%u\n",
-                        (long long)i, arr.u.o->kind, (unsigned)arr.u.o->count,
-                        r.tag, (r.tag==S_VAL_OBJ?r.u.o->kind:-1),
-                        (r.tag==S_VAL_OBJ&&r.u.o->kind==S_OBJ_STR?(unsigned)r.u.o->count:0));
-            }
             if (!push(vm, s_obj_array_data(arr.u.o)[i])) return 1;
+            pc++; break;
+        }
+        case BC_IDX_ST: {
+            s_value val = pop(vm);
+            s_value idx = pop(vm);
+            s_value arr = pop(vm);
             if (arr.tag != S_VAL_OBJ || arr.u.o->kind != S_OBJ_ARRAY ||
                 idx.tag != S_VAL_INT) {
                 vm_trap(vm, "index store type error");
