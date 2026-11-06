@@ -237,6 +237,7 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_nparams: [int], 
             pcrel = array_concat(pcrel, [array_len(buf) - fn_start[f]]);
             let op: int = ops[pc];
             let a: int = avs[pc];
+            let b: int = bs[pc];
             if op == 1 {
                 buf = array_concat(buf, [0x48,0xC7,0xC0]);
                 buf = array_concat(buf, [a & 255, (a >> 8) & 255, (a >> 16) & 255, (a >> 24) & 255, 0x50]);
