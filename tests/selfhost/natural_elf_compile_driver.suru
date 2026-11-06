@@ -65,6 +65,7 @@ func main() {
         let ins: [str] = nw_emit_ins(fns[fi]);
         mut ops: [int] = [];
         mut avs: [int] = [];
+        mut bvs: [int] = [];
         mut idx: int = 0;
         while idx < array_len(ins) {
             let f: [str] = str_split(ins[idx], "|");
@@ -117,15 +118,21 @@ func main() {
             } else {
                 avs = array_concat(avs, [int_from_str(f[1])]);
             }
+            if id == 52 or id == 57 or id == 58 {
+                bvs = array_concat(bvs, [int_from_str(f[2])]);
+            } else {
+                bvs = array_concat(bvs, [0]);
+            }
             idx += 1;
         }
         fn_ops = array_concat(fn_ops, [ops]);
         fn_avs = array_concat(fn_avs, [avs]);
+        fn_bs = array_concat(fn_bs, [bvs]);
         fn_nparams = array_concat(fn_nparams, [nw_func_nparams(instructions, fi)]);
         fi += 1;
     }
 
-    let elf: str = nw_emit_elf_multifunc(fn_ops, fn_avs, fn_nparams, entry);
+    let elf: str = nw_emit_elf_multifunc(fn_ops, fn_avs, fn_bs, fn_nparams, entry);
     if elf == "" { exit(7); }
     write_file(args(1), elf);
     exit(0);
