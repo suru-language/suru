@@ -283,26 +283,38 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_nparams: [int], 
                 }
             } else if op == 7 {
                 buf = array_concat(buf, [0x58]);
-            } else if op == 51 {
-                // NEW_ARRAY a: pop a elements, store them into the static data
-                // area at [data_vaddr + i*8], then push data_vaddr.
-                mut ei: int = a - 1;
+            } else if op == 51 or op == 52 {
+                // NEW_ARRAY a (51) / NEW_RECORD b (52): pop `count` values,
+                // store at bump pointer (data_vaddr), advance bump, push pointer.
+                let cnt: int = op == 51 ? a : b;
+                buf = array_concat(buf, [0x48,0x8B,0x14,0x25]);
+                let bp: int = array_len(buf);
+                buf = array_concat(buf, [0,0,0,0]);
+                fx = array_concat(fx, [to_str(bp) + "|B"]);
+                mut ei: int = cnt - 1;
                 while ei >= 0 {
                     buf = array_concat(buf, [0x58]);
-                    buf = array_concat(buf, [0x48,0x89,0x04,0x25]);
-                    let dv: int = array_len(buf);
-                    buf = array_concat(buf, [0,0,0,0]);
-                    fx = array_concat(fx, [to_str(dv) + "|V|" + to_str(ei)]);
+                    buf = array_concat(buf, [0x48,0x89,0x52, ei * 8]);
                     ei -= 1;
                 }
-                buf = array_concat(buf, [0x48,0xB8]);
-                let dp: int = array_len(buf);
-                buf = array_concat(buf, [0,0,0,0,0,0,0,0]);
-                fx = array_concat(fx, [to_str(dp) + "|D"]);
-                buf = array_concat(buf, [0x50]);
+                buf = array_concat(buf, [0x48,0x8D,0x4A, cnt * 8]);
+                buf = array_concat(buf, [0x48,0x89,0x0C,0x25]);
+                let bp2: int = array_len(buf);
+                buf = array_concat(buf, [0,0,0,0]);
+                fx = array_concat(fx, [to_str(bp2) + "|B"]);
+                buf = array_concat(buf, [0x52]);
+            } else if op == 4 {
+                // CONST_NONE: push 0
+                buf = array_concat(buf, [0x31,0xC0, 0x50]);
             } else if op == 54 {
                 // IDX_LD: pop idx -> rbx, pop ptr -> rax, mov rax,[rax+rbx*8]
                 buf = array_concat(buf, [0x5B, 0x58, 0x48,0x8B,0x04,0xD8, 0x50]);
+            } else if op == 57 {
+                // FIELD_LD: pop ptr -> rax, push [rax + b*8]
+                buf = array_concat(buf, [0x58, 0x48,0x8B,0x40, b * 8, 0x50]);
+            } else if op == 58 {
+                // FIELD_ST: pop val -> rcx, pop ptr -> rax, mov [rax+b*8],rcx, push rax
+                buf = array_concat(buf, [0x59, 0x58, 0x48,0x89,0x48, b * 8, 0x50]);
             } else if op == 59 {
                 if fn_nparams[a] >= 2 {
                     buf = array_concat(buf, [0x5E]);
@@ -353,7 +365,13 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_nparams: [int], 
     while fi < array_len(fx) {
         let entry: [str] = str_split(fx[fi], "|");
         let d: int = int_from_str(entry[0]);
-        if entry[1] == "V" {
+        if entry[1] == "B" {
+            let val: int = data_vaddr;
+            buf[d] = val & 255;
+            buf[d + 1] = (val >> 8) & 255;
+            buf[d + 2] = (val >> 16) & 255;
+            buf[d + 3] = (val >> 24) & 255;
+        } else if entry[1] == "V" {
             let val: int = data_vaddr + int_from_str(entry[2]) * 8;
             buf[d] = val & 255;
             buf[d + 1] = (val >> 8) & 255;
@@ -395,7 +413,7 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_nparams: [int], 
     }
     let total: int = 120 + str_len(s);
     let prog_entry: int = 0x400078 + fn_start[fn_entry];
-    mut data: str = "";
+    mut data: str = nw_i64(8);
     while str_len(data) < 512 {
         data = data + str_chr_byte(0);
     }

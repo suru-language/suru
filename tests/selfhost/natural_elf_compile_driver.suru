@@ -78,7 +78,11 @@ func main() {
             else if opname == "mul_i" { id = 16; }
             else if opname == "div_i" { id = 17; }
             else if opname == "new_array" { id = 51; }
+            else if opname == "new_record" { id = 52; }
+            else if opname == "const_none" { id = 4; }
             else if opname == "idx_ld" { id = 54; }
+            else if opname == "field_ld" { id = 57; }
+            else if opname == "field_st" { id = 58; }
             else if opname == "eq_i" { id = 29; }
             else if opname == "ne_i" { id = 30; }
             else if opname == "lt_i" { id = 31; }
