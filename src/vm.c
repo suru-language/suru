@@ -987,6 +987,10 @@ static bool builtin_str_split(s_vm *vm) {
     s_heap_add_root(vm->heap, &sep);
     s_gcobj *arr = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)n, 0);
     if (!arr) return false;
+    {
+        s_value arrv = s_val_obj(arr);
+        s_heap_add_root(vm->heap, &arrv);
+    }
     s_value *dst = s_obj_array_data(arr);
     s_size start = 0, k = 0;
     for (s_size i = 0; i + pl <= sl; ) {
@@ -1008,6 +1012,10 @@ static bool builtin_str_split(s_vm *vm) {
         if (!o) return false;
         if (ln) memcpy(s_obj_str_data(o), data + start, ln);
         dst[k++] = s_val_obj(o);
+    }
+    {
+        s_value arrv = s_val_obj(arr);
+        s_heap_remove_root(vm->heap, &arrv);
     }
     s_heap_remove_root(vm->heap, &sep);
     s_heap_remove_root(vm->heap, &s);

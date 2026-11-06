@@ -1,0 +1,21 @@
+bring "mathematics.suru" as mathematics
+
+contract D
+    routine f() -> Text
+end contract
+
+record R supports D
+    change name: Text
+    routine f() -> Text
+        give "x"
+    end routine
+end record
+
+choice C
+    A(x: Text)
+end choice
+
+choose C
+case A(x)
+    show(x)
+end choose
