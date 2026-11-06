@@ -39,6 +39,11 @@ s_om_err s_vmobj_alloc_value(s_om_heap h, s_obj_kind kind, s_u32 count,
 s_om_err s_vmobj_validate(s_om_heap h, s_om_ref o);
 bool s_vmobj_is_live(s_om_heap h, s_om_ref o);
 
+/* Family/object introspection over handles (validated). */
+s_om_err s_vmobj_kind(s_om_heap h, s_om_ref o, s_obj_kind *out);
+s_om_err s_vmobj_count(s_om_heap h, s_om_ref o, s_u32 *out);
+s_om_err s_vmobj_size(s_om_heap h, s_om_ref o, s_size *out);
+
 /* Resolve a live handle to a stable pointer to its header start plus its
  * rounded size. Trusted-runtime only; never exposed to ordinary programs. */
 s_om_err s_vmobj_inspect(s_om_heap h, s_om_ref o, const void **base,

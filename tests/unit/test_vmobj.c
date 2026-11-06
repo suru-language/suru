@@ -66,6 +66,38 @@ static void test_inspect_view(void) {
     CHECK_EQ_INT((int)s_vmobj_inspect(h, o, &base, &rounded), S_OM_ENOENT);
 }
 
+static void test_family_introspection(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    s_obj_kind kinds[] = {S_OBJ_STR, S_OBJ_ARRAY, S_OBJ_RECORD,
+                          S_OBJ_CLOSURE, S_OBJ_EXCEPTION};
+    s_u32 counts[] = {5, 3, 2, 1, 3};
+    int i;
+    for (i = 0; i < 5; ++i) {
+        s_om_ref o = S_OM_REF_NONE;
+        s_size payload = (kinds[i] == S_OBJ_STR) ? (s_size)counts[i] : 0;
+        CHECK_EQ_INT((int)s_vmobj_alloc(h, kinds[i], counts[i], payload, &o),
+                     S_OM_OK);
+        s_obj_kind k;
+        s_u32 c = 0;
+        s_size sz = 0;
+        CHECK_EQ_INT((int)s_vmobj_kind(h, o, &k), S_OM_OK);
+        CHECK_EQ_INT((int)k, (int)kinds[i]);
+        CHECK_EQ_INT((int)s_vmobj_count(h, o, &c), S_OM_OK);
+        CHECK_EQ_INT((int)c, (int)counts[i]);
+        CHECK_EQ_INT((int)s_vmobj_size(h, o, &sz), S_OM_OK);
+        CHECK((s_size)sz >= S_OM_HEADER_SIZE);
+        /* invalid handle rejected */
+        CHECK_EQ_INT((int)s_vmobj_kind(h, s_om_test_make_handle(0xFFFFFFu, 1), &k),
+                     S_OM_ENOENT);
+        CHECK_EQ_INT((int)s_vmobj_count(h, s_om_test_make_handle(0xFFFFFFu, 1), &c),
+                     S_OM_ENOENT);
+        CHECK_EQ_INT((int)s_vmobj_size(h, s_om_test_make_handle(0xFFFFFFu, 1), &sz),
+                     S_OM_ENOENT);
+    }
+}
+
 static void test_temp_root_survival(void) {
     om_reset();
     s_om_heap h = 0;

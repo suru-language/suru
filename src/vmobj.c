@@ -23,6 +23,18 @@ bool s_vmobj_is_live(s_om_heap h, s_om_ref o) {
     return s_om_is_live(h, o);
 }
 
+s_om_err s_vmobj_kind(s_om_heap h, s_om_ref o, s_obj_kind *out) {
+    return s_om_kind(h, o, out);
+}
+
+s_om_err s_vmobj_count(s_om_heap h, s_om_ref o, s_u32 *out) {
+    return s_om_count(h, o, out);
+}
+
+s_om_err s_vmobj_size(s_om_heap h, s_om_ref o, s_size *out) {
+    return s_om_size(h, o, out);
+}
+
 s_om_err s_vmobj_inspect(s_om_heap h, s_om_ref o, const void **base,
                          s_size *rounded) {
     return s_om_inspect(h, o, base, rounded);
