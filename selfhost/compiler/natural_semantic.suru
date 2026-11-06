@@ -352,16 +352,6 @@ func nss_expr_type(expression: str, names: [str], types: [str],
         }
         return ["error", "unknown field '" + atom + "'"];
     }
-    let obr: int = nss_find(atom, "[");
-    if obr > 0 and atom[str_len(atom) - 1] == "]" {
-        let base: str = str_trim(substr(atom, 0, obr));
-        let base_type: str = nss_lookup(names, types, base);
-        if base_type != "" and str_len(base_type) >= 3 and
-           base_type[0] == "[" and base_type[str_len(base_type) - 1] == "]" {
-            return ["ok", substr(base_type, 1, str_len(base_type) - 2)];
-        }
-        return ["error", "unknown array '" + base + "'"];
-    }
     let known: str = nss_lookup(names, types, atom);
     if known == "" { return ["error", "unknown name '" + atom + "'"]; }
     return ["ok", known];
