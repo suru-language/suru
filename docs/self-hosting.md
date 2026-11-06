@@ -249,12 +249,14 @@ The bytecode object-emitting half is now owned by SURU:
   write/read) now work via a single-segment writable static data buffer with a
   runtime bump allocator (`NEW_ARRAY`/`NEW_RECORD` allocate at a fixup-resolved
   data vaddr, `IDX_LD`/`FIELD_LD`/`FIELD_ST` access it), gated by
-  `natural_elf_array_run.sh` and `natural_elf_record_run.sh`. The native backend
-  is also reachable from the CLI as `suru --syntax=natural --backend=native
-  compile|run` (shells out to the SURU native compiler driver), gated by
-  `natural_exec_native_run.sh`. This is the first control-flow, call, and
-  array/record step of the Stage 3 backend; the SURU-managed GC/memory port and
-  the C-independent self-rebuild remain. (A native array attempt required a second loadable segment, which
+  `natural_elf_array_run.sh` and `natural_elf_record_run.sh`. Native calls
+  support up to six integer arguments via the SysV registers (`rdi,rsi,rdx,
+  rcx,r8,r9`), spilled into the callee frame slots (`natural_elf_call_run.sh`).
+  The native backend is also reachable from the CLI as `suru --syntax=natural
+  --backend=native compile|run` (shells out to the SURU native compiler driver),
+  gated by `natural_exec_native_run.sh`. This is the first control-flow, call,
+  and array/record step of the Stage 3 backend; the SURU-managed GC/memory port
+  and the C-independent self-rebuild remain. (A native array attempt required a second loadable segment, which
   intermittently triggered a host C17 VM memory-corruption bug; it was reverted
   to keep the suite green. Arrays/records in native output therefore remain
   open pending a more robust code layout.)
