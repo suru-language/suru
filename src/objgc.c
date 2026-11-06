@@ -8,6 +8,8 @@ struct s_om_gc {
     s_om_ref *roots;
     s_size nroots;
     s_size caproots;
+    const s_om_ref *stk_base;
+    s_size stk_len;
     bool marking_active;
     s_u32 mark_cursor;
     bool pass_changed;
@@ -76,6 +78,16 @@ void s_om_gc_clear_roots(s_om_gc *g) {
     if (g) g->nroots = 0;
 }
 
+s_om_err s_om_gc_set_stack_root(s_om_gc *g, const s_om_ref *base, s_size n) {
+    if (!g) return S_OM_ENOENT;
+    if (g->marking_active) return S_OM_ECOLLECT;
+    if (n < 0) return S_OM_EINVAL;
+    if (n > 0 && !base) return S_OM_EINVAL;
+    g->stk_base = base;
+    g->stk_len = n;
+    return S_OM_OK;
+}
+
 s_u32 s_om_gc_nroots(const s_om_gc *g) {
     return g ? (s_u32)g->nroots : 0;
 }
@@ -124,16 +136,22 @@ static void gc_reset_all_white(s_om_heap h) {
     }
 }
 
+static void gc_seed_one(s_om_heap h, s_om_ref r) {
+    if (!s_om_is_live(h, r)) return;
+    s_u8 col = 0;
+    if (s_om_colour(h, r, &col) == S_OM_OK && col == S_GC_WHITE) {
+        (void)s_om_set_colour(h, r, S_GC_GREY);
+    }
+}
+
 static void gc_seed_roots(s_om_gc *g) {
     s_om_heap h = g->h;
     s_size i;
     for (i = 0; i < g->nroots; ++i) {
-        s_om_ref r = g->roots[i];
-        if (!s_om_is_live(h, r)) continue;
-        s_u8 col = 0;
-        if (s_om_colour(h, r, &col) == S_OM_OK && col == S_GC_WHITE) {
-            (void)s_om_set_colour(h, r, S_GC_GREY);
-        }
+        gc_seed_one(h, g->roots[i]);
+    }
+    for (i = 0; i < g->stk_len; ++i) {
+        gc_seed_one(h, g->stk_base[i]);
     }
 }
 

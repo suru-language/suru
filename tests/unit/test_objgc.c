@@ -501,6 +501,83 @@ static void test_gc_preserves_corrupt_reachable(void) {
     s_om_gc_destroy(g);
 }
 
+static void test_stack_range_root_preserves(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    s_om_ref live = arr_with_kids(h, NULL, 0);
+    s_om_ref junk = arr_with_kids(h, NULL, 0);
+
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    s_om_ref stk[4];
+    stk[0] = live;
+    CHECK_EQ_INT((int)s_om_gc_set_stack_root(g, stk, 1), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_collect(g), 1); /* only junk reclaimed */
+    CHECK_EQ_INT((int)s_om_validate(h, live), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_validate(h, junk), S_OM_ENOENT);
+    s_om_gc_destroy(g);
+}
+
+static void test_stack_range_stale_ignored(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    s_om_ref live = arr_with_kids(h, NULL, 0);
+    s_om_ref ghost = arr_with_kids(h, NULL, 0);
+    s_u32 ghost_slot = s_om_test_slot_index(ghost);
+    CHECK_EQ_INT((int)s_om_free(h, ghost), S_OM_OK); /* stale handle */
+    s_om_ref ghost_stale = s_om_test_make_handle(ghost_slot, 1);
+
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    s_om_ref stk[4];
+    stk[0] = live;
+    stk[1] = ghost_stale;                 /* stale (wrong gen) */
+    stk[2] = s_om_test_make_handle(0xFFFFFFu, 1); /* out-of-range */
+    CHECK_EQ_INT((int)s_om_gc_set_stack_root(g, stk, 3), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_collect(g), 0); /* nothing extra reclaimed */
+    CHECK_EQ_INT((int)s_om_validate(h, live), S_OM_OK);
+    s_om_gc_destroy(g);
+}
+
+static void test_stack_range_clear(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    s_om_ref obj = arr_with_kids(h, NULL, 0);
+
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    s_om_ref stk[4];
+    stk[0] = obj;
+    CHECK_EQ_INT((int)s_om_gc_set_stack_root(g, stk, 1), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_collect(g), 0); /* preserved via stack root */
+    CHECK_EQ_INT((int)s_om_validate(h, obj), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_set_stack_root(g, NULL, 0), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_collect(g), 1); /* now reclaimed */
+    CHECK_EQ_INT((int)s_om_validate(h, obj), S_OM_ENOENT);
+    s_om_gc_destroy(g);
+}
+
+static void test_stack_root_during_marking_refused(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    s_om_ref live = arr_with_kids(h, NULL, 0);
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_mark_begin(g), S_OM_OK);
+    s_om_ref stk[4];
+    stk[0] = live;
+    CHECK_EQ_INT((int)s_om_gc_set_stack_root(g, stk, 1), S_OM_ECOLLECT);
+    while (s_om_gc_mark_step(g, 1)) {
+    }
+    CHECK_EQ_INT((int)s_om_gc_sweep(g), 0);
+    CHECK_EQ_INT((int)s_om_validate(h, live), S_OM_OK);
+    s_om_gc_destroy(g);
+}
+
 TEST_MAIN_BEGIN()
     test_gc_lifecycle();
     test_reachable_vs_unreachable();
@@ -523,4 +600,8 @@ TEST_MAIN_BEGIN()
     test_gc_stale_child_reference();
     test_gc_generation_marks_correct_object();
     test_gc_preserves_corrupt_reachable();
+    test_stack_range_root_preserves();
+    test_stack_range_stale_ignored();
+    test_stack_range_clear();
+    test_stack_root_during_marking_refused();
 TEST_MAIN_END()

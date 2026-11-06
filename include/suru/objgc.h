@@ -41,6 +41,15 @@ void s_om_gc_clear_roots(s_om_gc *g);
 s_u32 s_om_gc_nroots(const s_om_gc *g);
 
 /*
+ * Register a contiguous range of managed handles as roots (borrowed, not
+ * copied), mirroring s_heap_set_stack_root for the VM's operand stack. The
+ * range must stay valid and unchanged until the next full/incremental
+ * collection completes (stop-the-world). Passing base==NULL with n==0 clears
+ * the range. Stale/invalid handles in the range are ignored at mark time.
+ */
+s_om_err s_om_gc_set_stack_root(s_om_gc *g, const s_om_ref *base, s_size n);
+
+/*
  * Run a full mark-sweep collection. Returns the number of objects reclaimed.
  * Live objects reachable from the roots are preserved and reset to the white
  * colour for the next cycle. Unreachable live objects are freed back to the
