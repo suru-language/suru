@@ -90,6 +90,9 @@ s_pm_err s_pm_acquire(s_size size, s_size align, s_pm_handle *out) {
     r->align = align;
     r->magic = S_PM_MAGIC;
     r->in_use = true;
+    /* The acquire contract guarantees a zeroed region (callers rely on it,
+     * e.g. the object-model slot registry where magic==0 means "free"). */
+    memset(r->base, 0, r->size);
     alloc_count++;
 
     *out = (s_pm_handle)(idx + 1);

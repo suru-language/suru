@@ -175,6 +175,23 @@ static void test_zero_len_invalid_handle(void) {
     CHECK_EQ_INT((int)s_pm_write(h, 0, &b, 0), S_PM_ENOENT);
 }
 
+static void test_region_zeroed(void) {
+    pm_reset();
+    s_pm_handle h = 0;
+    CHECK_EQ_INT((int)s_pm_acquire(32, 16, &h), S_PM_OK);
+    s_u32 a = 0xDEADBEEFu;
+    s_u32 b = 0xDEADBEEFu;
+    s_u64 c = 0xDEADBEEFDEADBEEFull;
+    /* freshly acquired regions are zero-filled */
+    CHECK_EQ_INT((int)s_pm_read_u32(h, 0, &a), S_PM_OK);
+    CHECK_EQ_INT((int)a, 0);
+    CHECK_EQ_INT((int)s_pm_read_u32(h, 28, &b), S_PM_OK);
+    CHECK_EQ_INT((int)b, 0);
+    CHECK_EQ_INT((int)s_pm_read_u64(h, 0, &c), S_PM_OK);
+    CHECK_EQ_INT((int)c, 0);
+    CHECK_EQ_INT((int)s_pm_release(h), S_PM_OK);
+}
+
 static void test_alignment_reported(void) {
     pm_reset();
     s_pm_handle h = 0;
@@ -200,4 +217,5 @@ TEST_MAIN_BEGIN()
     test_cleanup_and_leak();
     test_zero_len_invalid_handle();
     test_alignment_reported();
+    test_region_zeroed();
 TEST_MAIN_END()
