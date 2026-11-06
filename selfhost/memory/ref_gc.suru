@@ -92,6 +92,32 @@ func expect(name: str, got: int, want: int) -> int {
     return 1;
 }
 
+// Generation-aware identity model (Phase 3F.1). A handle encodes a
+// (slot, generation) pair as h = slot + gen*100000. Object identity is a
+// lifetime, not merely a storage location. This models handle validity and
+// slot reuse; it does not claim full equivalence with the C collector (which
+// additionally enforces a stop-the-world lifecycle and a collection lock).
+func handle(slot: int, gen: int) -> int {
+    return slot + gen * 100000;
+}
+
+func h_slot(h: int) -> int {
+    return h % 100000;
+}
+
+func h_gen(h: int) -> int {
+    return h / 100000;
+}
+
+func valid_handle(gens: [int], n: int, h: int) -> int {
+    if h <= 0 { return 0; }
+    let s: int = h_slot(h);
+    if s < 0 { return 0; }
+    if s >= n { return 0; }
+    if gens[s] == h_gen(h) { return 1; }
+    return 0;
+}
+
 func main() {
     mut fails: int = 0;
     let N: int = 32; // heap capacity for model
@@ -233,6 +259,56 @@ func main() {
         let refs: [[int]] = [[1, 99, -1], empty_ints(), empty_ints()];
         let r: [int] = simulate([0], kinds, refs, 3, 8);
         fails += expect("stale-edge-ignored", r[1], 2);
+    }
+
+    // ---- 17+. Generation-aware identity (Phase 3F.1) ----
+    // Slot index is the storage location; generation is the lifetime. A valid
+    // handle must match both.
+    {
+        let n: int = 2;
+        let gens: [int] = [1, 1];
+        fails += expect("gen-initial-valid", valid_handle(gens, n, handle(0, 1)), 1);
+        fails += expect("gen-wrong-gen-rejected", valid_handle(gens, n, handle(0, 2)), 0);
+        fails += expect("gen-zero-rejected", valid_handle(gens, n, 0), 0);
+        fails += expect("gen-oob-slot-rejected", valid_handle(gens, n, handle(9, 1)), 0);
+    }
+
+    // Release then reuse a slot: the generation advances; the old handle is
+    // rejected and the replacement object's identity is preserved.
+    {
+        let n: int = 1;
+        mut gens: [int] = [1];
+        let old: int = handle(0, 1);
+        fails += expect("gen-old-valid-before", valid_handle(gens, n, old), 1);
+        gens = [2]; // slot 0 reused, advanced to generation 2
+        fails += expect("gen-stale-rejected-after-reuse", valid_handle(gens, n, old), 0);
+        let newh: int = handle(0, 2);
+        fails += expect("gen-replacement-valid", valid_handle(gens, n, newh), 1);
+        fails += expect("gen-replacement-distinct-id", (newh != old ? 1 : 0), 1);
+    }
+
+    // Repeated reuse: generations strictly increase; all earlier handles become
+    // invalid while the current one stays valid.
+    {
+        let n: int = 1;
+        mut gens: [int] = [1];
+        let first: int = handle(0, 1);
+        mut k: int = 1;
+        while k < 5 {
+            k += 1;
+            gens = [k];
+            fails += expect("gen-repeat-stale-invalid", valid_handle(gens, n, first), 0);
+            fails += expect("gen-repeat-current-valid", valid_handle(gens, n, handle(0, k)), 1);
+        }
+    }
+
+    // Stale child references are rejected; current-generation child references
+    // are accepted.
+    {
+        let n: int = 3;
+        let gens: [int] = [1, 2, 1]; // slot 1 is currently generation 2
+        fails += expect("gen-stale-child-rejected", valid_handle(gens, n, handle(1, 1)), 0);
+        fails += expect("gen-current-child-accepted", valid_handle(gens, n, handle(1, 2)), 1);
     }
 
     if fails == 0 { println("REF-GC: all tests passed"); }
