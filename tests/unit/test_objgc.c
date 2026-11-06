@@ -193,6 +193,7 @@ static void test_repeated_collect(void) {
     CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
     CHECK_EQ_INT((int)s_om_gc_add_root(g, a), S_OM_OK);
     CHECK_EQ_INT((int)s_om_gc_collect(g), 1); /* x reclaimed */
+    CHECK_EQ_INT((int)s_om_validate(h, x), S_OM_ENOENT);
     CHECK_EQ_INT((int)s_om_gc_collect(g), 0); /* stable */
     CHECK_EQ_INT((int)s_om_validate(h, a), S_OM_OK);
     CHECK_EQ_INT((int)s_om_live_objects(h), 1);
@@ -230,6 +231,7 @@ static void test_collect_preserves_content(void) {
     CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
     CHECK_EQ_INT((int)s_om_gc_add_root(g, a), S_OM_OK);
     CHECK_EQ_INT((int)s_om_gc_collect(g), 1);
+    CHECK_EQ_INT((int)s_om_validate(h, junk), S_OM_ENOENT);
     s_u32 child = 0;
     CHECK_EQ_INT((int)s_om_read_u32(h, a, 0, &child), S_OM_OK);
     CHECK_EQ_INT((int)child, (int)b);
