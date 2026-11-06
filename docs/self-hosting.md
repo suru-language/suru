@@ -256,7 +256,10 @@ The bytecode object-emitting half is now owned by SURU:
   --backend=native compile|run` (shells out to the SURU native compiler driver),
   gated by `natural_exec_native_run.sh`. This is the first control-flow, call,
   and array/record step of the Stage 3 backend; the SURU-managed GC/memory port
-  and the C-independent self-rebuild remain. (A native array attempt required a second loadable segment, which
+  and the C-independent self-rebuild remain. The bootstrap/rebuild loop
+  (`selfhost-bootstrap` builds the SURU-written compiler driver into
+  `build/bin/natural_compiler.sbc`; `selfhost-rebuild` runs it and requires
+  output byte-identical to the C reassembly path) is now part of `make test`. (A native array attempt required a second loadable segment, which
   intermittently triggered a host C17 VM memory-corruption bug; it was reverted
   to keep the suite green. Arrays/records in native output therefore remain
   open pending a more robust code layout.)
