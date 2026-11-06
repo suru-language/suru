@@ -565,16 +565,21 @@ static void test_stack_root_during_marking_refused(void) {
     s_om_heap h = 0;
     CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
     s_om_ref live = arr_with_kids(h, NULL, 0);
+    s_om_ref junk = arr_with_kids(h, NULL, 0);
     s_om_gc *g = NULL;
     CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
-    CHECK_EQ_INT((int)s_om_gc_mark_begin(g), S_OM_OK);
     s_om_ref stk[4];
     stk[0] = live;
-    CHECK_EQ_INT((int)s_om_gc_set_stack_root(g, stk, 1), S_OM_ECOLLECT);
+    CHECK_EQ_INT((int)s_om_gc_set_stack_root(g, stk, 1), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_mark_begin(g), S_OM_OK);
+    /* changing the range during marking is refused */
+    CHECK_EQ_INT((int)s_om_gc_set_stack_root(g, stk, 2), S_OM_ECOLLECT);
     while (s_om_gc_mark_step(g, 1)) {
     }
-    CHECK_EQ_INT((int)s_om_gc_sweep(g), 0);
+    /* the original range still applied: live preserved, junk reclaimed */
+    CHECK_EQ_INT((int)s_om_gc_sweep(g), 1);
     CHECK_EQ_INT((int)s_om_validate(h, live), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_validate(h, junk), S_OM_ENOENT);
     s_om_gc_destroy(g);
 }
 

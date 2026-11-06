@@ -81,7 +81,6 @@ void s_om_gc_clear_roots(s_om_gc *g) {
 s_om_err s_om_gc_set_stack_root(s_om_gc *g, const s_om_ref *base, s_size n) {
     if (!g) return S_OM_ENOENT;
     if (g->marking_active) return S_OM_ECOLLECT;
-    if (n < 0) return S_OM_EINVAL;
     if (n > 0 && !base) return S_OM_EINVAL;
     g->stk_base = base;
     g->stk_len = n;
