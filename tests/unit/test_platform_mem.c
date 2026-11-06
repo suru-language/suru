@@ -164,6 +164,27 @@ static void test_cleanup_and_leak(void) {
     CHECK_EQ_INT((int)s_pm_active_count(), 0);
 }
 
+static void test_zero_len_invalid_handle(void) {
+    pm_reset();
+    s_pm_handle h = 0;
+    CHECK_EQ_INT((int)s_pm_acquire(8, 0, &h), S_PM_OK);
+    CHECK_EQ_INT((int)s_pm_release(h), S_PM_OK);
+    unsigned char b = 0;
+    /* zero-length access on a released handle is still invalid */
+    CHECK_EQ_INT((int)s_pm_read(h, 0, &b, 0), S_PM_ENOENT);
+    CHECK_EQ_INT((int)s_pm_write(h, 0, &b, 0), S_PM_ENOENT);
+}
+
+static void test_alignment_reported(void) {
+    pm_reset();
+    s_pm_handle h = 0;
+    CHECK_EQ_INT((int)s_pm_acquire(40, 64, &h), S_PM_OK);
+    s_size al = 0;
+    CHECK_EQ_INT((int)s_pm_align(h, &al), S_PM_OK);
+    CHECK_EQ_INT((int)al, 64);
+    CHECK_EQ_INT((int)s_pm_release(h), S_PM_OK);
+}
+
 TEST_MAIN_BEGIN()
     test_acquire_release();
     test_zero_size();
@@ -177,4 +198,6 @@ TEST_MAIN_BEGIN()
     test_invalid_alignment();
     test_repeated_cycles();
     test_cleanup_and_leak();
+    test_zero_len_invalid_handle();
+    test_alignment_reported();
 TEST_MAIN_END()
