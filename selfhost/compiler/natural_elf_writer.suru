@@ -32,7 +32,7 @@ func nw_elf_header(total: int, entry: int) -> str {
 
     mut ph: str = "";
     ph = ph + nw_u32(1);
-    ph = ph + nw_u32(5);
+    ph = ph + nw_u32(7);
     ph = ph + nw_i64(0);
     ph = ph + nw_i64(0x400000);
     ph = ph + nw_i64(0x400000);
@@ -283,6 +283,26 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_nparams: [int], 
                 }
             } else if op == 7 {
                 buf = array_concat(buf, [0x58]);
+            } else if op == 51 {
+                // NEW_ARRAY a: pop a elements, store them into the static data
+                // area at [data_vaddr + i*8], then push data_vaddr.
+                mut ei: int = a - 1;
+                while ei >= 0 {
+                    buf = array_concat(buf, [0x58]);
+                    buf = array_concat(buf, [0x48,0x89,0x04,0x25]);
+                    let dv: int = array_len(buf);
+                    buf = array_concat(buf, [0,0,0,0]);
+                    fx = array_concat(fx, [to_str(dv) + "|V|" + to_str(ei)]);
+                    ei -= 1;
+                }
+                buf = array_concat(buf, [0x48,0xB8]);
+                let dp: int = array_len(buf);
+                buf = array_concat(buf, [0,0,0,0,0,0,0,0]);
+                fx = array_concat(fx, [to_str(dp) + "|D"]);
+                buf = array_concat(buf, [0x50]);
+            } else if op == 54 {
+                // IDX_LD: pop idx -> rbx, pop ptr -> rax, mov rax,[rax+rbx*8]
+                buf = array_concat(buf, [0x5B, 0x58, 0x48,0x8B,0x04,0xD8, 0x50]);
             } else if op == 59 {
                 if fn_nparams[a] >= 2 {
                     buf = array_concat(buf, [0x5E]);
@@ -329,22 +349,41 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_nparams: [int], 
     buf = array_concat(buf, [0x48,0xC7,0xC0,0x3C,0,0,0, 0x48,0x31,0xFF, 0x0F,0x05]);
 
     mut fi: int = 0;
+    let data_vaddr: int = 0x400078 + array_len(buf);
     while fi < array_len(fx) {
         let entry: [str] = str_split(fx[fi], "|");
         let d: int = int_from_str(entry[0]);
-        mut tpos: int = 0;
-        if entry[1] == "C" {
-            tpos = fn_start[int_from_str(entry[2])];
+        if entry[1] == "V" {
+            let val: int = data_vaddr + int_from_str(entry[2]) * 8;
+            buf[d] = val & 255;
+            buf[d + 1] = (val >> 8) & 255;
+            buf[d + 2] = (val >> 16) & 255;
+            buf[d + 3] = (val >> 24) & 255;
+        } else if entry[1] == "D" {
+            let val: int = data_vaddr;
+            buf[d] = val & 255;
+            buf[d + 1] = (val >> 8) & 255;
+            buf[d + 2] = (val >> 16) & 255;
+            buf[d + 3] = (val >> 24) & 255;
+            buf[d + 4] = (val >> 32) & 255;
+            buf[d + 5] = (val >> 40) & 255;
+            buf[d + 6] = (val >> 48) & 255;
+            buf[d + 7] = (val >> 56) & 255;
         } else {
-            let fidx: int = int_from_str(entry[1]);
-            let tp: int = int_from_str(entry[2]);
-            tpos = fn_start[fidx] + pc_all[fidx][tp];
+            mut tpos: int = 0;
+            if entry[1] == "C" {
+                tpos = fn_start[int_from_str(entry[2])];
+            } else {
+                let fidx: int = int_from_str(entry[1]);
+                let tp: int = int_from_str(entry[2]);
+                tpos = fn_start[fidx] + pc_all[fidx][tp];
+            }
+            let disp: int = tpos - (d + 4);
+            buf[d] = disp & 255;
+            buf[d + 1] = (disp >> 8) & 255;
+            buf[d + 2] = (disp >> 16) & 255;
+            buf[d + 3] = (disp >> 24) & 255;
         }
-        let disp: int = tpos - (d + 4);
-        buf[d] = disp & 255;
-        buf[d + 1] = (disp >> 8) & 255;
-        buf[d + 2] = (disp >> 16) & 255;
-        buf[d + 3] = (disp >> 24) & 255;
         fi += 1;
     }
 
@@ -356,7 +395,11 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_nparams: [int], 
     }
     let total: int = 120 + str_len(s);
     let prog_entry: int = 0x400078 + fn_start[fn_entry];
-    return nw_elf_header(total, prog_entry) + s;
+    mut data: str = "";
+    while str_len(data) < 512 {
+        data = data + str_chr_byte(0);
+    }
+    return nw_elf_header(total + 512, prog_entry) + s + data;
 }
 
 func nw_emit_elf_program(ops: [int], avs: [int], bs: [int], cs: [int]) -> str {
