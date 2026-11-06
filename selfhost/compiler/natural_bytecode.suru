@@ -755,7 +755,7 @@ func nbc_emit_expression(instructions: [str], expression: str, cur_func: str) ->
     return nbc_emit(result, "BC_TRAP", "unknown expression: " + text);
 }
 
-func nbc_expression_statement(instructions: [str], line: str) -> [str] {
+func nbc_expression_statement(instructions: [str], line: str, cur_func: str) -> [str] {
     mut result: [str] = instructions;
     if nbc_has_prefix(line, "show(") and line[str_len(line) - 1] == ")" {
         let value: str = substr(line, 5, str_len(line) - 6);
@@ -1361,7 +1361,7 @@ func nbc_collect(source: str) -> [str] {
             instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(slot));
             continue;
         }
-        instructions = nbc_expression_statement(instructions, line);
+        instructions = nbc_expression_statement(instructions, line, cur_func);
         if not nbc_has_prefix(line, "show(") { instructions = nbc_emit(instructions, "BC_POP", ""); }
     }
     if array_len(attempts) != 0 { println("bytecode-error|unterminated attempt"); return ["#emit-failed"]; }
