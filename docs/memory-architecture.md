@@ -455,6 +455,38 @@ Risk gates: each step keeps the suite green; the collector swap is the final,
 gated step. This phase deliberately does not change bytecode format, Natural
 syntax, or the language semantics.
 
+### Stage 11A–11B reviewed decisions (VM object-access contract & root enumeration)
+Design conclusions from the VM pre-migration audit (documented, not yet
+implemented):
+
+- **Reference residency.** The SURU VM keeps every runtime value in a single
+  contiguous operand stack `st[0,sp)`; call frames (`s_cont`), exception handler
+  frames (`s_handler`), and the active frame's locals/temporaries are all indices
+  into that stack, not separate storage. There is **no mutable-global storage**
+  in this IR (globals flatten at compile time). Therefore the *entire* VM live
+  reference set is `st[0,sp)` plus explicit C-local temporaries in builtins.
+- **Object-access contract.** The VM (trusted runtime) is allowed to resolve a
+  handle to an immutable, stable payload view via `s_om_inspect` (the only
+  address escape; gated to the trusted runtime, never to programs). The contract
+  is: allocate via `s_om_alloc`; validate via `s_om_validate`/`s_om_is_live`;
+  read/write payload via `s_om_read/write` or the inspected view; register the
+  operand stack as the GC root range each collection; and run collection only at
+  the single allocation choke point (`vm_alloc`), which is the mechanical
+  stop-the-world boundary. All managed-object mutation (array/record field
+  stores, closure capture) happens outside collection and never re-enters it.
+- **Enforcement.** The `objgc` collection lock already blocks allocation/free/
+  write during marking; the VM satisfies it because collection runs solely inside
+  `vm_alloc` and object writes never occur there. A mechanical invariant hook will
+  assert `!s_om_is_collecting` before any object write.
+- **Migration matrix** (existing C → handle-based): STR/ARRAY/RECORD/CLOSURE/
+  EXCEPTION map 1:1 to objmodel kinds; module constant strings stay C-owned (not
+  managed); immediates unchanged; `s_value.u.o` → `u.idx`. Builtin temporaries
+  and the `MKCLOSURE_V` environment are rooted explicitly.
+- **First task.** Implement an `objgc` stack-range root API
+  (`s_om_gc_set_stack_root(g, base, n)` mirroring `s_heap_set_stack_root`) plus
+  tests — the prerequisite for VM root enumeration — before any `vm.c`
+  translation.
+
 ## 11. First production component (recommendation)
 
 Implement **Stage 1 + Stage 2 first**: the minimal trusted platform interface and
