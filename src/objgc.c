@@ -5,7 +5,7 @@
 
 struct s_om_gc {
     s_om_heap h;
-    s_u32 *roots;
+    s_om_ref *roots;
     s_size nroots;
     s_size caproots;
     bool marking_active;
@@ -38,10 +38,10 @@ void s_om_gc_destroy(s_om_gc *g) {
 /* Roots                                                               */
 /* ------------------------------------------------------------------ */
 
-s_om_err s_om_gc_add_root(s_om_gc *g, s_u32 obj) {
+s_om_err s_om_gc_add_root(s_om_gc *g, s_om_ref obj) {
     if (!g) return S_OM_ENOENT;
     if (g->marking_active) return S_OM_ECOLLECT;
-    if (obj == 0) return S_OM_EINVAL;
+    if (obj == S_OM_REF_NONE) return S_OM_EINVAL;
     s_size i;
     for (i = 0; i < g->nroots; ++i) {
         if (g->roots[i] == obj) return S_OM_OK; /* already present */
@@ -49,7 +49,7 @@ s_om_err s_om_gc_add_root(s_om_gc *g, s_u32 obj) {
     if (g->nroots == g->caproots) {
         s_size ncap = g->caproots ? g->caproots * 2 : 8;
         if (ncap < g->caproots) return S_OM_EOVERFLOW; /* overflow guard */
-        s_u32 *nr = (s_u32 *)realloc(g->roots, ncap * sizeof(*nr));
+        s_om_ref *nr = (s_om_ref *)realloc(g->roots, ncap * sizeof(*nr));
         if (!nr) return S_OM_ENOMEM;
         g->roots = nr;
         g->caproots = ncap;
@@ -58,7 +58,7 @@ s_om_err s_om_gc_add_root(s_om_gc *g, s_u32 obj) {
     return S_OM_OK;
 }
 
-s_om_err s_om_gc_remove_root(s_om_gc *g, s_u32 obj) {
+s_om_err s_om_gc_remove_root(s_om_gc *g, s_om_ref obj) {
     if (!g) return S_OM_ENOENT;
     if (g->marking_active) return S_OM_ECOLLECT;
     s_size i;
@@ -88,9 +88,10 @@ bool s_om_gc_marking(const s_om_gc *g) {
 /* Mark-sweep                                                          */
 /* ------------------------------------------------------------------ */
 
-static bool gc_mark_children(s_om_heap h, s_u32 obj) {
-    /* Mark white children of `obj` grey. Returns true if any child was newly
-     * shaded grey. */
+static bool gc_mark_children(s_om_heap h, s_om_ref obj) {
+    /* Mark white children of `obj` grey. Children are stored as full object
+     * handles (u64) at payload word i (byte offset i*8). Returns true if any
+     * child was newly shaded grey. Stale/invalid child handles are ignored. */
     s_obj_kind k;
     s_u32 cnt;
     if (s_om_kind(h, obj, &k) != S_OM_OK || k == S_OBJ_STR) return false;
@@ -98,9 +99,9 @@ static bool gc_mark_children(s_om_heap h, s_u32 obj) {
     bool touched = false;
     s_u32 i;
     for (i = 0; i < cnt; ++i) {
-        s_u32 c = 0;
-        if (s_om_read_u32(h, obj, (s_size)i * 4, &c) != S_OM_OK) break;
-        if (c == 0) continue;
+        s_om_ref c = S_OM_REF_NONE;
+        if (s_om_read_u64(h, obj, (s_size)i * 8, &c) != S_OM_OK) break;
+        if (c == S_OM_REF_NONE) continue;
         if (s_om_validate(h, c) != S_OM_OK) continue;
         s_u8 cc = 0;
         if (s_om_colour(h, c, &cc) != S_OM_OK) continue;
@@ -113,7 +114,8 @@ static bool gc_mark_children(s_om_heap h, s_u32 obj) {
 }
 
 static void gc_reset_all_white(s_om_heap h) {
-    s_u32 cur = 0, o = 0;
+    s_u32 cur = 0;
+    s_om_ref o = S_OM_REF_NONE;
     while (s_om_next_live(h, &cur, &o) == S_OM_OK) {
         s_u8 col = 0;
         if (s_om_colour(h, o, &col) == S_OM_OK && col != S_GC_WHITE) {
@@ -126,7 +128,7 @@ static void gc_seed_roots(s_om_gc *g) {
     s_om_heap h = g->h;
     s_size i;
     for (i = 0; i < g->nroots; ++i) {
-        s_u32 r = g->roots[i];
+        s_om_ref r = g->roots[i];
         if (s_om_validate(h, r) != S_OM_OK) continue;
         s_u8 col = 0;
         if (s_om_colour(h, r, &col) == S_OM_OK && col == S_GC_WHITE) {
@@ -154,10 +156,8 @@ bool s_om_gc_mark_step(s_om_gc *g, s_size budget) {
     s_om_heap h = g->h;
     s_size examined = 0;
     while (examined < budget) {
-        s_u32 o = 0;
+        s_om_ref o = S_OM_REF_NONE;
         if (s_om_next_live(h, &g->mark_cursor, &o) != S_OM_OK) {
-            /* Pass finished. If anything changed this pass, scan again; else
-             * marking is complete. */
             if (g->pass_changed) {
                 g->pass_changed = false;
                 g->mark_cursor = 0;
@@ -180,23 +180,19 @@ bool s_om_gc_mark_step(s_om_gc *g, s_size budget) {
 
 s_u32 s_om_gc_sweep(s_om_gc *g) {
     if (!g) return 0;
-    /* Sweep is only valid once marking has completed; if marking is still in
-     * progress this is a contract violation and is a no-op so that an
-     * incomplete pass is never treated as completed. */
-    if (g->marking_active) return 0;
+    if (g->marking_active) return 0; /* incomplete pass never treated as done */
     s_om_heap h = g->h;
-    /* 1. Sweep white (unreachable) live objects. */
     s_u32 reclaimed = 0;
-    s_u32 cur = 0, o = 0;
+    s_u32 cur = 0;
+    s_om_ref o = S_OM_REF_NONE;
     while (s_om_next_live(h, &cur, &o) == S_OM_OK) {
         s_u8 col = 0;
         if (s_om_colour(h, o, &col) == S_OM_OK && col == S_GC_WHITE) {
             if (s_om_free(h, o) == S_OM_OK) reclaimed++;
         }
     }
-    /* 2. Reset surviving (black) objects to white for the next cycle. */
     cur = 0;
-    o = 0;
+    o = S_OM_REF_NONE;
     while (s_om_next_live(h, &cur, &o) == S_OM_OK) {
         s_u8 col = 0;
         if (s_om_colour(h, o, &col) == S_OM_OK && col == S_GC_BLACK) {
