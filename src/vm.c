@@ -937,7 +937,18 @@ static bool builtin_str_trim(s_vm *vm) {
     if (!o) return false;
     fprintf(stderr, "STR_TRIM_DEBUG: s.u.o=%p data=%p data+b=%p o=%p s_obj_str_data(o)=%p n=%zu b=%zu len=%zu\n",
             (void *)s.u.o, data, data + b, (void *)o, s_obj_str_data(o), n, b, len);
-    if (n) memcpy(s_obj_str_data(o), data + b, n);
+    if (n) {
+        char *d = s_obj_str_data(o);
+        const char *s = data + b;
+        if ((char *)o <= d && d < (char *)o + n) {
+            fprintf(stderr, "OVERLAP: d=%p o=%p n=%zu s.u.o=%p\n", d, o, n, (void *)s.u.o);
+            abort();
+        }
+        if (s >= (char *)o && s < (char *)o + n) {
+            fprintf(stderr, "OVERLAP2: s=%p o=%p n=%zu\n", s, o, n);
+            abort();
+        }
+        memcpy(s_obj_str_data(o), data + b, n);
     return push(vm, s_val_obj(o));
 }
 
