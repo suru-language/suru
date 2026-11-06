@@ -918,6 +918,12 @@ static bool builtin_str_repeat(s_vm *vm) {
 static bool builtin_str_trim(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+        fprintf(stderr, "TRIM: fid=%u tag=%d kind=%d count=%u sp=%d\n",
+                (unsigned)vm->cur_fid, s.tag,
+                (s.tag==S_VAL_OBJ?(int)s.u.o->kind:-1),
+                (s.tag==S_VAL_OBJ?(unsigned)s.u.o->count:0),
+                (int)vm->sp);
+        fflush(stderr);
         vm_trap(vm, "str_trim expects a string");
         return false;
     }
@@ -1833,6 +1839,13 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             if (i < 0 || i >= (s_i64)arr.u.o->count) {
                 vm_trap(vm, "index out of bounds (%lld of %u)", (long long)i, arr.u.o->count);
                 return 1;
+            }
+            {
+                s_value r = s_obj_array_data(arr.u.o)[i];
+                fprintf(stderr, "IDX: i=%lld arrkind=%d arrcount=%u res tag=%d kind=%d len=%u\n",
+                        (long long)i, arr.u.o->kind, (unsigned)arr.u.o->count,
+                        r.tag, (r.tag==S_VAL_OBJ?r.u.o->kind:-1),
+                        (r.tag==S_VAL_OBJ&&r.u.o->kind==S_OBJ_STR?(unsigned)r.u.o->count:0));
             }
             if (!push(vm, s_obj_array_data(arr.u.o)[i])) return 1;
             pc++; break;
