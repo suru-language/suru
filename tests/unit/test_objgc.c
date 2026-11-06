@@ -333,6 +333,79 @@ static void test_allocation_pressure(void) {
     s_om_gc_destroy(g);
 }
 
+static void test_stw_blocks_mutation_during_marking(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    s_u32 live = arr_with_kids(h, NULL, 0);
+
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_add_root(g, live), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_mark_begin(g), S_OM_OK);
+    CHECK(s_om_gc_marking(g));
+    CHECK(s_om_is_collecting(h));
+
+    s_u32 o = 0xDEADu;
+    CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, 1, 1, &o), S_OM_ECOLLECT);
+    CHECK_EQ_INT((int)o, 0);
+    CHECK_EQ_INT((int)s_om_free(h, live), S_OM_ECOLLECT);
+    CHECK_EQ_INT((int)s_om_gc_add_root(g, live), S_OM_ECOLLECT);
+    CHECK_EQ_INT((int)s_om_gc_remove_root(g, live), S_OM_ECOLLECT);
+    CHECK_EQ_INT((int)s_om_validate(h, live), S_OM_OK);
+
+    while (s_om_gc_mark_step(g, 1)) {
+    }
+    CHECK(!s_om_gc_marking(g));
+    CHECK(!s_om_is_collecting(h));
+    CHECK_EQ_INT((int)s_om_gc_sweep(g), 0);
+    CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, 1, 1, &o), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_free(h, o), S_OM_OK);
+    s_om_gc_destroy(g);
+}
+
+static void test_begin_twice_and_collect_while_active_refused(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    s_u32 root = arr_with_kids(h, NULL, 0);
+    s_u32 junk = arr_with_kids(h, NULL, 0);
+
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_add_root(g, root), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_mark_begin(g), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_mark_begin(g), S_OM_ECOLLECT);
+    CHECK_EQ_INT((int)s_om_gc_collect(g), 0); /* refused while active */
+    while (s_om_gc_mark_step(g, 1)) {
+    }
+    CHECK_EQ_INT((int)s_om_gc_sweep(g), 1); /* junk reclaimed */
+    CHECK_EQ_INT((int)s_om_validate(h, root), S_OM_OK);
+    s_om_gc_destroy(g);
+}
+
+static void test_sweep_before_completion_noop(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    s_u32 root = arr_with_kids(h, NULL, 0);
+    s_u32 junk = arr_with_kids(h, NULL, 0);
+
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_add_root(g, root), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_mark_begin(g), S_OM_OK);
+    /* sweep while marking is in progress must be a no-op */
+    CHECK_EQ_INT((int)s_om_gc_sweep(g), 0);
+    CHECK_EQ_INT((int)s_om_validate(h, junk), S_OM_OK);
+    while (s_om_gc_mark_step(g, 1)) {
+    }
+    CHECK_EQ_INT((int)s_om_gc_sweep(g), 1);
+    CHECK_EQ_INT((int)s_om_validate(h, junk), S_OM_ENOENT);
+    CHECK_EQ_INT((int)s_om_validate(h, root), S_OM_OK);
+    s_om_gc_destroy(g);
+}
+
 TEST_MAIN_BEGIN()
     test_gc_lifecycle();
     test_reachable_vs_unreachable();

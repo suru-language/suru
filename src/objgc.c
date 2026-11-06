@@ -80,6 +80,10 @@ s_u32 s_om_gc_nroots(const s_om_gc *g) {
     return g ? (s_u32)g->nroots : 0;
 }
 
+bool s_om_gc_marking(const s_om_gc *g) {
+    return g ? g->marking_active : false;
+}
+
 /* ------------------------------------------------------------------ */
 /* Mark-sweep                                                          */
 /* ------------------------------------------------------------------ */
