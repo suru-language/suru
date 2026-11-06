@@ -192,7 +192,7 @@ func nw_emit_minimal_elf() -> str {
     return nw_emit_elf_message("hi\n");
 }
 
-func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_nparams: [int], fn_entry: int) -> str {
+func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_bs: [[int]], fn_nparams: [int], fn_entry: int) -> str {
     let nfuncs: int = array_len(fn_ops);
     mut nl: [int] = [];
     mut f0: int = 0;
@@ -230,6 +230,7 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_nparams: [int], 
 
         let ops: [int] = fn_ops[f];
         let avs: [int] = fn_avs[f];
+        let bs: [int] = fn_bs[f];
         let nins: int = array_len(ops);
         mut pcrel: [int] = [];
         mut pc: int = 0;
