@@ -487,6 +487,18 @@ implemented):
   tests — the prerequisite for VM root enumeration — before any `vm.c`
   translation.
 
+### Stage 11D-A — S_VAL_OBJ 64-bit handle representation (implemented)
+`S_VAL_OBJ` now carries a complete generation-protected handle in `s_value.u.idx`
+(`(generation << 32) | slot`). Explicit constructors/accessors are provided in
+`include/suru/value.h`: `s_val_obj_h`, `s_val_obj_h_parts`, `s_val_obj_handle`,
+`s_val_obj_id`, `s_val_obj_slot`, `s_val_obj_generation`. Handles are full-width
+(never truncated, never reinterpreted as pointers); non-object values are
+unchanged; zero/stale handles are rejected at the resolution boundary via the
+trusted object-access interface. This is the representation boundary only: the
+VM still runs on the legacy heap, no new heap ownership is introduced, and the
+pointer-based legacy path remains isolated (`s_val_obj`/`u.o`) for the legacy
+backend and `test_gc`. Verified by `tests/unit/test_value_handle.c`.
+
 ### Stage 11C — VM root-enumeration integration (implemented)
 The VM now carries an optional `objgc` collector binding (`s_vm_gc_bind/`
 `unbind`, `s_vm_gc_sync`). `sync()` re-registers the VM's current live operand-
