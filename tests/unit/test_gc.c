@@ -148,6 +148,100 @@ static void test_exception_object_graph(void) {
     s_heap_destroy(h);
 }
 
+/* Differential tests against the SURU reference model (selfhost/memory/
+ * ref_gc.suru). Each scenario uses the same graph shapes and survivor counts
+ * as the model, so the C collector and the SURU model must agree.
+ */
+static void test_differential_ref_model(void) {
+    /* chain-reachable: root -> n1 -> n2 => 3 survivors */
+    {
+        s_heap *h = s_heap_create();
+        s_gcobj *n0 = s_heap_new_array(h, 1);
+        s_gcobj *n1 = s_heap_new_array(h, 1);
+        s_gcobj *n2 = s_heap_new_array(h, 0);
+        (void)n2;
+        s_obj_array_data(n0)[0] = s_val_obj(n1);
+        s_obj_array_data(n1)[0] = s_val_obj(n2);
+        s_value root[1] = { s_val_obj(n0) };
+        s_heap_set_stack_root(h, root, 1);
+        s_heap_collect(h);
+        CHECK_EQ_INT((int)s_heap_live_objects(h), 3);
+        s_heap_destroy(h);
+    }
+    /* unreachable-reclaimed: n2 orphaned => 2 survivors */
+    {
+        s_heap *h = s_heap_create();
+        s_gcobj *n0 = s_heap_new_array(h, 1);
+        s_gcobj *n1 = s_heap_new_array(h, 0);
+        s_gcobj *n2 = s_heap_new_array(h, 0);
+        s_obj_array_data(n0)[0] = s_val_obj(n1);
+        s_value root[1] = { s_val_obj(n0) };
+        s_heap_set_stack_root(h, root, 1);
+        s_heap_collect(h);
+        CHECK_EQ_INT((int)s_heap_live_objects(h), 2);
+        s_heap_destroy(h);
+    }
+    /* cycle-root-survives: root -> a <-> b => 3 survivors */
+    {
+        s_heap *h = s_heap_create();
+        s_gcobj *n0 = s_heap_new_array(h, 1);
+        s_gcobj *a = s_heap_new_array(h, 1);
+        s_gcobj *b = s_heap_new_array(h, 1);
+        s_obj_array_data(n0)[0] = s_val_obj(a);
+        s_obj_array_data(a)[0] = s_val_obj(b);
+        s_obj_array_data(b)[0] = s_val_obj(a);
+        s_value root[1] = { s_val_obj(n0) };
+        s_heap_set_stack_root(h, root, 1);
+        s_heap_collect(h);
+        CHECK_EQ_INT((int)s_heap_live_objects(h), 3);
+        s_heap_destroy(h);
+    }
+    /* multiple-roots: root0->n1, root2->n3 => 4 survivors */
+    {
+        s_heap *h = s_heap_create();
+        s_gcobj *n0 = s_heap_new_array(h, 1);
+        s_gcobj *n1 = s_heap_new_array(h, 0);
+        s_gcobj *n2 = s_heap_new_array(h, 1);
+        s_gcobj *n3 = s_heap_new_array(h, 0);
+        s_obj_array_data(n0)[0] = s_val_obj(n1);
+        s_obj_array_data(n2)[0] = s_val_obj(n3);
+        s_value root[2] = { s_val_obj(n0), s_val_obj(n2) };
+        s_heap_set_stack_root(h, root, 2);
+        s_heap_collect(h);
+        CHECK_EQ_INT((int)s_heap_live_objects(h), 4);
+        s_heap_destroy(h);
+    }
+    /* root-removal-reclaims: remove root => 0 survivors */
+    {
+        s_heap *h = s_heap_create();
+        s_gcobj *n0 = s_heap_new_array(h, 1);
+        s_gcobj *n1 = s_heap_new_array(h, 0);
+        s_obj_array_data(n0)[0] = s_val_obj(n1);
+        s_value root[1] = { s_val_obj(n0) };
+        s_heap_set_stack_root(h, root, 1);
+        s_heap_collect(h);
+        CHECK_EQ_INT((int)s_heap_live_objects(h), 2);
+        s_heap_set_stack_root(h, NULL, 0);
+        s_heap_collect(h);
+        CHECK_EQ_INT((int)s_heap_live_objects(h), 0);
+        s_heap_destroy(h);
+    }
+    /* nested-graph: root -> arr -> obj => 3 survivors */
+    {
+        s_heap *h = s_heap_create();
+        s_gcobj *n0 = s_heap_new_array(h, 1);
+        s_gcobj *n1 = s_heap_new_array(h, 1);
+        s_gcobj *n2 = s_heap_new_array(h, 0);
+        s_obj_array_data(n0)[0] = s_val_obj(n1);
+        s_obj_array_data(n1)[0] = s_val_obj(n2);
+        s_value root[1] = { s_val_obj(n0) };
+        s_heap_set_stack_root(h, root, 1);
+        s_heap_collect(h);
+        CHECK_EQ_INT((int)s_heap_live_objects(h), 3);
+        s_heap_destroy(h);
+    }
+}
+
 TEST_MAIN_BEGIN()
     test_alloc_free();
     test_collect_garbage();
@@ -158,4 +252,5 @@ TEST_MAIN_BEGIN()
     test_incremental_step();
     test_incremental_graph();
     test_exception_object_graph();
+    test_differential_ref_model();
 TEST_MAIN_END()
