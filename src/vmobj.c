@@ -5,6 +5,16 @@ s_om_err s_vmobj_alloc(s_om_heap h, s_obj_kind kind, s_u32 count,
     return s_om_alloc(h, kind, count, payload_bytes, out);
 }
 
+s_om_err s_vmobj_alloc_value(s_om_heap h, s_obj_kind kind, s_u32 count,
+                             s_size payload_bytes, s_value *out) {
+    if (!out) return S_OM_EINVAL;
+    s_om_ref o = S_OM_REF_NONE;
+    s_om_err e = s_om_alloc(h, kind, count, payload_bytes, &o);
+    if (e != S_OM_OK) return e;
+    *out = s_val_obj_h((s_u64)o);
+    return S_OM_OK;
+}
+
 s_om_err s_vmobj_validate(s_om_heap h, s_om_ref o) {
     return s_om_validate(h, o);
 }

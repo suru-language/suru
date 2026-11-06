@@ -487,6 +487,16 @@ implemented):
   tests — the prerequisite for VM root enumeration — before any `vm.c`
   translation.
 
+### Stage 11D-B1 — allocation-to-handle boundary (implemented)
+`vmobj` now provides `s_vmobj_alloc_value`: allocate through the object model and
+construct an `S_VAL_OBJ` value carrying the complete generation-protected handle
+(`s_val_obj_h`). On failure no value is published (caller's value is left
+unchanged). Ownership is unambiguous: the new object model owns the object
+(destroyed via `s_om_free`); a legacy pointer is never manufactured as a handle.
+This is the allocation-side boundary of the atomic cutover; the live VM still runs
+on the legacy heap (`s_heap_alloc` unchanged), no collector is activated, and no
+object-access site is migrated yet. Verified by `tests/unit/test_vmobj_alloc.c`.
+
 ### Stage 11D-A — S_VAL_OBJ 64-bit handle representation (implemented)
 `S_VAL_OBJ` now carries a complete generation-protected handle in `s_value.u.idx`
 (`(generation << 32) | slot`). Explicit constructors/accessors are provided in

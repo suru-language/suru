@@ -26,6 +26,14 @@ extern "C" {
 s_om_err s_vmobj_alloc(s_om_heap h, s_obj_kind kind, s_u32 count,
                        s_size payload_bytes, s_om_ref *out);
 
+/* Stage 11D-B1: allocate through the object model and construct an
+ * S_VAL_OBJ value carrying the complete generation-protected handle. On success
+ * `*out` is a genuine handle value; on failure `*out` is left unchanged and the
+ * error is returned. The allocated object is owned by the new object model
+ * (destroyed via s_om_free); a legacy pointer is never manufactured as a handle. */
+s_om_err s_vmobj_alloc_value(s_om_heap h, s_obj_kind kind, s_u32 count,
+                             s_size payload_bytes, s_value *out);
+
 /* Full validation and cheap identity liveness (slot+generation, no
  * header-intgrity check), respectively. */
 s_om_err s_vmobj_validate(s_om_heap h, s_om_ref o);
