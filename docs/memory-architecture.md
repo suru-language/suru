@@ -311,11 +311,36 @@ current numbering skips 10):
   objects, root removal mid-collection, OOM and alignment/overflow of offsets.
 
 ### Staged roadmap
-This phase commits only the architecture. Production implementation begins only
-after approval of this section:
 object layout → reference representation → metadata → allocator initialization →
 bookkeeping → free-space → validation → VM integration → roots → marking/collection
 → reclamation → replace the C collector. Each stage has tests.
+
+### Implemented so far — Stage 3 foundation (object model + allocator)
+The first production component of this roadmap is implemented as a self-contained
+module (`include/suru/objmodel.h`, `src/objmodel.c`, `tests/unit/test_objmodel.c`,
+154 checks) built directly on the Stage 1–2 platform interface:
+
+- **Object layout (D1):** fixed-format header in a RawBlock region; identity is a
+  flat u32 object index, not a native address. Header fields (kind/flags/colour/
+  size-rounded/magic/count) map onto the `s_gcobj` wire layout; payloads are
+  8-aligned, objects 16-aligned. Kinds preserved: str/array/record/closure/
+  exception.
+- **Reference representation (D2):** handles are 1-based indices; validation =
+  in-range + slot magic match. Stale/freed/invalid indices are rejected.
+- **Allocation separation (D3):** SURU-controlled object model/allocator/validation/
+  free-space over the trusted platform (opaque RawBlock handles, checked access).
+- **Algorithm (D4):** segregated small-bucket freelist (16 B buckets, ≤ 4096 B)
+  plus bump allocation, matching the approved design. OOM is a deterministic error
+  return with no partial registration.
+- **Bootstrap (D5):** metadata (slot registry) lives in a dedicated RawBlock; the
+  module never allocates from a managed heap, so it is non-recursive.
+- **Invariants (D6):** overflow-checked sizes, bounds-checked payload access,
+  debug poison on free, fault injection (`s_om_set_fail_alloc`,
+  `s_om_set_alloc_fail_after`), deterministic failure leaving live objects intact.
+
+This module is additive and trusted-runtime-only; it does not change
+`src/mem.c`, the VM, or bytecode. Stages 8–12 (VM integration, roots,
+marking/collection, reclamation, replacing the C collector) remain future work.
 
 ## 10. Implementation roadmap (each stage has tests)
 
