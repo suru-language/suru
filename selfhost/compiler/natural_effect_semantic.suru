@@ -46,7 +46,6 @@ func natural_effect_check(source: str) -> int {
 
     // Declaration pass: establish the effect signature of every routine.
     while i < array_len(lines) {
-        println("L i="+to_str(i)+" str="+lines[i]);
         let line: str = str_trim(lines[i]);
         i += 1;
         let open: str = nds_open_word(line);
