@@ -918,16 +918,6 @@ static bool builtin_str_repeat(s_vm *vm) {
 static bool builtin_str_trim(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
-        fprintf(stderr, "ST_FAIL: fid=%u kind=%d count=%u sp=%d stack:",
-                (unsigned)vm->cur_fid, s.u.o->kind, (unsigned)s.u.o->count,
-                (int)vm->sp);
-        for (int qi = vm->sp - 3; qi < (int)vm->sp; ++qi) {
-            if (qi >= 0 && vm->st[qi].tag == S_VAL_OBJ)
-                fprintf(stderr, " (o kind=%d)", vm->st[qi].u.o->kind);
-            else if (qi >= 0)
-                fprintf(stderr, " (tag=%d)", vm->st[qi].tag);
-        }
-        fprintf(stderr, "\n"); fflush(stderr);
         vm_trap(vm, "str_trim expects a string");
         return false;
     }
