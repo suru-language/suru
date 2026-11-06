@@ -181,6 +181,25 @@ func main() {
         fails += expect("alloc-cap-returns-minus1", over[2], -1);
     }
 
+    // ---- 11. Unrooted temporary array is reclaimed (models the str_split
+    // defect: a result array not yet rooted is collected during nested
+    // allocation). ----
+    {
+        let kinds: [int] = [1, 1];
+        let refs: [[int]] = [[1], empty_ints()];
+        let r: [int] = simulate(empty_ints(), kinds, refs, 2, 8);
+        fails += expect("unrooted-temp-reclaimed", r[1], 0);
+    }
+
+    // ---- 12. The same array survives when rooted before the second
+    // allocation (models the fix: root the result across element allocs). ----
+    {
+        let kinds: [int] = [1, 1];
+        let refs: [[int]] = [[1], empty_ints()];
+        let r: [int] = simulate([0], kinds, refs, 2, 8);
+        fails += expect("rooted-temp-survives", r[1], 2);
+    }
+
     if fails == 0 { println("REF-GC: all tests passed"); }
     exit(fails > 0 ? 1 : 0);
 }

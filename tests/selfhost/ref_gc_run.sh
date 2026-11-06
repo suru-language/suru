@@ -11,4 +11,4 @@ if ! "$SURU" run "$ROOT/selfhost/memory/ref_gc.suru" | grep -q "REF-GC: all test
     echo "natural GC reference model: FAILED" >&2
     exit 1
 fi
-echo "natural GC reference model: 10 checks passed"
+echo "natural GC reference model: 12 checks passed"
