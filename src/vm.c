@@ -712,6 +712,7 @@ static bool builtin_substr(s_vm *vm) {
     if (end > slen) end = slen;
     s_size n = (s_size)(end - b);
     s_heap_add_root(vm->heap, &s);
+    s_heap_add_root(vm->heap, &s);
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
     s_heap_remove_root(vm->heap, &s);
     if (!o) return false;
