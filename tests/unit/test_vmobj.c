@@ -142,4 +142,5 @@ TEST_MAIN_BEGIN()
     test_inspect_view();
     test_temp_root_survival();
     test_temp_root_refused_during_marking();
+    test_family_introspection();
 TEST_MAIN_END()
