@@ -712,7 +712,6 @@ static bool builtin_substr(s_vm *vm) {
     if (end > slen) end = slen;
     s_size n = (s_size)(end - b);
     s_heap_add_root(vm->heap, &s);
-    s_heap_add_root(vm->heap, &s);
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
     s_heap_remove_root(vm->heap, &s);
     if (!o) return false;
@@ -919,8 +918,6 @@ static bool builtin_str_repeat(s_vm *vm) {
 static bool builtin_str_trim(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
-        fprintf(stderr, "STR_TRIM_FAIL: tag=%d kind=%d tag_name=%d\n", s.tag, s.u.o->kind, s.u.o->kind);
-        fflush(stderr);
         vm_trap(vm, "str_trim expects a string");
         return false;
     }
@@ -932,19 +929,20 @@ static bool builtin_str_trim(s_vm *vm) {
     while (e > b && (data[e - 1] == ' ' || data[e - 1] == '\t' ||
                      data[e - 1] == '\n' || data[e - 1] == '\r')) e--;
     s_size n = e - b;
-    /* Copy trimmed text to a temp buffer BEFORE allocating, so we don't
-     * depend on s.u.o remaining valid across the allocator call. */
-    char tmp[1024];
+    /* Copy trimmed text to an exact-size temporary buffer BEFORE allocating,
+     * so the data survives even if GC frees the source object during
+     * allocation. A heap buffer (rather than a fixed stack buffer) supports
+     * arbitrary-length strings. */
+    char *tmp = NULL;
     if (n > 0) {
-        if (n > sizeof(tmp)) {
-            vm_trap(vm, "str_trim result too large");
-            return false;
-        }
+        tmp = (char *)malloc(n);
+        if (!tmp) { vm_trap(vm, "str_trim: out of memory"); return false; }
         memcpy(tmp, data + b, n);
     }
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
-    if (!o) return false;
+    if (!o) { free(tmp); return false; }
     if (n) memcpy(s_obj_str_data(o), tmp, n);
+    free(tmp);
     return push(vm, s_val_obj(o));}
 
 static bool builtin_args_len(s_vm *vm) {
