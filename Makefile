@@ -145,6 +145,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_elf_array_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_record_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_exec_native_run.sh $(BINDIR)/suru
+	@$(MAKE) selfhost-rebuild
 
 .PHONY: selfhost-compare
 selfhost-compare: $(BINDIR)/suru
