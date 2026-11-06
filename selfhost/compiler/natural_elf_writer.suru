@@ -221,11 +221,17 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_bs: [[int]], fn_
         fn_start = array_concat(fn_start, [array_len(buf)]);
         buf = array_concat(buf, [0x55, 0x48,0x89,0xE5, 0x48,0x83,0xEC,0x68]);
         buf[array_len(buf) - 1] = (96 + nl[f] * 8) & 255;
-        if fn_nparams[f] >= 2 {
-            buf = array_concat(buf, [0x48,0x89,0x75,0xF0]);
-        }
-        if fn_nparams[f] >= 1 {
-            buf = array_concat(buf, [0x48,0x89,0x7D,0xF8]);
+        if fn_nparams[f] > 6 { return ""; }
+        mut ai: int = 0;
+        while ai < fn_nparams[f] {
+            let disp: int = 256 - 8 * (ai + 1);
+            if ai == 0 { buf = array_concat(buf, [0x48,0x89,0x7D,disp]); }
+            else if ai == 1 { buf = array_concat(buf, [0x48,0x89,0x75,disp]); }
+            else if ai == 2 { buf = array_concat(buf, [0x48,0x89,0x55,disp]); }
+            else if ai == 3 { buf = array_concat(buf, [0x48,0x89,0x4D,disp]); }
+            else if ai == 4 { buf = array_concat(buf, [0x4C,0x89,0x45,disp]); }
+            else { buf = array_concat(buf, [0x4C,0x89,0x4D,disp]); }
+            ai += 1;
         }
 
         let ops: [int] = fn_ops[f];
@@ -318,11 +324,16 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_bs: [[int]], fn_
                 // FIELD_ST: pop val -> rcx, pop ptr -> rax, mov [rax+b*8],rcx, push rax
                 buf = array_concat(buf, [0x59, 0x58, 0x48,0x89,0x48, b * 8, 0x50]);
             } else if op == 59 {
-                if fn_nparams[a] >= 2 {
-                    buf = array_concat(buf, [0x5E]);
-                }
-                if fn_nparams[a] >= 1 {
-                    buf = array_concat(buf, [0x5F]);
+                if fn_nparams[a] > 6 { return ""; }
+                mut ai: int = fn_nparams[a] - 1;
+                while ai >= 0 {
+                    if ai == 0 { buf = array_concat(buf, [0x5F]); }
+                    else if ai == 1 { buf = array_concat(buf, [0x5E]); }
+                    else if ai == 2 { buf = array_concat(buf, [0x5A]); }
+                    else if ai == 3 { buf = array_concat(buf, [0x59]); }
+                    else if ai == 4 { buf = array_concat(buf, [0x41,0x58]); }
+                    else { buf = array_concat(buf, [0x41,0x59]); }
+                    ai -= 1;
                 }
                 buf = array_concat(buf, [0xE8]);
                 mut d: int = array_len(buf);
