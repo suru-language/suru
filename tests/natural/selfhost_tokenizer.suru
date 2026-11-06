@@ -1,0 +1,50 @@
+routine is_letter(c: str) -> Bool
+    give (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or c == "_"
+end routine
+
+routine is_digit(c: str) -> Bool
+    give c >= "0" and c <= "9"
+end routine
+
+routine tokenize(src: str) -> [str]
+    value n: Whole = str_len(src)
+    change i: Whole = 0
+    change out: [str] = []
+    repeat while i < n
+        change c: str = substr(src, i, 1)
+        when c == " " or c == "\n"
+            set i to i + 1
+        otherwise
+            when is_letter(c)
+                change j: Whole = i
+                repeat while j < n and is_letter(substr(src, j, 1))
+                    set j to j + 1
+                end repeat
+                set out to array_concat(out, [substr(src, i, j - i)])
+                set i to j
+            otherwise
+                when is_digit(c)
+                    change j: Whole = i
+                    repeat while j < n and is_digit(substr(src, j, 1))
+                        set j to j + 1
+                    end repeat
+                    set out to array_concat(out, [substr(src, i, j - i)])
+                    set i to j
+                otherwise
+                    set out to array_concat(out, [c])
+                    set i to i + 1
+                end when
+            end when
+        end when
+    end repeat
+    give out
+end routine
+
+routine main() -> Unit
+    value toks: [str] = tokenize("show(value + 2)")
+    value i: Whole = 0
+    repeat while i < array_len(toks)
+        show(toks[i])
+        set i to i + 1
+    end repeat
+end routine
