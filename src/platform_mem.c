@@ -125,6 +125,14 @@ s_pm_err s_pm_validate(s_pm_handle h) {
     return region_of(h) ? S_PM_OK : S_PM_ENOENT;
 }
 
+s_pm_err s_pm_ptr(s_pm_handle h, void **out) {
+    s_pm_region *r = region_of(h);
+    if (!r) return S_PM_ENOENT;
+    if (!out) return S_PM_EINVAL;
+    *out = r->base;
+    return S_PM_OK;
+}
+
 s_pm_err s_pm_read(s_pm_handle h, s_size off, void *dst, s_size len) {
     s_pm_region *r = region_of(h);
     if (!r) return S_PM_ENOENT;

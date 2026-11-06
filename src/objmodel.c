@@ -409,6 +409,21 @@ bool s_om_is_live(s_om_heap h, s_om_ref obj) {
     return ref_check(hp, obj, &sl) == S_OM_OK;
 }
 
+s_om_err s_om_inspect(s_om_heap h, s_om_ref obj, const void **base_out,
+                       s_size *rounded_out) {
+    if (!base_out || !rounded_out) return S_OM_EINVAL;
+    s_om_heap_ *hp = heap_of(h);
+    if (!hp) return S_OM_ENOENT;
+    s_om_slot sl;
+    s_om_err e = ref_check(hp, obj, &sl);
+    if (e != S_OM_OK) return e;
+    void *base = NULL;
+    if (s_pm_ptr(hp->obj_blk, &base) != S_PM_OK) return S_OM_ENOENT;
+    *base_out = (const unsigned char *)base + sl.off;
+    *rounded_out = (s_size)sl.size_rounded;
+    return S_OM_OK;
+}
+
 s_om_err s_om_next_live(s_om_heap h, s_u32 *cursor, s_om_ref *out_obj) {
     if (!cursor || !out_obj) return S_OM_EINVAL;
     s_om_heap_ *hp = heap_of(h);

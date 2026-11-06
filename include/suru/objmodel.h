@@ -119,6 +119,17 @@ s_om_err s_om_validate(s_om_heap h, s_om_ref obj);
 bool s_om_is_live(s_om_heap h, s_om_ref obj);
 
 /*
+ * Trusted-runtime only: resolve a live object handle to a stable pointer to its
+ * header start within its region, plus its rounded size. The pointer is stable
+ * because objects are non-moving and collection (stop-the-world) never coexists
+ * with runtime access. Ordinary SURU programs never obtain this; it exists so
+ * the VM can access payloads directly (the architecture's "runtime layer sees
+ * addresses"). Fails (ENOENT) for stale/invalid handles.
+ */
+s_om_err s_om_inspect(s_om_heap h, s_om_ref obj, const void **base_out,
+                       s_size *rounded_out);
+
+/*
  * Iterate live objects. Pass a cursor (u32 slot index) that starts at 0. On
  * success the cursor and *out_obj are set to the next live object's handle and
  * S_OM_OK is returned. When no further live object exists, S_OM_ENOENT is

@@ -175,6 +175,24 @@ static void test_zero_len_invalid_handle(void) {
     CHECK_EQ_INT((int)s_pm_write(h, 0, &b, 0), S_PM_ENOENT);
 }
 
+static void test_trusted_ptr_escape(void) {
+    pm_reset();
+    s_pm_handle h = 0;
+    CHECK_EQ_INT((int)s_pm_acquire(32, 16, &h), S_PM_OK);
+    void *base = NULL;
+    CHECK_EQ_INT((int)s_pm_ptr(h, &base), S_PM_OK);
+    CHECK(base != NULL);
+    /* pointer view must reflect API writes and be in-bounds */
+    CHECK_EQ_INT((int)s_pm_write_u32(h, 4, 0x11223344u), S_PM_OK);
+    s_u32 v = 0;
+    memcpy(&v, (const unsigned char *)base + 4, 4);
+    CHECK_EQ_INT((int)v, (int)0x11223344u);
+    CHECK_EQ_INT((int)s_pm_ptr(0, &base), S_PM_ENOENT);
+    CHECK_EQ_INT((int)s_pm_ptr(h, NULL), S_PM_EINVAL);
+    CHECK_EQ_INT((int)s_pm_release(h), S_PM_OK);
+    CHECK_EQ_INT((int)s_pm_ptr(h, &base), S_PM_ENOENT);
+}
+
 static void test_region_zeroed(void) {
     pm_reset();
     s_pm_handle h = 0;
@@ -218,4 +236,5 @@ TEST_MAIN_BEGIN()
     test_zero_len_invalid_handle();
     test_alignment_reported();
     test_region_zeroed();
+    test_trusted_ptr_escape();
 TEST_MAIN_END()

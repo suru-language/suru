@@ -511,6 +511,32 @@ static void test_metadata_corruption_detected(void) {
       CHECK_EQ_INT((int)s_om_test_set_hdr_u8(h, o, 16, 1), S_OM_EINVAL); }
 }
 
+static void test_inspect_stable_view(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+    s_om_ref o = S_OM_REF_NONE;
+    CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, 8, 8, &o), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_write(h, o, 0, "abcdefgh", 8), S_OM_OK);
+
+    const void *base = NULL;
+    s_size rounded = 0;
+    CHECK_EQ_INT((int)s_om_inspect(h, o, &base, &rounded), S_OM_OK);
+    CHECK(base != NULL);
+    CHECK(rounded >= S_OM_HEADER_SIZE + 8);
+    CHECK_EQ_INT((int)(rounded % S_OM_ALIGN), 0);
+
+    const unsigned char *p = (const unsigned char *)base;
+    s_u32 magic = 0;
+    memcpy(&magic, p + 8, 4);
+    CHECK_EQ_INT((int)magic, (int)S_OBJ_MAGIC);
+    CHECK_EQ_INT((int)memcmp(p + S_OM_HEADER_SIZE, "abcdefgh", 8), 0);
+
+    /* stale handle is rejected */
+    CHECK_EQ_INT((int)s_om_free(h, o), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_inspect(h, o, &base, &rounded), S_OM_ENOENT);
+}
+
 TEST_MAIN_BEGIN()
     test_heap_lifecycle();
     test_heap_create_invalid();
@@ -538,4 +564,5 @@ TEST_MAIN_BEGIN()
     test_generation_exhaustion_retires_slot();
     test_generation_exhaustion_all_slots_retired();
     test_metadata_corruption_detected();
+    test_inspect_stable_view();
 TEST_MAIN_END()

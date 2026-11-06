@@ -113,6 +113,15 @@ void s_pm_set_alloc_fail_after(s_u32 n_ok);
 s_u32 s_pm_active_count(void);
 void s_pm_dispose_all(void);
 
+/*
+ * Trusted-runtime only: return the aligned usable base pointer of a live region.
+ * This is the single, deliberate address-escape for the trusted runtime (the
+ * object model and VM, which per the architecture "see addresses"). Ordinary
+ * SURU programs can never reach this interface. The pointer is stable for the
+ * region's lifetime (no movement).
+ */
+s_pm_err s_pm_ptr(s_pm_handle h, void **out);
+
 #ifdef __cplusplus
 }
 #endif
