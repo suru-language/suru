@@ -699,14 +699,6 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
         }
         return nbc_emit(result, "BC_NEW_ARRAY", to_str(count));
     }
-    if str_contains(text, "[") {
-        let bracket = nbc_find_postfix(text, "[", "]");
-        if int_from_str(bracket[0]) >= 0 and bracket[1] != "" {
-            result = nbc_emit_expression(result, bracket[1]);
-            result = nbc_emit_expression(result, bracket[2]);
-            return nbc_emit(result, "BC_IDX_LD", "");
-        }
-    }
     let open: int = nbc_find(text, "(");
     if open > 0 and text[str_len(text) - 1] == ")" {
         let callee: str = str_trim(substr(text, 0, open));
@@ -730,6 +722,14 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
         let function: int = nbc_func_index(result, callee);
         if function >= 0 { return nbc_emit(result, "BC_CALL", to_str(function)); }
         return nbc_emit(result, "BC_TRAP", "unknown call: " + callee);
+    }
+    if str_contains(text, "[") {
+        let bracket = nbc_find_postfix(text, "[", "]");
+        if int_from_str(bracket[0]) >= 0 and bracket[1] != "" {
+            result = nbc_emit_expression(result, bracket[1]);
+            result = nbc_emit_expression(result, bracket[2]);
+            return nbc_emit(result, "BC_IDX_LD", "");
+        }
     }
     if nbc_is_integer(text) {
         return nbc_const(result, "int", "BC_CONST_INT", text);
