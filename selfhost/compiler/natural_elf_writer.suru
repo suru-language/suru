@@ -43,49 +43,6 @@ func nw_elf_header(total: int, entry: int) -> str {
     return hd + ph;
 }
 
-func nw_elf_header2(total: int, entry: int, heap_vaddr: int, heap_size: int) -> str {
-    let hd: str = "";
-    hd = hd + str_chr_byte(0x7f) + "ELF" +
-        str_chr_byte(2) + str_chr_byte(1) + str_chr_byte(1) + str_chr_byte(0) +
-        str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0) +
-        str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0) + str_chr_byte(0);
-    hd = hd + nw_u16(2);
-    hd = hd + nw_u16(62);
-    hd = hd + nw_u32(1);
-    hd = hd + nw_i64(entry);
-    hd = hd + nw_i64(64);
-    hd = hd + nw_i64(0);
-    hd = hd + nw_u32(0);
-    hd = hd + nw_u16(64);
-    hd = hd + nw_u16(56);
-    hd = hd + nw_u16(2);
-    hd = hd + nw_u16(0);
-    hd = hd + nw_u16(0);
-    hd = hd + nw_u16(0);
-
-    let ph1: str = "";
-    ph1 = ph1 + nw_u32(1);
-    ph1 = ph1 + nw_u32(5);
-    ph1 = ph1 + nw_i64(0);
-    ph1 = ph1 + nw_i64(0x400000);
-    ph1 = ph1 + nw_i64(0x400000);
-    ph1 = ph1 + nw_i64(total);
-    ph1 = ph1 + nw_i64(total);
-    ph1 = ph1 + nw_i64(0x1000);
-
-    let ph2: str = "";
-    ph2 = ph2 + nw_u32(1);
-    ph2 = ph2 + nw_u32(6);
-    ph2 = ph2 + nw_i64(total);
-    ph2 = ph2 + nw_i64(heap_vaddr);
-    ph2 = ph2 + nw_i64(heap_vaddr);
-    ph2 = ph2 + nw_i64(heap_size);
-    ph2 = ph2 + nw_i64(heap_size);
-    ph2 = ph2 + nw_i64(0x1000);
-
-    return hd + ph1 + ph2;
-}
-
 func nw_print_routine() -> str {
     mut code: str = "";
     // sub rsp, 32
@@ -235,7 +192,7 @@ func nw_emit_minimal_elf() -> str {
     return nw_emit_elf_message("hi\n");
 }
 
-func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_entry: int) -> str {
+func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_nparams: [int], fn_entry: int) -> str {
     let nfuncs: int = array_len(fn_ops);
     mut nl: [int] = [];
     mut f0: int = 0;
@@ -264,6 +221,12 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_entry: int) -> s
         fn_start = array_concat(fn_start, [array_len(buf)]);
         buf = array_concat(buf, [0x55, 0x48,0x89,0xE5, 0x48,0x83,0xEC,0x68]);
         buf[array_len(buf) - 1] = (96 + nl[f] * 8) & 255;
+        if fn_nparams[f] >= 2 {
+            buf = array_concat(buf, [0x48,0x89,0x75,0xF0]);
+        }
+        if fn_nparams[f] >= 1 {
+            buf = array_concat(buf, [0x48,0x89,0x7D,0xF8]);
+        }
 
         let ops: [int] = fn_ops[f];
         let avs: [int] = fn_avs[f];
@@ -303,34 +266,30 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_entry: int) -> s
                 else { buf = array_concat(buf, [0x0F,0x9D,0xC0]); }
                 buf = array_concat(buf, [0x48,0x0F,0xB6,0xC0, 0x50]);
             } else if op == 63 {
-                if a != 1 { return ""; }
-                buf = array_concat(buf, [0x58]);
-                let pr: str = nw_print_routine();
-                mut k: int = 0;
-                while k < str_len(pr) {
-                    buf = array_concat(buf, [str_byte_at(pr, k)]);
-                    k += 1;
+                if a == 5 {
+                    // to_str on int subset: no-op (println prints ints directly)
+                } else if a != 1 {
+                    return "";
                 }
-                buf = array_concat(buf, [0x50]);
+                if a == 1 {
+                    buf = array_concat(buf, [0x58]);
+                    let pr: str = nw_print_routine();
+                    mut k: int = 0;
+                    while k < str_len(pr) {
+                        buf = array_concat(buf, [str_byte_at(pr, k)]);
+                        k += 1;
+                    }
+                    buf = array_concat(buf, [0x50]);
+                }
             } else if op == 7 {
                 buf = array_concat(buf, [0x58]);
-            } else if op == 51 {
-                // new_array: pop a elements into heap at bump, advance bump, push ptr
-                buf = array_concat(buf, [0x48,0x8B,0x14,0x25, 0x00,0x20,0x40,0x00]);
-                let ei: int = a - 1;
-                while ei >= 0 {
-                    buf = array_concat(buf, [0x58]);
-                    let off: int = ei * 8;
-                    buf = array_concat(buf, [0x48,0x89,0x42, off]);
-                    ei -= 1;
-                }
-                buf = array_concat(buf, [0x48,0x81,0xC2]);
-                buf = array_concat(buf, [(a * 8) & 255, ((a * 8) >> 8) & 255, ((a * 8) >> 16) & 255, ((a * 8) >> 24) & 255]);
-                buf = array_concat(buf, [0x48,0x89,0x14,0x25, 0x00,0x20,0x40,0x00]);
-                buf = array_concat(buf, [0x52]);
-            } else if op == 54 {
-                buf = array_concat(buf, [0x5B, 0x58, 0x48,0x8B,0x04,0xD8, 0x50]);
             } else if op == 59 {
+                if fn_nparams[a] >= 2 {
+                    buf = array_concat(buf, [0x5E]);
+                }
+                if fn_nparams[a] >= 1 {
+                    buf = array_concat(buf, [0x5F]);
+                }
                 buf = array_concat(buf, [0xE8]);
                 mut d: int = array_len(buf);
                 buf = array_concat(buf, [0,0,0,0]);
@@ -338,6 +297,9 @@ func nw_emit_elf_multifunc(fn_ops: [[int]], fn_avs: [[int]], fn_entry: int) -> s
                 buf = array_concat(buf, [0x50]);
             } else if op == 64 or op == 65 {
                 if f != fn_entry {
+                    if op == 64 {
+                        buf = array_concat(buf, [0x58]);
+                    }
                     buf = array_concat(buf, [0xC9, 0xC3]);
                 }
             } else if op == 66 {

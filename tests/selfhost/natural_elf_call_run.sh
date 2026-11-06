@@ -30,6 +30,8 @@ check_call() {
 fail=0
 if check_call helper 'routine helper() -> Whole\n    give 7\nend routine\nroutine main() -> Unit\n    show(helper())\nend routine' "7"; then :; else fail=$((fail + 1)); fi
 if check_call helperarith 'routine helper() -> Whole\n    give 7\nend routine\nroutine main() -> Unit\n    show(helper() + 2)\nend routine' "9"; then :; else fail=$((fail + 1)); fi
+if check_call twopar 'routine add(a: Whole, b: Whole) -> Whole\n    give a + b\nend routine\nroutine main() -> Unit\n    show(add(3, 4))\nend routine' "7"; then :; else fail=$((fail + 1)); fi
+if check_call recursive 'routine fib(n: Whole) -> Whole\n    when n < 2\n        give n\n    otherwise\n        give fib(n - 1) + fib(n - 2)\n    end when\nend routine\nroutine main() -> Unit\n    show(to_str(fib(6)))\nend routine' "8"; then :; else fail=$((fail + 1)); fi
 
-echo "natural ELF call: 2 tests, $fail failures"
+echo "natural ELF call: 4 tests, $fail failures"
 [ "$fail" -eq 0 ]

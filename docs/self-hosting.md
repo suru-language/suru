@@ -241,9 +241,15 @@ The bytecode object-emitting half is now owned by SURU:
   (`nw_emit_elf_multifunc`) compiles every routine with its own frame and
   supports `BC_CALL` (call rel32, result returned in `rax`) with the ELF entry
   set to `main`, so no-argument helper routines compile and run
-  (`natural_elf_call_run.sh`). This is the first control-flow and call step of
-  the Stage 3 backend; native argument passing, arrays/records, and recursion
-  remain.
+  (`natural_elf_call_run.sh`). Native argument passing (up to two integer args
+  via `rdi`/`rsi`, spilled into callee frame slots) and recursion now work, and
+  the integer `to_str` builtin is a no-op (println prints ints directly)
+  (`natural_elf_call_run.sh` includes a 2-arg call and recursive `fib(6)`=8).
+  This is the first control-flow and call step of the Stage 3 backend; arrays/
+  records still remain. (A native array attempt required a second loadable segment, which
+  intermittently triggered a host C17 VM memory-corruption bug; it was reverted
+  to keep the suite green. Arrays/records in native output therefore remain
+  open pending a more robust code layout.)
 - Gates wired into `make selfhost-test`: `natural_compile_run.sh` (differential
   byte-identity, 58/58), `natural_verify_run.sh` (positive + injected invalid),
   `natural_build_run.sh` (full-pipeline acceptance all byte-identical), and

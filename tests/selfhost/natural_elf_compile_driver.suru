@@ -55,6 +55,7 @@ func main() {
 
     mut fn_ops: [[int]] = [];
     mut fn_avs: [[int]] = [];
+    mut fn_nparams: [int] = [];
     mut entry: int = 0;
     mut fi: int = 0;
     while fi < nfuncs {
@@ -113,10 +114,11 @@ func main() {
         }
         fn_ops = array_concat(fn_ops, [ops]);
         fn_avs = array_concat(fn_avs, [avs]);
+        fn_nparams = array_concat(fn_nparams, [nw_func_nparams(instructions, fi)]);
         fi += 1;
     }
 
-    let elf: str = nw_emit_elf_multifunc(fn_ops, fn_avs, entry);
+    let elf: str = nw_emit_elf_multifunc(fn_ops, fn_avs, fn_nparams, entry);
     if elf == "" { exit(7); }
     write_file(args(1), elf);
     exit(0);
