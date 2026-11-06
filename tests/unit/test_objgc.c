@@ -467,6 +467,40 @@ static void test_gc_generation_marks_correct_object(void) {
     s_om_gc_destroy(g);
 }
 
+static void test_gc_preserves_corrupt_reachable(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+
+    /* Parent validly references child; then we corrupt the CHILD's inline
+     * header. The object is still identified (slot+generation intact), so the
+     * collector must preserve it; the corruption is surfaced by validation. */
+    s_om_ref child = arr_with_kids(h, NULL, 0);
+    s_om_ref parent = S_OM_REF_NONE;
+    { s_om_ref k[1] = {child}; parent = arr_with_kids(h, k, 1); }
+    CHECK_EQ_INT((int)s_om_test_set_hdr_u32(h, child, 8, 0xDEADBEEFu), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_validate(h, child), S_OM_EINVAL);
+
+    s_om_gc *g = NULL;
+    CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_add_root(g, parent), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_gc_collect(g), 0); /* nothing reclaimed */
+    CHECK_EQ_INT((int)s_om_validate(h, parent), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_live_objects(h), 2);
+    /* child still present (identity live), flagged corrupt by strict validation */
+    s_u32 cur = 0;
+    s_om_ref o = S_OM_REF_NONE;
+    int n = 0;
+    int saw_child = 0;
+    while (s_om_next_live(h, &cur, &o) == S_OM_OK) {
+        n++;
+        if (o == child) saw_child = 1;
+    }
+    CHECK_EQ_INT(n, 2);
+    CHECK_EQ_INT(saw_child, 1);
+    s_om_gc_destroy(g);
+}
+
 TEST_MAIN_BEGIN()
     test_gc_lifecycle();
     test_reachable_vs_unreachable();
@@ -488,4 +522,5 @@ TEST_MAIN_BEGIN()
     test_sweep_before_completion_noop();
     test_gc_stale_child_reference();
     test_gc_generation_marks_correct_object();
+    test_gc_preserves_corrupt_reachable();
 TEST_MAIN_END()

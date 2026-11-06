@@ -102,7 +102,7 @@ static bool gc_mark_children(s_om_heap h, s_om_ref obj) {
         s_om_ref c = S_OM_REF_NONE;
         if (s_om_read_u64(h, obj, (s_size)i * 8, &c) != S_OM_OK) break;
         if (c == S_OM_REF_NONE) continue;
-        if (s_om_validate(h, c) != S_OM_OK) continue;
+        if (!s_om_is_live(h, c)) continue;
         s_u8 cc = 0;
         if (s_om_colour(h, c, &cc) != S_OM_OK) continue;
         if (cc == S_GC_WHITE) {
@@ -129,7 +129,7 @@ static void gc_seed_roots(s_om_gc *g) {
     s_size i;
     for (i = 0; i < g->nroots; ++i) {
         s_om_ref r = g->roots[i];
-        if (s_om_validate(h, r) != S_OM_OK) continue;
+        if (!s_om_is_live(h, r)) continue;
         s_u8 col = 0;
         if (s_om_colour(h, r, &col) == S_OM_OK && col == S_GC_WHITE) {
             (void)s_om_set_colour(h, r, S_GC_GREY);

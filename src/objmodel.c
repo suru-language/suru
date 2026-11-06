@@ -402,6 +402,13 @@ s_om_err s_om_validate(s_om_heap h, s_om_ref obj) {
     return slot_check_metadata(hp, &sl);
 }
 
+bool s_om_is_live(s_om_heap h, s_om_ref obj) {
+    s_om_heap_ *hp = heap_of(h);
+    if (!hp) return false;
+    s_om_slot sl;
+    return ref_check(hp, obj, &sl) == S_OM_OK;
+}
+
 s_om_err s_om_next_live(s_om_heap h, s_u32 *cursor, s_om_ref *out_obj) {
     if (!cursor || !out_obj) return S_OM_EINVAL;
     s_om_heap_ *hp = heap_of(h);
@@ -602,4 +609,30 @@ s_om_err s_om_test_set_generation(s_om_heap h, s_u32 slot_index, s_u32 generatio
     if (sl.magic != 0) return S_OM_EINVAL; /* must be free */
     sl.gen = generation;
     return slot_store(hp, slot_index, &sl);
+}
+
+static s_om_err test_hdr_write(s_om_heap_ *hp, s_om_ref obj, s_size off,
+                               bool is32, s_u32 v) {
+    s_om_slot sl;
+    s_om_err e = ref_check(hp, obj, &sl);
+    if (e != S_OM_OK) return e;
+    s_size need = is32 ? 4 : 1;
+    if (off > S_OM_HEADER_SIZE - need) return S_OM_EINVAL;
+    s_size abs = (s_size)sl.off + off;
+    if (is32) {
+        return pm_err_map(s_pm_write_u32(hp->obj_blk, abs, v));
+    }
+    return pm_err_map(s_pm_write_u8(hp->obj_blk, abs, (s_u8)v));
+}
+
+s_om_err s_om_test_set_hdr_u8(s_om_heap h, s_om_ref obj, s_size off, s_u8 v) {
+    s_om_heap_ *hp = heap_of(h);
+    if (!hp) return S_OM_ENOENT;
+    return test_hdr_write(hp, obj, off, false, v);
+}
+
+s_om_err s_om_test_set_hdr_u32(s_om_heap h, s_om_ref obj, s_size off, s_u32 v) {
+    s_om_heap_ *hp = heap_of(h);
+    if (!hp) return S_OM_ENOENT;
+    return test_hdr_write(hp, obj, off, true, v);
 }

@@ -466,6 +466,51 @@ static void test_generation_exhaustion_all_slots_retired(void) {
     CHECK_EQ_INT((int)b, 0); /* no partial/invalid handle published */
 }
 
+static s_om_ref fresh_str(s_om_heap h) {
+    s_om_ref o = S_OM_REF_NONE;
+    CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, 8, 8, &o), S_OM_OK);
+    return o;
+}
+
+static void test_metadata_corruption_detected(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
+
+    /* invalid magic */
+    { s_om_ref o = fresh_str(h);
+      CHECK_EQ_INT((int)s_om_validate(h, o), S_OM_OK);
+      CHECK_EQ_INT((int)s_om_test_set_hdr_u32(h, o, 8, 0xDEADBEEFu), S_OM_OK);
+      CHECK_EQ_INT((int)s_om_validate(h, o), S_OM_EINVAL); }
+    /* unknown kind */
+    { s_om_ref o = fresh_str(h);
+      CHECK_EQ_INT((int)s_om_test_set_hdr_u8(h, o, 12, 99), S_OM_OK);
+      CHECK_EQ_INT((int)s_om_validate(h, o), S_OM_EINVAL); }
+    /* invalid colour */
+    { s_om_ref o = fresh_str(h);
+      CHECK_EQ_INT((int)s_om_test_set_hdr_u8(h, o, 13, 9), S_OM_OK);
+      CHECK_EQ_INT((int)s_om_validate(h, o), S_OM_EINVAL); }
+    /* invalid flags */
+    { s_om_ref o = fresh_str(h);
+      CHECK_EQ_INT((int)s_om_test_set_hdr_u8(h, o, 14, 1), S_OM_OK);
+      CHECK_EQ_INT((int)s_om_validate(h, o), S_OM_EINVAL); }
+    /* impossible size: zero */
+    { s_om_ref o = fresh_str(h);
+      CHECK_EQ_INT((int)s_om_test_set_hdr_u32(h, o, 0, 0), S_OM_OK);
+      CHECK_EQ_INT((int)s_om_validate(h, o), S_OM_EINVAL); }
+    /* impossible size: non-aligned */
+    { s_om_ref o = fresh_str(h);
+      CHECK_EQ_INT((int)s_om_test_set_hdr_u32(h, o, 0, 0x123u), S_OM_OK);
+      CHECK_EQ_INT((int)s_om_validate(h, o), S_OM_EINVAL); }
+    /* impossible size: out of region */
+    { s_om_ref o = fresh_str(h);
+      CHECK_EQ_INT((int)s_om_test_set_hdr_u32(h, o, 0, 0x7FFFFFF0u), S_OM_OK);
+      CHECK_EQ_INT((int)s_om_validate(h, o), S_OM_EINVAL); }
+    /* out-of-range header offset rejected by the hook */
+    { s_om_ref o = fresh_str(h);
+      CHECK_EQ_INT((int)s_om_test_set_hdr_u8(h, o, 16, 1), S_OM_EINVAL); }
+}
+
 TEST_MAIN_BEGIN()
     test_heap_lifecycle();
     test_heap_create_invalid();
@@ -492,4 +537,5 @@ TEST_MAIN_BEGIN()
     test_generation_advance_across_reuse();
     test_generation_exhaustion_retires_slot();
     test_generation_exhaustion_all_slots_retired();
+    test_metadata_corruption_detected();
 TEST_MAIN_END()

@@ -378,7 +378,12 @@ changes and a documented residual risk:
   registry against the inline object header (magic, size, kind, colour, flags)
   and rejects impossible sizes/alignment/kinds/colours/offsets, so metadata
   corruption cannot silently pass a live-object check. Colour mutations now
-  update both the slot and the inline header (they were drifting).
+  update both the slot and the inline header (they were drifting). Test-only
+  header-corruption hooks (`s_om_test_set_hdr_u8/u32`) fault-inject corruption to
+  exercise detection. Traversal and root-seeding use lightweight identity
+  liveness (`s_om_is_live`: slot+generation only), so a header-corrupt but
+  still-identified object is preserved rather than reclaimed by its own
+  corruption.
 - **Freelist corruption guard.** Allocation now refuses to pop a freelist entry
   whose slot is still marked live (duplicate registration / corrupt list).
 - **Bucket-boundary bug fixed.** Size exactly `S_OM_SMALL_MAX` (4096 B) indexed

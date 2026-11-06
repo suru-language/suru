@@ -111,6 +111,14 @@ s_om_err s_om_free(s_om_heap h, s_om_ref obj);
 s_om_err s_om_validate(s_om_heap h, s_om_ref obj);
 
 /*
+ * Cheap identity liveness: true iff the handle's slot is live and its stored
+ * generation matches (no header-integrity check). This is the check the GC uses
+ * for traversal/root seeding so that header corruption on a still-identified
+ * object cannot cause it to be reclaimed while still referenced.
+ */
+bool s_om_is_live(s_om_heap h, s_om_ref obj);
+
+/*
  * Iterate live objects. Pass a cursor (u32 slot index) that starts at 0. On
  * success the cursor and *out_obj are set to the next live object's handle and
  * S_OM_OK is returned. When no further live object exists, S_OM_ENOENT is
@@ -159,6 +167,12 @@ s_u32 s_om_test_generation(s_om_ref obj);
 s_om_ref s_om_test_make_handle(s_u32 slot_index, s_u32 generation);
 /* Set a FREE slot's generation. Fails (S_OM_EINVAL) if the slot is live. */
 s_om_err s_om_test_set_generation(s_om_heap h, s_u32 slot_index, s_u32 generation);
+/* Test-only: overwrite an inline object-header byte/u32 (offsets 0..15:
+ * size@0, count@4, magic@8, kind@12, colour@13, flags@14) of a live object, to
+ * exercise metadata-corruption detection. Fails if the handle is invalid or the
+ * offset is out of range. */
+s_om_err s_om_test_set_hdr_u8(s_om_heap h, s_om_ref obj, s_size off, s_u8 v);
+s_om_err s_om_test_set_hdr_u32(s_om_heap h, s_om_ref obj, s_size off, s_u32 v);
 
 /* Limits. */
 #define S_OM_MAX_HEAPS 32u
