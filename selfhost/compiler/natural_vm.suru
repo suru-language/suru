@@ -486,6 +486,31 @@ func natural_run_module(bytes: str) -> int {
                 let v: str = stack[n - 1];
                 stack = vm_pop(stack);
                 stack = vm_push(stack, "S" + vm_to_str(v));
+            } else if a == 2 {
+                let n: int = array_len(stack);
+                let v: str = stack[n - 1];
+                stack = vm_pop(stack);
+                stack = vm_push(stack, "I" + to_str(str_len(vm_to_str(v))));
+            } else if a == 11 {
+                let n: int = array_len(stack);
+                let len_e: str = stack[n - 1];
+                let pos_e: str = stack[n - 2];
+                let sv: str = stack[n - 3];
+                stack = vm_pop(stack);
+                stack = vm_pop(stack);
+                stack = vm_pop(stack);
+                let leni: int = int_from_str(substr(len_e, 1, str_len(len_e)));
+                let posi: int = int_from_str(substr(pos_e, 1, str_len(pos_e)));
+                let txt: str = vm_to_str(sv);
+                stack = vm_push(stack, "S" + substr(txt, posi, leni));
+            } else if a == 12 {
+                let n: int = array_len(stack);
+                let needle: str = stack[n - 1];
+                let hay: str = stack[n - 2];
+                stack = vm_pop(stack);
+                stack = vm_pop(stack);
+                let found: bool = str_contains(vm_to_str(hay), vm_to_str(needle));
+                stack = vm_push(stack, found ? "I1" : "I0");
             } else {
                 return 2;
             }

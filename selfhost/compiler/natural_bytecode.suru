@@ -521,6 +521,9 @@ func nbc_builtin_index(name: str) -> int {
     if name == "array_len" { return 3; }
     if name == "to_str" { return 5; }
     if name == "read_line" { return 4; }
+    if name == "substr" { return 11; }
+    if name == "str_contains" { return 12; }
+    if name == "str_compare" { return 35; }
     if name == "args" { return 27; }
     if name == "read_file" { return 57; }
     if name == "exit" { return 20; }
