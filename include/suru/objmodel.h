@@ -73,6 +73,16 @@ s_om_err s_om_free(s_om_heap h, s_u32 obj);
  * slot magic is set. */
 s_om_err s_om_validate(s_om_heap h, s_u32 obj);
 
+/*
+ * Iterate live objects. Pass a cursor (u32) that starts at 0. On success the
+ * cursor and *out_obj are set to the next live object index and S_OM_OK is
+ * returned. When no further live object exists, S_OM_ENOENT is returned and
+ * the cursor is left past the last slot. The iteration is a snapshot-free
+ *  strictly-forward scan; freeing the just-returned object during iteration
+ *  is permitted (later slots are unaffected).
+ */
+s_om_err s_om_next_live(s_om_heap h, s_u32 *cursor, s_u32 *out_obj);
+
 /* Introspection. */
 s_om_err s_om_kind(s_om_heap h, s_u32 obj, s_obj_kind *out);
 s_om_err s_om_count(s_om_heap h, s_u32 obj, s_u32 *out);

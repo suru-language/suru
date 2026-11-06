@@ -325,6 +325,25 @@ s_om_err s_om_validate(s_om_heap h, s_u32 obj) {
     return slot_live(hp, obj, &sl);
 }
 
+s_om_err s_om_next_live(s_om_heap h, s_u32 *cursor, s_u32 *out_obj) {
+    if (!cursor || !out_obj) return S_OM_EINVAL;
+    s_om_heap_ *hp = heap_of(h);
+    if (!hp) return S_OM_ENOENT;
+    s_u32 i = *cursor;
+    while (i < hp->nslots) {
+        i++;
+        s_om_slot sl;
+        if (i <= hp->nslots &&
+            slot_load(hp, i, &sl) == S_OM_OK &&
+            sl.magic == S_OM_SLOT_MAGIC) {
+            *cursor = i;
+            *out_obj = i;
+            return S_OM_OK;
+        }
+    }
+    return S_OM_ENOENT;
+}
+
 /* ------------------------------------------------------------------ */
 /* Introspection                                                       */
 /* ------------------------------------------------------------------ */

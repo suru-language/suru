@@ -290,6 +290,29 @@ static void test_cleanup_and_leak(void) {
     CHECK_EQ_INT((int)s_pm_active_count(), 0);
 }
 
+static void test_next_live(void) {
+    om_reset();
+    s_om_heap h = 0;
+    CHECK_EQ_INT((int)s_om_heap_create(64, 4096, &h), S_OM_OK);
+    s_u32 o1 = 0, o2 = 0, o3 = 0;
+    CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, 1, 1, &o1), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, 1, 1, &o2), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, 1, 1, &o3), S_OM_OK);
+    s_u32 cur = 0, o = 0;
+    int count = 0;
+    while (s_om_next_live(h, &cur, &o) == S_OM_OK) count++;
+    CHECK_EQ_INT(count, 3);
+    /* free one and re-iterate */
+    CHECK_EQ_INT((int)s_om_free(h, o2), S_OM_OK);
+    cur = 0;
+    count = 0;
+    while (s_om_next_live(h, &cur, &o) == S_OM_OK) count++;
+    CHECK_EQ_INT(count, 2);
+    s_u32 bad = 0;
+    CHECK_EQ_INT((int)s_om_next_live(h, NULL, &bad), S_OM_EINVAL);
+    CHECK_EQ_INT((int)s_om_next_live(h, &cur, NULL), S_OM_EINVAL);
+}
+
 static void test_zero_len_str_and_array0(void) {
     om_reset();
     s_om_heap h = 0;
@@ -328,4 +351,5 @@ TEST_MAIN_BEGIN()
     test_large_object();
     test_cleanup_and_leak();
     test_zero_len_str_and_array0();
+    test_next_live();
 TEST_MAIN_END()
