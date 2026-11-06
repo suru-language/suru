@@ -935,6 +935,8 @@ static bool builtin_str_trim(s_vm *vm) {
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
     s_heap_remove_root(vm->heap, &s);
     if (!o) return false;
+    fprintf(stderr, "STR_TRIM_DEBUG: s.u.o=%p data=%p data+b=%p o=%p s_obj_str_data(o)=%p n=%zu b=%zu len=%zu\n",
+            (void *)s.u.o, data, data + b, (void *)o, s_obj_str_data(o), n, b, len);
     if (n) memcpy(s_obj_str_data(o), data + b, n);
     return push(vm, s_val_obj(o));
 }
