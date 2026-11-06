@@ -17,6 +17,14 @@ int s_driver_compile(const char *file, const char *src, s_size len,
 int s_driver_run_module(s_bc_module *m);
 int s_driver_run_module_args(s_bc_module *m, int argc, char **argv);
 
+/* Deterministic execution heap-mode selection (Stage 11D T1). */
+typedef enum s_driver_heap_mode_t {
+    S_DRIVER_HEAP_LEGACY = 0,
+} s_driver_heap_mode_t;
+/* Resolve SURU_HEAP. Returns S_DRIVER_HEAP_LEGACY for unset/"legacy";
+ * prints an error and returns -1 for any other (unsupported) value. */
+int s_driver_heap_mode(void);
+
 #ifdef __cplusplus
 }
 #endif
