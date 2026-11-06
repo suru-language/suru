@@ -245,11 +245,13 @@ The bytecode object-emitting half is now owned by SURU:
   via `rdi`/`rsi`, spilled into callee frame slots) and recursion now work, and
   the integer `to_str` builtin is a no-op (println prints ints directly)
   (`natural_elf_call_run.sh` includes a 2-arg call and recursive `fib(6)`=8).
-  Native integer array literals + index reads now work via a single-segment
-  static data buffer (the load segment is made writable, `NEW_ARRAY` stores the
-  literal elements at a fixup-resolved data vaddr, and `IDX_LD` reads them),
-  gated by `natural_elf_array_run.sh`. This is the first control-flow, call,
-  and array step of the Stage 3 backend; records still remain. (A native array attempt required a second loadable segment, which
+  Native integer array literals + index reads and records (construction, field
+  write/read) now work via a single-segment writable static data buffer with a
+  runtime bump allocator (`NEW_ARRAY`/`NEW_RECORD` allocate at a fixup-resolved
+  data vaddr, `IDX_LD`/`FIELD_LD`/`FIELD_ST` access it), gated by
+  `natural_elf_array_run.sh` and `natural_elf_record_run.sh`. This is the first
+  control-flow, call, and array/record step of the Stage 3 backend; the SURU-
+  managed GC/memory port and the C-independent self-rebuild remain. (A native array attempt required a second loadable segment, which
   intermittently triggered a host C17 VM memory-corruption bug; it was reverted
   to keep the suite green. Arrays/records in native output therefore remain
   open pending a more robust code layout.)
