@@ -383,14 +383,25 @@ changes and a documented residual risk:
   whose slot is still marked live (duplicate registration / corrupt list).
 - **Bucket-boundary bug fixed.** Size exactly `S_OM_SMALL_MAX` (4096 B) indexed
   `small_head[256]`, out of bounds; the count now includes the 4096 B bucket.
-- **Residual risk — reference identity has no generation.** Object handles are
-  bare slot indices; when a slot is freed and reused, a stale handle aliases the
-  new occupant (verified by probe). The smallest correct fix is to encode a
-  generation/epoch in the handle (e.g. `(epoch << IDX_BITS) | idx`) and bump it
-  on reuse, validating the epoch on lookup. That changes the reference
-  representation, the payload child encoding, and every handle comparison/test,
-  so it is deliberately left as a separate, documented design change rather than
-  silently applied.
+- **Generation-protected handles (Phase 3F.1).** References are now 64-bit
+  logical handles: `handle = (generation << 32) | slot_index`, with `0` invalid.
+  The slot registry stores each slot's current generation. `generation` is
+  committed at allocation (1 for a fresh slot; incremented on reuse), so a stale
+  handle fails validation both immediately after release (slot no longer live)
+  and after slot reuse (generation mismatch). Generation exhaustion is
+  deterministic: a slot at the maximum generation is permanently retired and
+  never reissued; if no usable slot remains, allocation returns `S_OM_ENOMEM`
+  without publishing a handle. Full handles propagate through allocation, child
+  references (payload words are now u64 handles at 8-byte stride), roots,
+  traversal, marking, free, and lookup; internal slot-index operations are kept
+  separate. Test-only helpers (`s_om_test_*`) exercise exhaustion without
+  billions of allocations and are never exposed through the SURU language.
+  Migration surface: `s_om_ref` (u64) replaces u32 handle parameters across the
+  object-model and collector APIs; the standalone objgc child encoding, root
+  set, and tests all carry full handles; memory overhead increases by 4 bytes
+  per slot (generation field). Future implication: the `u.o`→`u.idx` VM
+  transition must carry the full 64-bit handle, and bytecode format/Natural
+  syntax are unchanged in this phase.
 
 ## 10. Implementation roadmap (each stage has tests)
 
