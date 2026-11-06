@@ -919,6 +919,8 @@ static bool builtin_str_repeat(s_vm *vm) {
 static bool builtin_str_trim(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+        fprintf(stderr, "STR_TRIM_FAIL: tag=%d kind=%d tag_name=%d\n", s.tag, s.u.o->kind, s.u.o->kind);
+        fflush(stderr);
         vm_trap(vm, "str_trim expects a string");
         return false;
     }
