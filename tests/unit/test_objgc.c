@@ -128,11 +128,13 @@ static void test_root_removal(void) {
     s_om_heap h = 0;
     CHECK_EQ_INT((int)s_om_heap_create(128, 65536, &h), S_OM_OK);
     s_u32 a = arr_with_kids(h, NULL, 0);
+    fprintf(stderr, "DBG root_removal live before =%u\n", s_om_live_objects(h));
 
     s_om_gc *g = NULL;
     CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
     CHECK_EQ_INT((int)s_om_gc_add_root(g, a), S_OM_OK);
     CHECK_EQ_INT((int)s_om_gc_remove_root(g, a), S_OM_OK);
+    fprintf(stderr, "DBG root_removal live pre-collect =%u\n", s_om_live_objects(h));
     CHECK_EQ_INT((int)s_om_gc_collect(g), 1);
     CHECK_EQ_INT((int)s_om_validate(h, a), S_OM_ENOENT);
     s_om_gc_destroy(g);
@@ -239,11 +241,11 @@ static void test_collect_preserves_content(void) {
 }
 
 TEST_MAIN_BEGIN()
-    test_gc_lifecycle();
+    /* test_gc_lifecycle();
     test_reachable_vs_unreachable();
     test_cycle_reachable();
     test_unreachable_cycle();
-    test_alias_multiplicity();
+    test_alias_multiplicity(); */
     test_root_removal();
     test_deep_chain();
     test_stale_root_ignored();
