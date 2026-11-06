@@ -37,6 +37,10 @@ static inline s_value s_val_float(double v) { s_value x; x.tag = S_VAL_FLOAT; x.
 static inline s_value s_val_bool(bool v) { s_value x; x.tag = S_VAL_BOOL; x.u.b = v; return x; }
 static inline s_value s_val_none(void) { s_value x; x.tag = S_VAL_NONE; x.u.i = 0; return x; }
 static inline s_value s_val_obj(s_gcobj *o) { s_value x; x.tag = S_VAL_OBJ; x.u.o = o; return x; }
+/* Handle-based object value (Stage 11 transition): carries a generation-protected
+ * s_om_ref in u.idx instead of a raw s_gcobj* pointer. */
+static inline s_value s_val_obj_h(s_u64 h) { s_value x; x.tag = S_VAL_OBJ; x.u.idx = h; return x; }
+static inline s_u64 s_val_obj_handle(s_value v) { return v.u.idx; }
 
 static inline bool s_val_is_int(s_value v) { return v.tag == S_VAL_INT; }
 static inline bool s_val_is_float(s_value v) { return v.tag == S_VAL_FLOAT; }
