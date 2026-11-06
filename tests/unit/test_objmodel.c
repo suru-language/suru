@@ -198,7 +198,7 @@ static void test_oom_region_exhausted(void) {
     om_reset();
     s_om_heap h = 0;
     /* very small object region: holds exactly one 16-byte object */
-    CHECK_EQ_INT((int)s_om_heap_create(64, 32, &h), S_OM_OK);
+    CHECK_EQ_INT((int)s_om_heap_create(64, 16, &h), S_OM_OK);
     s_u32 o1 = 0, o2 = 0;
     CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, 0, 0, &o1), S_OM_OK);
     CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_STR, 0, 0, &o2), S_OM_ENOMEM);
