@@ -200,6 +200,41 @@ func main() {
         fails += expect("rooted-temp-survives", r[1], 2);
     }
 
+    // ---- 13. Deep graph: an 8-object chain rooted at the head survives. ----
+    {
+        let kinds: [int] = [1, 1, 1, 1, 1, 1, 1, 1];
+        let refs: [[int]] = [[1], [2], [3], [4], [5], [6], [7], empty_ints()];
+        let r: [int] = simulate([0], kinds, refs, 8, 16);
+        fails += expect("deep-chain-survives", r[1], 8);
+    }
+
+    // ---- 14. Wide graph: root fans out to six leaves; all survive. ----
+    {
+        let kinds: [int] = [1, 1, 1, 1, 1, 1, 1];
+        let refs: [[int]] = [[1, 2, 3, 4, 5, 6], empty_ints(), empty_ints(),
+                             empty_ints(), empty_ints(), empty_ints(), empty_ints()];
+        let r: [int] = simulate([0], kinds, refs, 7, 16);
+        fails += expect("wide-graph-survives", r[1], 7);
+    }
+
+    // ---- 15. Alias multiplicity: one object referenced several times is
+    // preserved and counted once; all reachable objects survive. ----
+    {
+        let kinds: [int] = [1, 1, 1];
+        let refs: [[int]] = [[1, 1, 2], empty_ints(), empty_ints()];
+        let r: [int] = simulate([0], kinds, refs, 3, 8);
+        fails += expect("alias-multiplicity", r[1], 3);
+    }
+
+    // ---- 16. Stale/out-of-range child references are safely ignored; the
+    // reachable objects still survive. ----
+    {
+        let kinds: [int] = [1, 1, 1];
+        let refs: [[int]] = [[1, 99, -1], empty_ints(), empty_ints()];
+        let r: [int] = simulate([0], kinds, refs, 3, 8);
+        fails += expect("stale-edge-ignored", r[1], 2);
+    }
+
     if fails == 0 { println("REF-GC: all tests passed"); }
     exit(fails > 0 ? 1 : 0);
 }

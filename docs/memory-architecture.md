@@ -303,12 +303,16 @@ gates, 12/12 reference model, 34 GC units, 482 platform units).
 9. No allocation path silently loses ownership.
 10. Object-model initialization does not require recursive managed allocation.
 
-### D7 — Reference-model test gaps to plan (not implement here)
-Future additions to `selfhost/memory/ref_gc.suru` (append as scenario 13+; its
-current numbering skips 10):
-- deep/wide graphs, alias multiplicity, mutation during marking, write-barrier
-  correctness, stale/corrupt metadata, repeated collection under pressure, large
-  objects, root removal mid-collection, OOM and alignment/overflow of offsets.
+### D7 — Reference-model test gaps
+The expressible gaps have been appended to `selfhost/memory/ref_gc.suru` as
+scenarios 13+ (its numbering skips 10): deep chains, wide graphs, alias
+multiplicity, and stale/out-of-range edge references (now 16 checks total).
+Mutation-during-marking, write-barrier correctness, stale/corrupt metadata,
+repeated collection under pressure, large objects, root-removal mid-collection,
+and OOM/overflow-of-offsets require either a mutation-aware model or the C
+differential harness; they are covered by the `objgc`/`objmodel` unit fixtures
+(deep chain, alias, repeated/pressure collection, root removal, stale roots) and
+remain open as future model extensions.
 
 ### Staged roadmap
 object layout → reference representation → metadata → allocator initialization →
