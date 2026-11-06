@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <sys/stat.h>
 
 static int cmd_compile_natural(const char *path, const char *outpath,
                                const char *argv0);
@@ -34,10 +35,28 @@ static char *read_file(const char *path, s_size *len) {
 
 static int cmd_exec(const char *path, int argc, char **argv);
 static int cmd_exec_natural_vm(const char *path, const char *argv0);
+static int cmd_compile_natural_native(const char *path, const char *outpath,
+                                      const char *argv0);
 
 static int cmd_run(const char *path, int argc, char **argv, int natural,
-                   const char *argv0) {
+                   int native_backend, const char *argv0) {
     if (natural) {
+        if (native_backend) {
+            char elf[512];
+            snprintf(elf, sizeof elf, "/tmp/suru_native_%d.elf", (int)getpid());
+            if (cmd_compile_natural_native(path, elf, argv0) != 0) return 1;
+            chmod(elf, 0755);
+            char cmd[4096];
+            snprintf(cmd, sizeof cmd, "\"%s\"", elf);
+            int i;
+            for (i = 0; i < argc; ++i) {
+                size_t n = strlen(cmd);
+                snprintf(cmd + n, sizeof cmd - n, " \"%s\"", argv[i]);
+            }
+            int rc = system(cmd);
+            remove(elf);
+            return rc == 0 ? 0 : rc;
+        }
         char out[512];
         snprintf(out, sizeof out, "/tmp/suru_nat_%d.sbc", (int)getpid());
         if (cmd_compile_natural(path, out, argv0) != 0) return 1;
@@ -344,8 +363,9 @@ static int cmd_check(const char *path, int natural, const char *argv0) {
 }
 
 static int cmd_compile(const char *path, const char *outpath, int natural,
-                       const char *argv0) {
+                       int native_backend, const char *argv0) {
     if (natural) {
+        if (native_backend) return cmd_compile_natural_native(path, outpath, argv0);
         return cmd_compile_natural(path, outpath, argv0);
     }
     s_size len;
@@ -397,6 +417,20 @@ static int cmd_exec(const char *path, int argc, char **argv) {
     return rc;
 }
 
+static int cmd_compile_natural_native(const char *path, const char *outpath,
+                                      const char *argv0) {
+    char driver[2048];
+    if (resolve_driver(driver, sizeof driver, argv0,
+                       "natural_elf_compile_driver.suru") != 0) {
+        fprintf(stderr, "suru: native compile driver not found\n");
+        return 1;
+    }
+    char cmd[4096];
+    snprintf(cmd, sizeof cmd, "\"%s\" run \"%s\" \"%s\" \"%s\"",
+             argv0, driver, path, outpath);
+    return system(cmd) == 0 ? 0 : 1;
+}
+
 static int cmd_exec_natural_vm(const char *path, const char *argv0) {
     char driver[2048];
     if (resolve_driver(driver, sizeof driver, argv0,
@@ -417,7 +451,9 @@ static void usage(void) {
             "  compile <file.suru> <out.sbc>  compile to bytecode module\n"
             "  exec   <module.sbc> [args...]  run a precompiled bytecode module\n"
             "  --syntax selects the language edition; legacy is the default.\n"
-            "  --vm=natural runs an exec module through the SURU-written VM.\n");
+            "  --vm=natural runs an exec module through the SURU-written VM.\n"
+            "  --backend=native compiles Natural to a standalone x86-64 ELF64\n"
+            "    executable (no C compiler/linker) for the supported subset.\n");
 }
 
 int main(int argc, char **argv) {
@@ -435,6 +471,7 @@ int main(int argc, char **argv) {
     }
     int natural = 0;
     int vm_natural = 0;
+    int native_backend = 0;
     int w = 1;
     for (int r = 1; r < argc; ++r) {
         if (strncmp(argv[r], "--syntax=", 9) == 0) {
@@ -452,6 +489,13 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "suru: unknown vm '%s'\n", v);
                 return 2;
             }
+        } else if (strncmp(argv[r], "--backend=", 10) == 0) {
+            const char *v = argv[r] + 10;
+            if (strcmp(v, "native") == 0) native_backend = 1;
+            else {
+                fprintf(stderr, "suru: unknown backend '%s'\n", v);
+                return 2;
+            }
         } else {
             argv[w++] = argv[r];
         }
@@ -465,7 +509,7 @@ int main(int argc, char **argv) {
     const char *cmd = argv[1];
     const char *path = argv[2];
     if (strcmp(cmd, "run") == 0) {
-        return cmd_run(path, argc - 3, argv + 3, natural, argv[0]);
+        return cmd_run(path, argc - 3, argv + 3, natural, native_backend, argv[0]);
     }
     if (strcmp(cmd, "check") == 0) {
         return cmd_check(path, natural, argv[0]);
@@ -475,7 +519,7 @@ int main(int argc, char **argv) {
             usage();
             return 2;
         }
-        return cmd_compile(path, argv[3], natural, argv[0]);
+        return cmd_compile(path, argv[3], natural, native_backend, argv[0]);
     }
     if (strcmp(cmd, "exec") == 0) {
         if (vm_natural) return cmd_exec_natural_vm(path, argv[0]);
