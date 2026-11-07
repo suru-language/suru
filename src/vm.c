@@ -294,6 +294,25 @@ static s_value pop(s_vm *vm) {
 /* Objmodel resolution helpers                                         */
 /* ------------------------------------------------------------------ */
 
+/* Inline object-model header layout (16 bytes, same as legacy s_gcobj):
+ *   offset 0:  size      (s_u64)
+ *   offset 4:  count      (s_u32)
+ *   offset 8:  magic      (s_u32)  // slot magic for generation protection
+ *   offset 12: kind        (s_u8)
+ *   offset 13: colour      (s_u8)
+ *   offset 14/15: flags      (s_u16)
+ *
+ * NOT wire-compatible with legacy s_gcobj (32 bytes). Access via
+ * s_vmobj_inspect() and cast the returned base pointer. */
+typedef struct s_om_hdr {
+    s_u64 size;
+    s_u32 count;
+    s_u32 magic;
+    s_u8 kind;
+    s_u8 colour;
+    s_u16 flags;
+} s_om_hdr;
+
 static inline s_om_ref vm_obj_h(s_value v) {
     return v.tag == S_VAL_OBJ ? v.u.idx : S_OM_REF_NONE;
 }
@@ -301,8 +320,11 @@ static inline s_om_ref vm_obj_h(s_value v) {
 static inline const s_om_hdr *vm_obj_hdr(s_vm *vm, s_value v) {
     s_om_ref h = vm_obj_h(v);
     if (!h) return NULL;
-    const void *base = s_vmobj_inspect(vm->oh, h, NULL);
-    return base ? (const s_om_hdr *)base : NULL;
+    const void *base = NULL;
+    s_size rounded = 0;
+    s_om_err err = s_vmobj_inspect(vm->oh, h, &base, &rounded);
+    if (err != S_OM_OK || !base) return NULL;
+    return (const s_om_hdr *)base;
 }
 
 static inline void *vm_obj_payload(s_vm *vm, s_value v) {
