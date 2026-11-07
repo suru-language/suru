@@ -345,12 +345,14 @@ static inline s_u32 vm_obj_count(s_vm *vm, s_value v) {
 /* Temp-root helpers for GC safety during marking */
 static inline bool vm_temp_root(s_vm *vm, s_value v) {
     s_om_ref h = vm_obj_h(v);
-    return h && s_vmobj_temp_root(vm->oh, h) == S_OM_OK;
+    if (!h) return true;
+    s_om_err err = s_vmobj_temp_root(vm->gc, h);
+    return err == S_OM_OK;
 }
 
 static inline void vm_temp_unroot(s_vm *vm, s_value v) {
     s_om_ref h = vm_obj_h(v);
-    if (h) s_vmobj_temp_unroot(vm->oh, h);
+    if (h) s_vmobj_temp_unroot(vm->gc, h);
 }
 
 static bool push(s_vm *vm, s_value v) {
