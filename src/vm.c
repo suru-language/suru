@@ -812,7 +812,8 @@ static bool builtin_substr(s_vm *vm) {
         return false;
     }
     vm_temp_unroot(vm, s);
-    if (n) s_vmobj_write(vm->oh, h, 0, vm_obj_payload(vm, s) + b, n);
+    if (n) s_vmobj_write(vm->oh, h, 0,
+                        (const char *)vm_obj_payload(vm, s) + b, n);
     return push(vm, s_val_obj_h(h));
 }
 
