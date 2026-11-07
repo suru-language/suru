@@ -1,4 +1,5 @@
 #include "suru/vm.h"
+#include "suru/vmobj.h"
 #include "suru/verify.h"
 #include "suru/stdlib.h"
 #include "suru/runtime.h"
@@ -265,14 +266,14 @@ static void maybe_collect(s_vm *vm) {
     }
 }
 
-static s_gcobj *vm_alloc(s_vm *vm, s_obj_kind kind, s_u32 count, s_size payload) {
+static bool vm_alloc_obj(s_vm *vm, s_obj_kind kind, s_u32 count, s_size payload,
+                          s_om_ref *out_h) {
     maybe_collect(vm);
-    s_gcobj *o = s_heap_alloc(vm->heap, kind, count, payload);
-    if (!o) {
+    if (s_vmobj_alloc_value(vm->oh, kind, count, payload, out_h) != S_OM_OK) {
         vm_trap(vm, "out of memory");
-        return NULL;
+        return false;
     }
-    return o;
+    return true;
 }
 
 static s_value pop(s_vm *vm) {
@@ -371,10 +372,10 @@ static bool fmt_into(s_vm *vm, s_value v, s_buf *b, int depth) {
 }
 
 static bool push_str_from_buf(s_vm *vm, const char *buf, s_size len) {
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
-    if (!o) return false;
-    if (len) memcpy(s_obj_str_data(o), buf, len);
-    return push(vm, s_val_obj(o));
+    s_om_ref h = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)len, len, &h)) return false;
+    if (len) s_vmobj_write(vm->oh, h, 0, buf, len);
+    return push(vm, s_val_obj_h(h));
 }
 
 static bool builtin_print(s_vm *vm, bool newline) {
