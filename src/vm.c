@@ -1904,14 +1904,14 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
         case BC_REPEAT_S: {
             s_value n = pop(vm);
             s_value s = pop(vm);
-            if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR ||
+            if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR ||
                 n.tag != S_VAL_INT) {
                 vm_trap(vm, "repeat type error");
                 return 1;
             }
             s_i64 rep = n.u.i;
             if (rep < 0) { vm_trap(vm, "repeat count must be non-negative"); return 1; }
-            s_size slen = s_obj_str_len(s.u.o);
+            s_size slen = vm_obj_count(vm, s);
             s_size total;
             if (!s_size_mul_ovf(slen, (s_size)rep, &total) || total > (1u << 24)) {
                 vm_trap(vm, "repeat too large");
