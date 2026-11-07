@@ -96,6 +96,8 @@ void s_vm_destroy(s_vm *vm) {
         /* invalidate the borrowed stack-root registration before freeing the
          * stack, so the collector never retains a dangling address */
         (void)s_om_gc_set_svalue_root(vm->gc, NULL, 0);
+        s_om_gc_destroy(vm->gc);
+        vm->gc = NULL;
     }
     s_om_heap_destroy(vm->oh);
     free(vm->st);
@@ -251,29 +253,14 @@ static inline void vm_temp_unroot(s_vm *vm, s_value v) {
 static bool exception_matches(const s_vm *vm, s_value exception,
                               s_u32 type_index) {
     if (exception.tag != S_VAL_OBJ ||
-        vm_obj_kind(vm, exception) != S_OBJ_EXCEPTION) {
-        fprintf(stderr, "DEBUG exception_matches: exception tag/kind fail tag=%d kind=%d\n", exception.tag, vm_obj_kind(vm, exception));
-        return false;
-    }
+        vm_obj_kind(vm, exception) != S_OBJ_EXCEPTION) return false;
     if (type_index == UINT32_MAX) return true;
     s_value *fields = (s_value *)vm_obj_payload(vm, exception);
     s_value type = fields[0];
-    if (type.tag != S_VAL_OBJ || vm_obj_kind(vm, type) != S_OBJ_STR) {
-        fprintf(stderr, "DEBUG exception_matches: type tag/kind fail tag=%d kind=%d\n", type.tag, vm_obj_kind(vm, type));
-        return false;
-    }
+    if (type.tag != S_VAL_OBJ || vm_obj_kind(vm, type) != S_OBJ_STR) return false;
     s_size want_len = vm->m->strlens[type_index];
-    s_size actual_len = vm_obj_count(vm, type);
-    if (vm_obj_count(vm, type) != want_len) {
-        fprintf(stderr, "DEBUG exception_matches: len mismatch want=%zu actual=%zu\n", want_len, actual_len);
-        return false;
-    }
-    int cmp = memcmp(vm_obj_payload(vm, type), vm->m->strings[type_index], want_len);
-    if (cmp != 0) {
-        fprintf(stderr, "DEBUG exception_matches: memcmp failed cmp=%d\n", cmp);
-        return false;
-    }
-    return true;
+    return vm_obj_count(vm, type) == want_len &&
+           memcmp(vm_obj_payload(vm, type), vm->m->strings[type_index], want_len) == 0;
 }
 
 static void vm_uncaught_exception(s_vm *vm, s_value exception) {
@@ -294,19 +281,15 @@ static void vm_uncaught_exception(s_vm *vm, s_value exception) {
 
 static bool vm_throw(s_vm *vm, s_value exception, const s_bc_module *m,
                      const s_bc_func **f, s_u32 *pc) {
-    fprintf(stderr, "DEBUG vm_throw: nhandlers=%zu exception.tag=%d\n", vm->nhandlers, exception.tag);
     s_size found = vm->nhandlers;
     while (found > 0) {
         --found;
-        fprintf(stderr, "DEBUG vm_throw: checking handler %zu type_index=%u\n", found, vm->handlers[found].type_index);
         if (exception_matches(vm, exception, vm->handlers[found].type_index)) break;
     }
     if (found == vm->nhandlers) {
-        fprintf(stderr, "DEBUG vm_throw: no handler found, calling uncaught\n");
         vm_uncaught_exception(vm, exception);
         return false;
     }
-    fprintf(stderr, "DEBUG vm_throw: handler %zu matched\n", found);
     s_handler handler = vm->handlers[found];
     vm->nhandlers = found;
     vm->ncalls = handler.call_depth;
