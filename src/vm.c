@@ -1770,10 +1770,10 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             pc++; break;
         case BC_CONST_STR: {
             s_size len = m->strlens[in->a];
-            s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
-            if (!o) return 1;
-            if (len) memcpy(s_obj_str_data(o), m->strings[in->a], len);
-            if (!push(vm, s_val_obj(o))) return 1;
+            s_om_ref h = S_OM_REF_NONE;
+            if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)len, len, &h)) return 1;
+            if (len) s_vmobj_write(vm->oh, h, 0, m->strings[in->a], len);
+            if (!push(vm, s_val_obj_h(h))) return 1;
             pc++; break;
         }
         case BC_CONST_NONE:
