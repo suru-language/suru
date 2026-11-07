@@ -1489,14 +1489,14 @@ static bool builtin_array_concat(s_vm *vm) {
 static bool builtin_array_lookup(s_vm *vm, bool want_index) {
     s_value needle = pop(vm);
     s_value arr = pop(vm);
-    if (arr.tag != S_VAL_OBJ || arr.u.o->kind != S_OBJ_ARRAY ||
+    if (arr.tag != S_VAL_OBJ || vm_obj_kind(vm, arr) != S_OBJ_ARRAY ||
         needle.tag != S_VAL_INT) {
         vm_trap(vm, want_index ? "array_index_of expects (array, int)"
                                : "array_contains expects (array, int)");
         return false;
     }
-    s_u32 n = arr.u.o->count;
-    s_value *el = s_obj_array_data(arr.u.o);
+    s_u32 n = vm_obj_count(vm, arr);
+    s_value *el = (s_value *)vm_obj_payload(vm, arr);
     for (s_u32 i = 0; i < n; ++i) {
         if (el[i].tag != S_VAL_INT) {
             vm_trap(vm, "array lookup expects an int array");
