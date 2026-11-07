@@ -1518,27 +1518,31 @@ static int cmp_i64(const void *pa, const void *pb) {
 
 static bool builtin_array_sort(s_vm *vm) {
     s_value v = pop(vm);
-    if (v.tag != S_VAL_OBJ || v.u.o->kind != S_OBJ_ARRAY) {
+    if (v.tag != S_VAL_OBJ || vm_obj_kind(vm, v) != S_OBJ_ARRAY) {
         vm_trap(vm, "array_sort expects an array");
         return false;
     }
-    s_u32 n = v.u.o->count;
-    s_value *el = s_obj_array_data(v.u.o);
+    s_u32 n = vm_obj_count(vm, v);
+    s_value *el = (s_value *)vm_obj_payload(vm, v);
     for (s_u32 i = 0; i < n; ++i) {
         if (el[i].tag != S_VAL_INT) {
             vm_trap(vm, "array_sort expects an int array");
             return false;
         }
     }
-    s_heap_add_root(vm->heap, &v);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, n, 0);
-    s_heap_remove_root(vm->heap, &v);
-    if (!o) return false;
-    if (n) {
-        memcpy(s_obj_array_data(o), el, sizeof(s_value) * n);
-        qsort(s_obj_array_data(o), n, sizeof(s_value), cmp_i64);
+    if (!vm_temp_root(vm, v)) return false;
+    s_om_ref o = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_ARRAY, n, 0, &o)) {
+        vm_temp_unroot(vm, v);
+        return false;
     }
-    return push(vm, s_val_obj(o));
+    vm_temp_unroot(vm, v);
+    if (n) {
+        s_value *dst = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
+        memcpy(dst, el, sizeof(s_value) * n);
+        qsort(dst, n, sizeof(s_value), cmp_i64);
+    }
+    return push(vm, s_val_obj_h(o));
 }
 
 static bool dispatch_builtin(s_vm *vm, s_u32 id) {
