@@ -183,7 +183,7 @@ static void discard_frame_handlers(s_vm *vm) {
 /* ------------------------------------------------------------------ */
 
 /* Inline object-model header layout (16 bytes, same as legacy s_gcobj):
- *   offset 0:  size      (s_u64)
+ *   offset 0:  size      (s_u32)
  *   offset 4:  count      (s_u32)
  *   offset 8:  magic      (s_u32)  // slot magic for generation protection
  *   offset 12: kind        (s_u8)
@@ -192,8 +192,8 @@ static void discard_frame_handlers(s_vm *vm) {
  *
  * NOT wire-compatible with legacy s_gcobj (32 bytes). Access via
  * s_vmobj_inspect() and cast the returned base pointer. */
-typedef struct s_om_hdr {
-    s_u64 size;
+typedef struct __attribute__((packed)) s_om_hdr {
+    s_u32 size;
     s_u32 count;
     s_u32 magic;
     s_u8 kind;
@@ -1963,24 +1963,6 @@ int s_vm_run(s_vm *vm) {
             s_value cause = pop(vm);
             s_value message = pop(vm);
             s_value type = pop(vm);
-            {
-                s_om_ref h = type.u.idx;
-                const void *base = NULL; s_size rounded = 0;
-                s_om_err err = s_vmobj_inspect(vm->oh, h, &base, &rounded);
-                fprintf(stderr, "DEBUG type: tag=%d u.idx=%llu inspect_err=%d base=%p\n",
-                        type.tag, (unsigned long long)type.u.idx, err, base);
-                if (base) {
-                    const unsigned char *bytes = (const unsigned char *)base;
-                    fprintf(stderr, "DEBUG header: size=%u count=%u magic=%c%c%c%c kind=%u colour=%u flags=%u\n",
-                            (unsigned)bytes[0], (unsigned)bytes[4],
-                            bytes[8], bytes[9], bytes[10], bytes[11],
-                            (unsigned)bytes[12], (unsigned)bytes[13], (unsigned)bytes[14]);
-                }
-                s_u8 computed_kind = base ? ((const s_om_hdr*)base)->kind : 0;
-                fprintf(stderr, "DEBUG: computed_kind=%u S_OBJ_STR=%d condition=%d\n",
-                        computed_kind, S_OBJ_STR,
-                        (type.tag != S_VAL_OBJ || computed_kind != S_OBJ_STR));
-            }
             if (type.tag != S_VAL_OBJ || vm_obj_kind(vm, type) != S_OBJ_STR ||
                 message.tag != S_VAL_OBJ || vm_obj_kind(vm, message) != S_OBJ_STR ||
                 (cause.tag != S_VAL_NONE &&
