@@ -1968,7 +1968,6 @@ int s_vm_run(s_vm *vm) {
             pc++; break;
         }
         case BC_NEW_EXCEPTION: {
-            fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: start\n");
             s_value cause = pop(vm);
             s_value message = pop(vm);
             s_value type = pop(vm);
@@ -1980,7 +1979,6 @@ int s_vm_run(s_vm *vm) {
                 message.tag != S_VAL_OBJ || vm_obj_kind(vm, message) != S_OBJ_STR ||
                 (cause.tag != S_VAL_NONE &&
                  (cause.tag != S_VAL_OBJ || vm_obj_kind(vm, cause) != S_OBJ_EXCEPTION))) {
-                fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: type check failed\n");
                 vm_trap(vm, "new_exception type error");
                 return 1;
             }
