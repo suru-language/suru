@@ -764,9 +764,9 @@ static bool builtin_make_array(s_vm *vm) {
     if (v.tag != S_VAL_INT) { vm_trap(vm, "make_array expects an int"); return false; }
     s_i64 n = v.u.i;
     if (n < 0 || n > (1 << 20)) { vm_trap(vm, "make_array length out of range"); return false; }
-    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)n, 0);
-    if (!o) return false;
-    return push(vm, s_val_obj(o));
+    s_om_ref h = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_ARRAY, (s_u32)n, 0, &h)) return false;
+    return push(vm, s_val_obj_h(h));
 }
 
 static bool builtin_range(s_vm *vm) {
@@ -779,11 +779,12 @@ static bool builtin_range(s_vm *vm) {
     s_i64 n = hi.u.i - lo.u.i;
     if (n < 0) n = 0;
     if (n > (1 << 20)) { vm_trap(vm, "range too large"); return false; }
-    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)n, 0);
-    if (!o) return false;
-    s_value *data = s_obj_array_data(o);
+    s_om_ref h = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_ARRAY, (s_u32)n, 0, &h)) return false;
+    s_value arr = s_val_obj_h(h);
+    s_value *data = (s_value *)vm_obj_payload(vm, arr);
     for (s_i64 i = 0; i < n; ++i) data[i] = s_val_int(lo.u.i + i);
-    return push(vm, s_val_obj(o));
+    return push(vm, arr);
 }
 
 static bool builtin_substr(s_vm *vm) {
