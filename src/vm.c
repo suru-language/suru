@@ -81,6 +81,12 @@ s_vm *s_vm_create(const s_bc_module *m) {
         free(vm);
         return NULL;
     }
+    if (s_om_gc_create(vm->oh, &vm->gc) != S_OM_OK) {
+        s_om_heap_destroy(vm->oh);
+        free(vm->st);
+        free(vm);
+        return NULL;
+    }
     return vm;
 }
 
