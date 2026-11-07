@@ -204,7 +204,7 @@ static inline s_om_ref vm_obj_h(s_value v) {
     return v.tag == S_VAL_OBJ ? v.u.idx : S_OM_REF_NONE;
 }
 
-static inline const s_om_hdr *vm_obj_hdr(s_vm *vm, s_value v) {
+static inline const s_om_hdr *vm_obj_hdr(const s_vm *vm, s_value v) {
     s_om_ref h = vm_obj_h(v);
     if (!h) return NULL;
     const void *base = NULL;
@@ -214,17 +214,17 @@ static inline const s_om_hdr *vm_obj_hdr(s_vm *vm, s_value v) {
     return (const s_om_hdr *)base;
 }
 
-static inline void *vm_obj_payload(s_vm *vm, s_value v) {
+static inline void *vm_obj_payload(const s_vm *vm, s_value v) {
     const s_om_hdr *hdr = vm_obj_hdr(vm, v);
     return hdr ? (char *)hdr + S_OM_HEADER_SIZE : NULL;
 }
 
-static inline s_u8 vm_obj_kind(s_vm *vm, s_value v) {
+static inline s_u8 vm_obj_kind(const s_vm *vm, s_value v) {
     const s_om_hdr *hdr = vm_obj_hdr(vm, v);
     return hdr ? hdr->kind : 0;
 }
 
-static inline s_u32 vm_obj_count(s_vm *vm, s_value v) {
+static inline s_u32 vm_obj_count(const s_vm *vm, s_value v) {
     const s_om_hdr *hdr = vm_obj_hdr(vm, v);
     return hdr ? hdr->count : 0;
 }
