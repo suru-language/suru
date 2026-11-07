@@ -1023,33 +1023,35 @@ static bool builtin_str_repeat(s_vm *vm) {
 
 static bool builtin_str_trim(s_vm *vm) {
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR) {
         vm_trap(vm, "str_trim expects a string");
         return false;
     }
-    const char *data = s_obj_str_data(s.u.o);
-    s_size len = s_obj_str_len(s.u.o);
+    const char *data = vm_obj_payload(vm, s);
+    s_size len = vm_obj_count(vm, s);
     s_size b = 0, e = len;
     while (b < e && (data[b] == ' ' || data[b] == '\t' ||
                      data[b] == '\n' || data[b] == '\r')) b++;
     while (e > b && (data[e - 1] == ' ' || data[e - 1] == '\t' ||
                      data[e - 1] == '\n' || data[e - 1] == '\r')) e--;
     s_size n = e - b;
-    /* Copy trimmed text to an exact-size temporary buffer BEFORE allocating,
-     * so the data survives even if GC frees the source object during
-     * allocation. A heap buffer (rather than a fixed stack buffer) supports
-     * arbitrary-length strings. */
     char *tmp = NULL;
     if (n > 0) {
         tmp = (char *)malloc(n);
         if (!tmp) { vm_trap(vm, "str_trim: out of memory"); return false; }
         memcpy(tmp, data + b, n);
     }
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
-    if (!o) { free(tmp); return false; }
-    if (n) memcpy(s_obj_str_data(o), tmp, n);
+    if (!vm_temp_root(vm, s)) { free(tmp); return false; }
+    s_om_ref h = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)n, n, &h)) {
+        free(tmp); vm_temp_unroot(vm, s);
+        return false;
+    }
+    vm_temp_unroot(vm, s);
+    if (n) s_vmobj_write(vm->oh, h, 0, tmp, n);
     free(tmp);
-    return push(vm, s_val_obj(o));}
+    return push(vm, s_val_obj_h(h));
+}
 
 static bool builtin_args_len(s_vm *vm) {
     return push(vm, s_val_int((s_i64)vm->argc));
@@ -1065,10 +1067,10 @@ static bool builtin_args(s_vm *vm) {
     }
     const char *s = vm->argv[k];
     s_size len = strlen(s);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
-    if (!o) return false;
-    if (len) memcpy(s_obj_str_data(o), s, len);
-    return push(vm, s_val_obj(o));
+    s_om_ref h = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)len, len, &h)) return false;
+    if (len) s_vmobj_write(vm->oh, h, 0, s, len);
+    return push(vm, s_val_obj_h(h));
 }
 
 static bool builtin_str_split(s_vm *vm) {
