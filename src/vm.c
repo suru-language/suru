@@ -1963,6 +1963,20 @@ int s_vm_run(s_vm *vm) {
             s_value cause = pop(vm);
             s_value message = pop(vm);
             s_value type = pop(vm);
+            fprintf(stderr, "DEBUG: type.tag=%d type.u.idx=%u\n", type.tag, (unsigned)type.u.idx);
+            {
+                s_om_ref h = type.u.idx;
+                const void *base = NULL; s_size rounded = 0;
+                s_om_err err = s_vmobj_inspect(vm->oh, h, &base, &rounded);
+                fprintf(stderr, "DEBUG: inspect err=%d base=%p rounded=%zu\n", err, base, rounded);
+                if (base) {
+                    const unsigned char *bytes = (const unsigned char *)base;
+                    fprintf(stderr, "DEBUG: header bytes: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
+                            bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+                            bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]);
+                    fprintf(stderr, "DEBUG: kind at byte 12 = %u\n", (unsigned)bytes[12]);
+                }
+            }
             if (type.tag != S_VAL_OBJ || vm_obj_kind(vm, type) != S_OBJ_STR ||
                 message.tag != S_VAL_OBJ || vm_obj_kind(vm, message) != S_OBJ_STR ||
                 (cause.tag != S_VAL_NONE &&
