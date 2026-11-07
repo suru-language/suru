@@ -1979,13 +1979,19 @@ int s_vm_run(s_vm *vm) {
             pc++; break;
         }
         case BC_NEW_EXCEPTION: {
+            fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: start\n");
             s_value cause = pop(vm);
             s_value message = pop(vm);
             s_value type = pop(vm);
+            fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: type tag=%d kind=%d msg tag=%d kind=%d cause tag=%d\n",
+                    type.tag, type.tag == S_VAL_OBJ ? vm_obj_kind(vm, type) : -1,
+                    message.tag, message.tag == S_VAL_OBJ ? vm_obj_kind(vm, message) : -1,
+                    cause.tag);
             if (type.tag != S_VAL_OBJ || vm_obj_kind(vm, type) != S_OBJ_STR ||
                 message.tag != S_VAL_OBJ || vm_obj_kind(vm, message) != S_OBJ_STR ||
                 (cause.tag != S_VAL_NONE &&
                  (cause.tag != S_VAL_OBJ || vm_obj_kind(vm, cause) != S_OBJ_EXCEPTION))) {
+                fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: type check failed\n");
                 vm_trap(vm, "new_exception type error");
                 return 1;
             }
@@ -1997,12 +2003,15 @@ int s_vm_run(s_vm *vm) {
                 return 1;
             }
             s_om_ref o = S_OM_REF_NONE;
+            fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: calling vm_alloc_obj\n");
             if (!vm_alloc_obj(vm, S_OBJ_EXCEPTION, 3, 0, &o)) {
+                fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: vm_alloc_obj failed\n");
                 vm_temp_unroot(vm, cause);
                 vm_temp_unroot(vm, message);
                 vm_temp_unroot(vm, type);
                 return 1;
             }
+            fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: alloc succeeded, o=%lu\n", (unsigned long)o);
             vm_temp_unroot(vm, cause);
             vm_temp_unroot(vm, message);
             vm_temp_unroot(vm, type);
@@ -2011,6 +2020,7 @@ int s_vm_run(s_vm *vm) {
             fields[1] = message;
             fields[2] = cause;
             if (!push(vm, s_val_obj_h(o))) return 1;
+            fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: done, pushed exception\n");
             pc++;
             break;
         }
