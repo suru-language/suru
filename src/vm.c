@@ -1429,29 +1429,33 @@ static bool builtin_str_pad(s_vm *vm) {
     s_value fill = pop(vm);
     s_value width = pop(vm);
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR ||
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR ||
         width.tag != S_VAL_INT ||
-        fill.tag != S_VAL_OBJ || fill.u.o->kind != S_OBJ_STR) {
+        fill.tag != S_VAL_OBJ || vm_obj_kind(vm, fill) != S_OBJ_STR) {
         vm_trap(vm, "str_pad expects (str, int, str)");
         return false;
     }
-    s_size slen = s_obj_str_len(s.u.o);
+    s_size slen = vm_obj_count(vm, s);
     s_i64 w = width.u.i;
     if (w <= (s_i64)slen) return push(vm, s);
     s_size pad = (s_size)(w - (s_i64)slen);
     if (pad > (1u << 26)) { vm_trap(vm, "str_pad too wide"); return false; }
     char fc = ' ';
-    if (s_obj_str_len(fill.u.o) > 0) fc = s_obj_str_data(fill.u.o)[0];
+    if (vm_obj_count(vm, fill) > 0) fc = ((const char *)vm_obj_payload(vm, fill))[0];
     s_size total = slen + pad;
-    s_heap_add_root(vm->heap, &s);
-    s_heap_add_root(vm->heap, &fill);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
-    s_heap_remove_root(vm->heap, &fill);
-    s_heap_remove_root(vm->heap, &s);
-    if (!o) return false;
-    memset(s_obj_str_data(o), fc, pad);
-    memcpy(s_obj_str_data(o) + pad, s_obj_str_data(s.u.o), slen);
-    return push(vm, s_val_obj(o));
+    if (!vm_temp_root(vm, s)) return false;
+    if (!vm_temp_root(vm, fill)) { vm_temp_unroot(vm, s); return false; }
+    s_om_ref o = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)total, total, &o)) {
+        vm_temp_unroot(vm, fill);
+        vm_temp_unroot(vm, s);
+        return false;
+    }
+    vm_temp_unroot(vm, fill);
+    vm_temp_unroot(vm, s);
+    memset(vm_obj_payload(vm, s_val_obj_h(o)), fc, pad);
+    memcpy((char *)vm_obj_payload(vm, s_val_obj_h(o)) + pad, vm_obj_payload(vm, s), slen);
+    return push(vm, s_val_obj_h(o));
 }
 
 static bool builtin_array_concat(s_vm *vm) {
