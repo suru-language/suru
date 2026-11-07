@@ -280,6 +280,47 @@ static s_value pop(s_vm *vm) {
     return vm->st[--vm->sp];
 }
 
+/* ------------------------------------------------------------------ */
+/* Objmodel resolution helpers                                         */
+/* ------------------------------------------------------------------ */
+
+static inline s_om_ref vm_obj_h(s_value v) {
+    return v.tag == S_VAL_OBJ ? v.u.idx : S_OM_REF_NONE;
+}
+
+static inline const s_om_hdr *vm_obj_hdr(s_vm *vm, s_value v) {
+    s_om_ref h = vm_obj_h(v);
+    if (!h) return NULL;
+    const void *base = s_vmobj_inspect(vm->oh, h, NULL);
+    return base ? (const s_om_hdr *)base : NULL;
+}
+
+static inline void *vm_obj_payload(s_vm *vm, s_value v) {
+    const s_om_hdr *hdr = vm_obj_hdr(vm, v);
+    return hdr ? (char *)hdr + S_OM_HEADER_SIZE : NULL;
+}
+
+static inline s_u8 vm_obj_kind(s_vm *vm, s_value v) {
+    const s_om_hdr *hdr = vm_obj_hdr(vm, v);
+    return hdr ? hdr->kind : 0;
+}
+
+static inline s_u32 vm_obj_count(s_vm *vm, s_value v) {
+    const s_om_hdr *hdr = vm_obj_hdr(vm, v);
+    return hdr ? hdr->count : 0;
+}
+
+/* Temp-root helpers for GC safety during marking */
+static inline bool vm_temp_root(s_vm *vm, s_value v) {
+    s_om_ref h = vm_obj_h(v);
+    return h && s_vmobj_temp_root(vm->oh, h) == S_OM_OK;
+}
+
+static inline void vm_temp_unroot(s_vm *vm, s_value v) {
+    s_om_ref h = vm_obj_h(v);
+    if (h) s_vmobj_temp_unroot(vm->oh, h);
+}
+
 static bool push(s_vm *vm, s_value v) {
     if (!grow_stack(vm, vm->sp + 1)) {
         vm_trap(vm, "operand stack overflow");
@@ -395,11 +436,11 @@ static bool builtin_print(s_vm *vm, bool newline) {
 
 static bool builtin_str_len(s_vm *vm) {
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR) {
         vm_trap(vm, "str_len expects a string");
         return false;
     }
-    return push(vm, s_val_int((s_i64)s_obj_str_len(s.u.o)));
+    return push(vm, s_val_int((s_i64)vm_obj_count(vm, s)));
 }
 
 static bool valid_utf8(const char *bytes, s_size len) {
@@ -440,12 +481,14 @@ static bool valid_utf8(const char *bytes, s_size len) {
 
 static bool builtin_str_valid_utf8(s_vm *vm) {
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR) {
         vm_trap(vm, "str_valid_utf8 expects a string");
         return false;
     }
-    return push(vm, s_val_int(valid_utf8(s_obj_str_data(s.u.o),
-                                          s_obj_str_len(s.u.o)) ? 1 : 0));
+    void *payload = vm_obj_payload(vm, s);
+    s_size len = vm_obj_count(vm, s);
+    return push(vm, s_val_int(valid_utf8((const char *)payload,
+                                          len) ? 1 : 0));
 }
 
 static bool builtin_str_utf8_len(s_vm *vm) {
