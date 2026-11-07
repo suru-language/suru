@@ -259,7 +259,7 @@ static bool exception_matches(const s_vm *vm, s_value exception,
     s_size want_len = vm->m->strlens[type_index];
     s_size actual_len = vm_obj_count(vm, type);
     if (vm_obj_count(vm, type) != want_len) {
-        fprintf(stderr, "DEBUG exception_matches: len mismatch want=%d actual=%d\n", want_len, actual_len);
+        fprintf(stderr, "DEBUG exception_matches: len mismatch want=%zu actual=%zu\n", want_len, actual_len);
         return false;
     }
     int cmp = memcmp(vm_obj_payload(vm, type), vm->m->strings[type_index], want_len);
