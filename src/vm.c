@@ -1731,8 +1731,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
         vm_trap(vm, "refusing to execute unverified bytecode");
         return 1;
     }
-    vm->heap = heap;
-    s_heap_set_incremental(heap, vm->gc_incremental);
+    (void)heap;
     vm->sp = 0;
     vm->fp = 0;
     vm->ncalls = 0;
