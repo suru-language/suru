@@ -245,14 +245,29 @@ static inline void vm_temp_unroot(s_vm *vm, s_value v) {
 static bool exception_matches(const s_vm *vm, s_value exception,
                               s_u32 type_index) {
     if (exception.tag != S_VAL_OBJ ||
-        vm_obj_kind(vm, exception) != S_OBJ_EXCEPTION) return false;
+        vm_obj_kind(vm, exception) != S_OBJ_EXCEPTION) {
+        fprintf(stderr, "DEBUG exception_matches: exception tag/kind fail tag=%d kind=%d\n", exception.tag, vm_obj_kind(vm, exception));
+        return false;
+    }
     if (type_index == UINT32_MAX) return true;
     s_value *fields = (s_value *)vm_obj_payload(vm, exception);
     s_value type = fields[0];
-    if (type.tag != S_VAL_OBJ || vm_obj_kind(vm, type) != S_OBJ_STR) return false;
+    if (type.tag != S_VAL_OBJ || vm_obj_kind(vm, type) != S_OBJ_STR) {
+        fprintf(stderr, "DEBUG exception_matches: type tag/kind fail tag=%d kind=%d\n", type.tag, vm_obj_kind(vm, type));
+        return false;
+    }
     s_size want_len = vm->m->strlens[type_index];
-    return vm_obj_count(vm, type) == want_len &&
-           memcmp(vm_obj_payload(vm, type), vm->m->strings[type_index], want_len) == 0;
+    s_size actual_len = vm_obj_count(vm, type);
+    if (vm_obj_count(vm, type) != want_len) {
+        fprintf(stderr, "DEBUG exception_matches: len mismatch want=%d actual=%d\n", want_len, actual_len);
+        return false;
+    }
+    int cmp = memcmp(vm_obj_payload(vm, type), vm->m->strings[type_index], want_len);
+    if (cmp != 0) {
+        fprintf(stderr, "DEBUG exception_matches: memcmp failed cmp=%d\n", cmp);
+        return false;
+    }
+    return true;
 }
 
 static void vm_uncaught_exception(s_vm *vm, s_value exception) {
