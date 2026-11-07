@@ -111,9 +111,11 @@ bool s_om_gc_marking(const s_om_gc *g) {
 /* ------------------------------------------------------------------ */
 
 static bool gc_mark_children(s_om_heap h, s_om_ref obj) {
-    /* Mark white children of `obj` grey. Children are stored as full object
-     * handles (u64) at payload word i (byte offset i*8). Returns true if any
-     * child was newly shaded grey. Stale/invalid child handles are ignored. */
+    /* Mark white children of `obj` grey. The real VM object graph stores its
+     * children as s_value slots at payload offset i * sizeof(s_value); only
+     * slots whose tag is S_VAL_OBJ carry a genuine handle (u.idx). Stale/
+     * invalid child handles are ignored. Returns true if any child was newly
+     * shaded grey. */
     s_obj_kind k;
     s_u32 cnt;
     if (s_om_kind(h, obj, &k) != S_OM_OK || k == S_OBJ_STR) return false;
@@ -121,8 +123,13 @@ static bool gc_mark_children(s_om_heap h, s_om_ref obj) {
     bool touched = false;
     s_u32 i;
     for (i = 0; i < cnt; ++i) {
-        s_om_ref c = S_OM_REF_NONE;
-        if (s_om_read_u64(h, obj, (s_size)i * 8, &c) != S_OM_OK) break;
+        s_value v;
+        if (s_om_read(h, obj, (s_size)i * sizeof(s_value), &v, sizeof(v))
+            != S_OM_OK) {
+            break;
+        }
+        if (v.tag != S_VAL_OBJ) continue;
+        s_om_ref c = v.u.idx;
         if (c == S_OM_REF_NONE) continue;
         if (!s_om_is_live(h, c)) continue;
         s_u8 cc = 0;
