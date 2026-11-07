@@ -1208,17 +1208,20 @@ static bool builtin_array_slice(s_vm *vm) {
 
 static bool builtin_str_map(s_vm *vm, int mode) {
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR) {
         vm_trap(vm, "string transform expects a string");
         return false;
     }
-    s_size n = s_obj_str_len(s.u.o);
-    const char *src = s_obj_str_data(s.u.o);
-    s_heap_add_root(vm->heap, &s);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
-    s_heap_remove_root(vm->heap, &s);
-    if (!o) return false;
-    char *dst = s_obj_str_data(o);
+    s_size n = vm_obj_count(vm, s);
+    const char *src = vm_obj_payload(vm, s);
+    if (!vm_temp_root(vm, s)) return false;
+    s_om_ref o = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)n, n, &o)) {
+        vm_temp_unroot(vm, s);
+        return false;
+    }
+    vm_temp_unroot(vm, s);
+    char *dst = (char *)vm_obj_payload(vm, s_val_obj_h(o));
     if (mode == 0) {
         for (s_size i = 0; i < n; ++i) dst[i] = src[n - 1 - i];
     } else {
@@ -1229,7 +1232,7 @@ static bool builtin_str_map(s_vm *vm, int mode) {
             dst[i] = ch;
         }
     }
-    return push(vm, s_val_obj(o));
+    return push(vm, s_val_obj_h(o));
 }
 
 static bool builtin_len(s_vm *vm) {
@@ -1238,37 +1241,40 @@ static bool builtin_len(s_vm *vm) {
         vm_trap(vm, "len expects an array or string");
         return false;
     }
-    if (v.u.o->kind == S_OBJ_ARRAY || v.u.o->kind == S_OBJ_STR)
-        return push(vm, s_val_int((s_i64)v.u.o->count));
+    if (vm_obj_kind(vm, v) == S_OBJ_ARRAY || vm_obj_kind(vm, v) == S_OBJ_STR)
+        return push(vm, s_val_int((s_i64)vm_obj_count(vm, v)));
     vm_trap(vm, "len expects an array or string");
     return false;
 }
 
 static bool builtin_array_reverse(s_vm *vm) {
     s_value v = pop(vm);
-    if (v.tag != S_VAL_OBJ || v.u.o->kind != S_OBJ_ARRAY) {
+    if (v.tag != S_VAL_OBJ || vm_obj_kind(vm, v) != S_OBJ_ARRAY) {
         vm_trap(vm, "array_reverse expects an array");
         return false;
     }
-    s_u32 n = v.u.o->count;
-    s_heap_add_root(vm->heap, &v);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, n, 0);
-    s_heap_remove_root(vm->heap, &v);
-    if (!o) return false;
-    s_value *src = s_obj_array_data(v.u.o);
-    s_value *dst = s_obj_array_data(o);
+    s_u32 n = vm_obj_count(vm, v);
+    if (!vm_temp_root(vm, v)) return false;
+    s_om_ref o = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_ARRAY, n, 0, &o)) {
+        vm_temp_unroot(vm, v);
+        return false;
+    }
+    s_value *src = (s_value *)vm_obj_payload(vm, v);
+    s_value *dst = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
     for (s_u32 i = 0; i < n; ++i) dst[i] = src[n - 1 - i];
-    return push(vm, s_val_obj(o));
+    vm_temp_unroot(vm, v);
+    return push(vm, s_val_obj_h(o));
 }
 
 static bool builtin_array_reduce(s_vm *vm, int mode) {
     s_value v = pop(vm);
-    if (v.tag != S_VAL_OBJ || v.u.o->kind != S_OBJ_ARRAY) {
+    if (v.tag != S_VAL_OBJ || vm_obj_kind(vm, v) != S_OBJ_ARRAY) {
         vm_trap(vm, "array reduction expects an array");
         return false;
     }
-    s_u32 n = v.u.o->count;
-    s_value *el = s_obj_array_data(v.u.o);
+    s_u32 n = vm_obj_count(vm, v);
+    s_value *el = (s_value *)vm_obj_payload(vm, v);
     if (n == 0) {
         vm_trap(vm, "array reduction on empty array");
         return false;
@@ -1291,35 +1297,42 @@ static bool builtin_array_reduce(s_vm *vm, int mode) {
 
 static bool builtin_str_to_f64(s_vm *vm) {
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR) {
         vm_trap(vm, "str_to_f64 expects a string");
         return false;
     }
-    s_size n = s_obj_str_len(s.u.o);
+    s_size n = vm_obj_count(vm, s);
     char buf[128];
     if (n >= sizeof buf) n = sizeof buf - 1;
-    memcpy(buf, s_obj_str_data(s.u.o), n);
+    memcpy(buf, vm_obj_payload(vm, s), n);
     buf[n] = '\0';
     double v = strtod(buf, NULL);
     return push(vm, s_val_float(v));
 }
 
-static char *cstr_dup(const s_value *sv) {
-    s_size n = s_obj_str_len(sv->u.o);
+static char *cstr_dup(const s_value *sv, s_vm *vm) {
+    if (sv->tag != S_VAL_OBJ) return NULL;
+    s_om_ref h = sv->u.idx;
+    if (!h) return NULL;
+    const void *base = NULL;
+    s_size rounded = 0;
+    if (s_vmobj_inspect(vm->oh, h, &base, &rounded) != S_OM_OK) return NULL;
+    const char *data = (const char *)base + S_OM_HEADER_SIZE;
+    s_size n = *(const s_u32 *)(base + 4);
     char *buf = malloc(n + 1);
     if (!buf) return NULL;
-    memcpy(buf, s_obj_str_data(sv->u.o), n);
+    memcpy(buf, data, n);
     buf[n] = '\0';
     return buf;
 }
 
 static bool builtin_read_file(s_vm *vm) {
     s_value p = pop(vm);
-    if (p.tag != S_VAL_OBJ || p.u.o->kind != S_OBJ_STR) {
+    if (p.tag != S_VAL_OBJ || vm_obj_kind(vm, p) != S_OBJ_STR) {
         vm_trap(vm, "read_file expects a path string");
         return false;
     }
-    char *path = cstr_dup(&p);
+    char *path = cstr_dup(&p, vm);
     if (!path) { vm_trap(vm, "read_file: out of memory"); return false; }
     FILE *f = fopen(path, "rb");
     free(path);
@@ -1330,28 +1343,32 @@ static bool builtin_read_file(s_vm *vm) {
     if (fseek(f, 0, SEEK_SET) != 0) { fclose(f); vm_trap(vm, "read_file: seek failed"); return false; }
     s_size n = (s_size)sz;
     if (n > (1u << 26)) { fclose(f); vm_trap(vm, "read_file too large"); return false; }
-    s_heap_add_root(vm->heap, &p);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
-    s_heap_remove_root(vm->heap, &p);
-    if (!o) { fclose(f); return false; }
-    size_t got = n ? fread(s_obj_str_data(o), 1, n, f) : 0;
+    if (!vm_temp_root(vm, p)) return false;
+    s_om_ref h = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)n, n, &h)) {
+        vm_temp_unroot(vm, p);
+        fclose(f);
+        return false;
+    }
+    vm_temp_unroot(vm, p);
+    size_t got = n ? fread(vm_obj_payload(vm, s_val_obj_h(h)), 1, n, f) : 0;
     fclose(f);
     if (got != n) { vm_trap(vm, "read_file: short read"); return false; }
-    return push(vm, s_val_obj(o));
+    return push(vm, s_val_obj_h(h));
 }
 
 static bool builtin_write_file(s_vm *vm) {
     s_value data = pop(vm);
     s_value p = pop(vm);
-    if (p.tag != S_VAL_OBJ || p.u.o->kind != S_OBJ_STR ||
-        data.tag != S_VAL_OBJ || data.u.o->kind != S_OBJ_STR) {
+    if (p.tag != S_VAL_OBJ || vm_obj_kind(vm, p) != S_OBJ_STR ||
+        data.tag != S_VAL_OBJ || vm_obj_kind(vm, data) != S_OBJ_STR) {
         vm_trap(vm, "write_file expects (str, str)");
         return false;
     }
-    char *path = cstr_dup(&p);
+    char *path = cstr_dup(&p, vm);
     if (!path) { vm_trap(vm, "write_file: out of memory"); return false; }
-    s_size n = s_obj_str_len(data.u.o);
-    const char *bytes = s_obj_str_data(data.u.o);
+    s_size n = vm_obj_count(vm, data);
+    const char *bytes = vm_obj_payload(vm, data);
     FILE *f = fopen(path, "wb");
     free(path);
     if (!f) { vm_trap(vm, "write_file: cannot open file"); return false; }
@@ -1365,11 +1382,11 @@ static bool builtin_write_file(s_vm *vm) {
 
 static bool builtin_file_exists(s_vm *vm) {
     s_value p = pop(vm);
-    if (p.tag != S_VAL_OBJ || p.u.o->kind != S_OBJ_STR) {
+    if (p.tag != S_VAL_OBJ || vm_obj_kind(vm, p) != S_OBJ_STR) {
         vm_trap(vm, "file_exists expects a path string");
         return false;
     }
-    char *path = cstr_dup(&p);
+    char *path = cstr_dup(&p, vm);
     if (!path) { vm_trap(vm, "file_exists: out of memory"); return false; }
     FILE *f = fopen(path, "rb");
     free(path);
