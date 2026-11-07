@@ -2055,7 +2055,7 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 vm_trap(vm, "array_len type error");
                 return 1;
             }
-            if (!push(vm, s_val_int((s_i64)vm_obj_count(vm, arr))) return 1;
+            if (!push(vm, s_val_int((s_i64)vm_obj_count(vm, arr)))) return 1;
             pc++; break;
         }
         case BC_FIELD_LD: {
@@ -2128,28 +2128,32 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             break;
         }
         case BC_MKCLOSURE: {
-            s_gcobj *o = vm_alloc(vm, S_OBJ_CLOSURE, 1, 0);
-            if (!o) return 1;
-            s_obj_array_data(o)[0] = s_val_int((s_i64)in->a);
-            if (!push(vm, s_val_obj(o))) return 1;
+            s_om_ref o = S_OM_REF_NONE;
+            if (!vm_alloc_obj(vm, S_OBJ_CLOSURE, 1, 0, &o)) return 1;
+            ((s_value *)vm_obj_payload(vm, s_val_obj_h(o)))[0] = s_val_int((s_i64)in->a);
+            if (!push(vm, s_val_obj_h(o))) return 1;
             pc++; break;
         }
         case BC_MKCLOSURE_V: {
             s_u32 ncap = in->b;
             if (vm->sp < ncap) { vm_trap(vm, "mkclosure_v underflow"); return 1; }
-            s_gcobj *env = vm_alloc(vm, S_OBJ_ARRAY, ncap, 0);
-            if (!env) return 1;
+            s_om_ref env = S_OM_REF_NONE;
+            if (!vm_alloc_obj(vm, S_OBJ_ARRAY, ncap, 0, &env)) return 1;
             vm->sp -= ncap;
-            memcpy(s_obj_array_data(env), vm->st + vm->sp,
+            memcpy(vm_obj_payload(vm, s_val_obj_h(env)), vm->st + vm->sp,
                    sizeof(s_value) * ncap);
-            s_value envv = s_val_obj(env);
-            s_heap_add_root(vm->heap, &envv);
-            s_gcobj *o = vm_alloc(vm, S_OBJ_CLOSURE, 2, 0);
-            s_heap_remove_root(vm->heap, &envv);
-            if (!o) return 1;
-            s_obj_array_data(o)[0] = s_val_int((s_i64)in->a);
-            s_obj_array_data(o)[1] = s_val_obj(env);
-            if (!push(vm, s_val_obj(o))) return 1;
+            s_value envv = s_val_obj_h(env);
+            if (!vm_temp_root(vm, envv)) return 1;
+            s_om_ref o = S_OM_REF_NONE;
+            if (!vm_alloc_obj(vm, S_OBJ_CLOSURE, 2, 0, &o)) {
+                vm_temp_unroot(vm, envv);
+                return 1;
+            }
+            vm_temp_unroot(vm, envv);
+            s_value *dst = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
+            dst[0] = s_val_int((s_i64)in->a);
+            dst[1] = envv;
+            if (!push(vm, s_val_obj_h(o))) return 1;
             pc++; break;
         }
         case BC_CALLV: {
