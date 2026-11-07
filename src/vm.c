@@ -180,23 +180,26 @@ static void discard_frame_handlers(s_vm *vm) {
 static bool exception_matches(const s_vm *vm, s_value exception,
                               s_u32 type_index) {
     if (exception.tag != S_VAL_OBJ ||
-        exception.u.o->kind != S_OBJ_EXCEPTION) return false;
+        vm_obj_kind(vm, exception) != S_OBJ_EXCEPTION) return false;
     if (type_index == UINT32_MAX) return true;
-    s_value type = s_obj_exception_fields(exception.u.o)[0];
-    if (type.tag != S_VAL_OBJ || type.u.o->kind != S_OBJ_STR) return false;
+    s_value *fields = (s_value *)vm_obj_payload(vm, exception);
+    s_value type = fields[0];
+    if (type.tag != S_VAL_OBJ || vm_obj_kind(vm, type) != S_OBJ_STR) return false;
     s_size want_len = vm->m->strlens[type_index];
-    return s_obj_str_len(type.u.o) == want_len &&
-           memcmp(s_obj_str_data(type.u.o), vm->m->strings[type_index], want_len) == 0;
+    return vm_obj_count(vm, type) == want_len &&
+           memcmp(vm_obj_payload(vm, type), vm->m->strings[type_index], want_len) == 0;
 }
 
 static void vm_uncaught_exception(s_vm *vm, s_value exception) {
-    if (exception.tag == S_VAL_OBJ && exception.u.o->kind == S_OBJ_EXCEPTION) {
-        s_value *fields = s_obj_exception_fields(exception.u.o);
-        if (fields[0].tag == S_VAL_OBJ && fields[1].tag == S_VAL_OBJ &&
-            fields[0].u.o->kind == S_OBJ_STR && fields[1].u.o->kind == S_OBJ_STR) {
+    if (exception.tag == S_VAL_OBJ && vm_obj_kind(vm, exception) == S_OBJ_EXCEPTION) {
+        s_value *fields = (s_value *)vm_obj_payload(vm, exception);
+        s_value msg = fields[1];
+        s_value type = fields[0];
+        if (msg.tag == S_VAL_OBJ && vm_obj_kind(vm, msg) == S_OBJ_STR &&
+            type.tag == S_VAL_OBJ && vm_obj_kind(vm, type) == S_OBJ_STR) {
             vm_trap(vm, "uncaught %.*s: %.*s",
-                    (int)s_obj_str_len(fields[0].u.o), s_obj_str_data(fields[0].u.o),
-                    (int)s_obj_str_len(fields[1].u.o), s_obj_str_data(fields[1].u.o));
+                    (int)vm_obj_count(vm, type), (char *)vm_obj_payload(vm, type),
+                    (int)vm_obj_count(vm, msg), (char *)vm_obj_payload(vm, msg));
             return;
         }
     }
