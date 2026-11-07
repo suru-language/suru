@@ -34,7 +34,7 @@ typedef struct s_handler {
 
 struct s_vm {
     const s_bc_module *m;
-    s_heap *heap;
+    s_om_heap oh;
     s_value *st;
     s_size st_cap;
     s_size sp;
