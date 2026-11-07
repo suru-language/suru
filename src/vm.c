@@ -72,8 +72,13 @@ s_vm *s_vm_create(const s_bc_module *m) {
         if (end != gs && v > 0) vm->gc_threshold = (s_u64)v;
     }
     vm->gc_min_threshold = vm->gc_threshold;
-    vm->gc_incremental = getenv("SURU_GC_INCREMENTAL") != NULL;
-    s_heap_set_incremental(vm->heap, vm->gc_incremental);
+    vm->gc_incremental = false; /* STW-only in new objmodel runtime */
+
+    if (s_om_heap_create(65536, 1u << 26, &vm->oh) != S_OM_OK) {
+        free(vm->st);
+        free(vm);
+        return NULL;
+    }
     return vm;
 }
 
