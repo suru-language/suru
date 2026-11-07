@@ -1132,52 +1132,57 @@ static bool builtin_str_split(s_vm *vm) {
 static bool builtin_str_join(s_vm *vm) {
     s_value sep = pop(vm);
     s_value arr = pop(vm);
-    if (arr.tag != S_VAL_OBJ || arr.u.o->kind != S_OBJ_ARRAY ||
-        sep.tag != S_VAL_OBJ || sep.u.o->kind != S_OBJ_STR) {
+    if (arr.tag != S_VAL_OBJ || vm_obj_kind(vm, arr) != S_OBJ_ARRAY ||
+        sep.tag != S_VAL_OBJ || vm_obj_kind(vm, sep) != S_OBJ_STR) {
         vm_trap(vm, "str_join expects ([str], str)");
         return false;
     }
-    s_size n = arr.u.o->count;
-    const char *sp = s_obj_str_data(sep.u.o);
-    s_size pl = s_obj_str_len(sep.u.o);
+    s_size n = vm_obj_count(vm, arr);
+    const char *sp = vm_obj_payload(vm, sep);
+    s_size pl = vm_obj_count(vm, sep);
+    s_value *elems = (s_value *)vm_obj_payload(vm, arr);
     s_size total = 0;
     for (s_size i = 0; i < n; ++i) {
-        s_value e = s_obj_array_data(arr.u.o)[i];
-        if (e.tag != S_VAL_OBJ || e.u.o->kind != S_OBJ_STR) {
+        s_value e = elems[i];
+        if (e.tag != S_VAL_OBJ || vm_obj_kind(vm, e) != S_OBJ_STR) {
             vm_trap(vm, "str_join array must contain strings");
             return false;
         }
-        total += s_obj_str_len(e.u.o);
+        total += vm_obj_count(vm, e);
         if (i + 1 < n) total += pl;
     }
     if (total > (1u << 24)) { vm_trap(vm, "str_join too large"); return false; }
-    s_heap_add_root(vm->heap, &arr);
-    s_heap_add_root(vm->heap, &sep);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
-    s_heap_remove_root(vm->heap, &sep);
-    s_heap_remove_root(vm->heap, &arr);
-    if (!o) return false;
-    char *d = s_obj_str_data(o);
+    if (!vm_temp_root(vm, arr)) return false;
+    if (!vm_temp_root(vm, sep)) { vm_temp_unroot(vm, arr); return false; }
+    s_om_ref o = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)total, total, &o)) {
+        vm_temp_unroot(vm, sep);
+        vm_temp_unroot(vm, arr);
+        return false;
+    }
+    vm_temp_unroot(vm, sep);
+    vm_temp_unroot(vm, arr);
+    char *d = vm_obj_payload(vm, s_val_obj_h(o));
     s_size off = 0;
     for (s_size i = 0; i < n; ++i) {
-        s_value e = s_obj_array_data(arr.u.o)[i];
-        s_size ln = s_obj_str_len(e.u.o);
-        if (ln) { memcpy(d + off, s_obj_str_data(e.u.o), ln); off += ln; }
+        s_value e = elems[i];
+        s_size ln = vm_obj_count(vm, e);
+        if (ln) { memcpy(d + off, vm_obj_payload(vm, e), ln); off += ln; }
         if (i + 1 < n) { memcpy(d + off, sp, pl); off += pl; }
     }
-    return push(vm, s_val_obj(o));
+    return push(vm, s_val_obj_h(o));
 }
 
 static bool builtin_array_slice(s_vm *vm) {
     s_value len = pop(vm);
     s_value start = pop(vm);
     s_value arr = pop(vm);
-    if (arr.tag != S_VAL_OBJ || arr.u.o->kind != S_OBJ_ARRAY ||
+    if (arr.tag != S_VAL_OBJ || vm_obj_kind(vm, arr) != S_OBJ_ARRAY ||
         start.tag != S_VAL_INT || len.tag != S_VAL_INT) {
         vm_trap(vm, "slice expects ([T], int, int)");
         return false;
     }
-    s_i64 n = (s_i64)arr.u.o->count;
+    s_i64 n = (s_i64)vm_obj_count(vm, arr);
     s_i64 b = start.u.i;
     if (b < 0) b = 0;
     if (b > n) b = n;
@@ -1186,13 +1191,19 @@ static bool builtin_array_slice(s_vm *vm) {
     s_i64 end = b + l;
     if (end > n) end = n;
     s_size m = (s_size)(end - b);
-    s_heap_add_root(vm->heap, &arr);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)m, 0);
-    s_heap_remove_root(vm->heap, &arr);
-    if (!o) return false;
-    if (m) memcpy(s_obj_array_data(o), s_obj_array_data(arr.u.o) + b,
-                  sizeof(s_value) * m);
-    return push(vm, s_val_obj(o));
+    if (!vm_temp_root(vm, arr)) return false;
+    s_om_ref o = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_ARRAY, (s_u32)m, 0, &o)) {
+        vm_temp_unroot(vm, arr);
+        return false;
+    }
+    vm_temp_unroot(vm, arr);
+    if (m) {
+        s_value *src = (s_value *)vm_obj_payload(vm, arr);
+        s_value *dst = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
+        memcpy(dst, src + b, sizeof(s_value) * m);
+    }
+    return push(vm, s_val_obj_h(o));
 }
 
 static bool builtin_str_map(s_vm *vm, int mode) {
