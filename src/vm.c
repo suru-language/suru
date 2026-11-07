@@ -1008,6 +1008,7 @@ static bool builtin_str_repeat(s_vm *vm) {
         return false;
     }
     if (!vm_temp_root(vm, s)) return false;
+    const char *src = vm_obj_payload(vm, s);
     s_om_ref h = S_OM_REF_NONE;
     if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)total, total, &h)) {
         vm_temp_unroot(vm, s);
@@ -1015,10 +1016,8 @@ static bool builtin_str_repeat(s_vm *vm) {
     }
     vm_temp_unroot(vm, s);
     char *d = (char *)vm_obj_payload(vm, s_val_obj_h(h));
-    s_size slen_ = slen;
     for (s_i64 i = 0; i < rep; ++i)
-        memcpy(d + (s_size)i * slen_, s_obj_str_data(s.u.o), slen_);  /* old 's' retains its old obj, but we already temp_unroot'd - need to save payload ptr first */
-    /* Fix: need to capture payload before unrooting. Let me redo this. */
+        memcpy(d + (s_size)i * slen, src, slen);
     return push(vm, s_val_obj_h(h));
 }
 
