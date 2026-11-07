@@ -227,24 +227,17 @@ static bool vm_throw(s_vm *vm, s_value exception, const s_bc_module *m,
 static void maybe_collect(s_vm *vm) {
     vm->alloc_counter++;
     bool should = vm->alloc_counter >= VM_GC_ALLOC_INTERVAL ||
-                  s_heap_live_bytes(vm->heap) > vm->gc_threshold;
+                  s_om_live_bytes(vm->oh) > vm->gc_threshold;
     if (!should) return;
-    s_heap_set_stack_root(vm->heap, vm->st, vm->sp);
-    s_u64 before = s_heap_live_bytes(vm->heap);
 
-    if (vm->gc_incremental) {
-        /* Incremental collection: run a slice of marking. If the current
-         * cycle is not finished, keep the alloc counter high so the next
-         * allocation re-enters and continues making progress. */
-        if (!s_heap_collect_incremental(vm->heap, VM_GC_INCREMENTAL_BUDGET)) {
-            vm->alloc_counter = VM_GC_ALLOC_INTERVAL;
-            return;
-        }
-    } else {
-        s_heap_collect(vm->heap);
-    }
+    if (!vm->gc) return; /* no bound collector, nothing to do */
 
-    s_u64 after = s_heap_live_bytes(vm->heap);
+    s_vm_gc_sync(vm);
+    s_u64 before = s_om_live_bytes(vm->oh);
+
+    s_u32 reclaimed = s_vmobj_collect(vm->gc);
+    s_u64 after = s_om_live_bytes(vm->oh);
+
     /* Nursery sizing heuristic: size the next trigger to leave HEADROOM
      * over the surviving set, so collection frequency tracks actual
      * allocation/survival instead of growing without bound. Clamp to
@@ -263,11 +256,12 @@ static void maybe_collect(s_vm *vm) {
         target = vm->gc_threshold;
     vm->gc_threshold = target;
     vm->alloc_counter = 0;
+
     if (getenv("SURU_GC_DEBUG")) {
-        fprintf(stderr, "GC[%llu] live %llu -> %llu, threshold %llu\n",
-                (unsigned long long)s_heap_collections(vm->heap),
+        fprintf(stderr, "GC[%u] live %llu -> %llu, threshold %llu, reclaimed %u\n",
+                s_om_active_count(),
                 (unsigned long long)before, (unsigned long long)after,
-                (unsigned long long)vm->gc_threshold);
+                (unsigned long long)vm->gc_threshold, reclaimed);
     }
 }
 
