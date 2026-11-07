@@ -1886,11 +1886,11 @@ int s_vm_run(s_vm *vm) {
             s_value b = pop(vm);
             s_value a = pop(vm);
             if (a.tag != S_VAL_OBJ || b.tag != S_VAL_OBJ ||
-                a.u.o->kind != S_OBJ_STR || b.u.o->kind != S_OBJ_STR) {
+                vm_obj_kind(vm, a) != S_OBJ_STR || vm_obj_kind(vm, b) != S_OBJ_STR) {
                 vm_trap(vm, "concat type error");
                 return 1;
             }
-            s_size la = s_obj_str_len(a.u.o), lb = s_obj_str_len(b.u.o);
+            s_size la = vm_obj_count(vm, a), lb = vm_obj_count(vm, b);
             s_size total;
             if (!s_size_add_ovf(la, lb, &total)) {
                 vm_trap(vm, "concat overflow");
