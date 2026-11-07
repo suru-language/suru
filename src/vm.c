@@ -2175,11 +2175,12 @@ int s_vm_run(s_vm *vm) {
             }
             s_size closure_slot = vm->sp - nargs - 1;
             s_value cl = vm->st[closure_slot];
-            if (cl.tag != S_VAL_OBJ || cl.u.o->kind != S_OBJ_CLOSURE) {
+            if (cl.tag != S_VAL_OBJ || vm_obj_kind(vm, cl) != S_OBJ_CLOSURE) {
                 vm_trap(vm, "call_v expects a closure");
                 return 1;
             }
-            s_value fnv = s_obj_array_data(cl.u.o)[0];
+            s_value *closure_data = (s_value *)vm_obj_payload(vm, cl);
+            s_value fnv = closure_data[0];
             if (fnv.tag != S_VAL_INT || fnv.u.i < 0 ||
                 (s_u64)fnv.u.i >= m->nfuncs) {
                 vm_trap(vm, "call_v invalid function reference");
@@ -2187,7 +2188,7 @@ int s_vm_run(s_vm *vm) {
             }
             s_u32 callee = (s_u32)fnv.u.i;
             const s_bc_func *cf = &m->funcs[callee];
-            bool has_env = (cl.u.o->count == 2);
+            bool has_env = (vm_obj_count(vm, cl) == 2);
             s_u32 want = has_env ? nargs + 1 : nargs;
             if (cf->nparams != want) {
                 vm_trap(vm, "call_v arity mismatch");
@@ -2195,7 +2196,7 @@ int s_vm_run(s_vm *vm) {
             }
             s_size fp_new;
             if (has_env) {
-                vm->st[closure_slot] = s_obj_array_data(cl.u.o)[1];
+                vm->st[closure_slot] = closure_data[1];
                 fp_new = closure_slot;
             } else {
                 fp_new = closure_slot + 1;
