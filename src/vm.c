@@ -89,6 +89,7 @@ void s_vm_destroy(s_vm *vm) {
          * stack, so the collector never retains a dangling address */
         (void)s_om_gc_set_svalue_root(vm->gc, NULL, 0);
     }
+    s_om_heap_destroy(vm->oh);
     free(vm->st);
     free(vm->calls);
     free(vm->handlers);
