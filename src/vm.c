@@ -493,7 +493,7 @@ static bool builtin_str_valid_utf8(s_vm *vm) {
 
 static bool builtin_str_utf8_len(s_vm *vm) {
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR) {
         vm_trap(vm, "str_utf8_len expects a string");
         return false;
     }
