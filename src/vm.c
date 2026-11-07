@@ -1318,7 +1318,7 @@ static char *cstr_dup(const s_value *sv, s_vm *vm) {
     s_size rounded = 0;
     if (s_vmobj_inspect(vm->oh, h, &base, &rounded) != S_OM_OK) return NULL;
     const char *data = (const char *)base + S_OM_HEADER_SIZE;
-    s_size n = *(const s_u32 *)(base + 4);
+    s_size n = *(const s_u32 *)((const char *)base + 4);
     char *buf = malloc(n + 1);
     if (!buf) return NULL;
     memcpy(buf, data, n);
