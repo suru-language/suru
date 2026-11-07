@@ -2024,56 +2024,53 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             if (!push(vm, ((s_value *)vm_obj_payload(vm, arr))[i])) return 1;
             pc++; break;
         }
-            pc++; break;
-        }
         case BC_IDX_ST: {
             s_value val = pop(vm);
             s_value idx = pop(vm);
             s_value arr = pop(vm);
-            if (arr.tag != S_VAL_OBJ || arr.u.o->kind != S_OBJ_ARRAY ||
+            if (arr.tag != S_VAL_OBJ || vm_obj_kind(vm, arr) != S_OBJ_ARRAY ||
                 idx.tag != S_VAL_INT) {
                 vm_trap(vm, "index store type error");
                 return 1;
             }
             s_i64 i = idx.u.i;
-            if (i < 0) i += (s_i64)arr.u.o->count;
-            if (i < 0 || i >= (s_i64)arr.u.o->count) {
-                vm_trap(vm, "index out of bounds (%lld of %u)", (long long)i, arr.u.o->count);
+            s_i64 n = (s_i64)vm_obj_count(vm, arr);
+            if (i < 0) i += n;
+            if (i < 0 || i >= n) {
+                vm_trap(vm, "index out of bounds (%lld of %u)", (long long)i, (unsigned)n);
                 return 1;
             }
-            s_heap_write_barrier(vm->heap, arr.u.o, val);
-            s_obj_array_data(arr.u.o)[i] = val;
+            ((s_value *)vm_obj_payload(vm, arr))[i] = val;
             pc++; break;
         }
         case BC_ARR_LEN: {
             s_value arr = pop(vm);
-            if (arr.tag != S_VAL_OBJ || arr.u.o->kind != S_OBJ_ARRAY) {
+            if (arr.tag != S_VAL_OBJ || vm_obj_kind(vm, arr) != S_OBJ_ARRAY) {
                 vm_trap(vm, "array_len type error");
                 return 1;
             }
-            if (!push(vm, s_val_int((s_i64)arr.u.o->count))) return 1;
+            if (!push(vm, s_val_int((s_i64)vm_obj_count(vm, arr))) return 1;
             pc++; break;
         }
         case BC_FIELD_LD: {
             s_value rec = pop(vm);
-            if (rec.tag != S_VAL_OBJ || rec.u.o->kind != S_OBJ_RECORD) {
+            if (rec.tag != S_VAL_OBJ || vm_obj_kind(vm, rec) != S_OBJ_RECORD) {
                 vm_trap(vm, "field load type error");
                 return 1;
             }
-            if (in->b >= rec.u.o->count) { vm_trap(vm, "field out of bounds"); return 1; }
-            if (!push(vm, s_obj_record_fields(rec.u.o)[in->b])) return 1;
+            if (in->b >= vm_obj_count(vm, rec)) { vm_trap(vm, "field out of bounds"); return 1; }
+            if (!push(vm, ((s_value *)vm_obj_payload(vm, rec))[in->b])) return 1;
             pc++; break;
         }
         case BC_FIELD_ST: {
             s_value val = pop(vm);
             s_value rec = pop(vm);
-            if (rec.tag != S_VAL_OBJ || rec.u.o->kind != S_OBJ_RECORD) {
+            if (rec.tag != S_VAL_OBJ || vm_obj_kind(vm, rec) != S_OBJ_RECORD) {
                 vm_trap(vm, "field store type error");
                 return 1;
             }
-            if (in->b >= rec.u.o->count) { vm_trap(vm, "field out of bounds"); return 1; }
-            s_heap_write_barrier(vm->heap, rec.u.o, val);
-            s_obj_record_fields(rec.u.o)[in->b] = val;
+            if (in->b >= vm_obj_count(vm, rec)) { vm_trap(vm, "field out of bounds"); return 1; }
+            ((s_value *)vm_obj_payload(vm, rec))[in->b] = val;
             pc++; break;
         }
         case BC_CALL: {
