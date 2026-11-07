@@ -1917,12 +1917,18 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 vm_trap(vm, "repeat too large");
                 return 1;
             }
-            s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
-            if (!o) return 1;
-            char *d = s_obj_str_data(o);
+            if (!vm_temp_root(vm, s)) return 1;
+            s_om_ref o = S_OM_REF_NONE;
+            if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)total, total, &o)) {
+                vm_temp_unroot(vm, s);
+                return 1;
+            }
+            vm_temp_unroot(vm, s);
+            char *d = (char *)vm_obj_payload(vm, s_val_obj_h(o));
+            const char *src = vm_obj_payload(vm, s);
             for (s_i64 i = 0; i < rep; ++i)
-                memcpy(d + (s_size)i * slen, s_obj_str_data(s.u.o), slen);
-            if (!push(vm, s_val_obj(o))) return 1;
+                memcpy(d + (s_size)i * slen, src, slen);
+            if (!push(vm, s_val_obj_h(o))) return 1;
             pc++; break;
         }
         case BC_EQ_B: case BC_NE_B:
