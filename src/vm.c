@@ -177,6 +177,70 @@ static void discard_frame_handlers(s_vm *vm) {
     }
 }
 
+/* ------------------------------------------------------------------ */
+/* Objmodel resolution helpers                                         */
+/* ------------------------------------------------------------------ */
+
+/* Inline object-model header layout (16 bytes, same as legacy s_gcobj):
+ *   offset 0:  size      (s_u64)
+ *   offset 4:  count      (s_u32)
+ *   offset 8:  magic      (s_u32)  // slot magic for generation protection
+ *   offset 12: kind        (s_u8)
+ *   offset 13: colour      (s_u8)
+ *   offset 14/15: flags      (s_u16)
+ *
+ * NOT wire-compatible with legacy s_gcobj (32 bytes). Access via
+ * s_vmobj_inspect() and cast the returned base pointer. */
+typedef struct s_om_hdr {
+    s_u64 size;
+    s_u32 count;
+    s_u32 magic;
+    s_u8 kind;
+    s_u8 colour;
+    s_u16 flags;
+} s_om_hdr;
+
+static inline s_om_ref vm_obj_h(s_value v) {
+    return v.tag == S_VAL_OBJ ? v.u.idx : S_OM_REF_NONE;
+}
+
+static inline const s_om_hdr *vm_obj_hdr(s_vm *vm, s_value v) {
+    s_om_ref h = vm_obj_h(v);
+    if (!h) return NULL;
+    const void *base = NULL;
+    s_size rounded = 0;
+    s_om_err err = s_vmobj_inspect(vm->oh, h, &base, &rounded);
+    if (err != S_OM_OK || !base) return NULL;
+    return (const s_om_hdr *)base;
+}
+
+static inline void *vm_obj_payload(s_vm *vm, s_value v) {
+    const s_om_hdr *hdr = vm_obj_hdr(vm, v);
+    return hdr ? (char *)hdr + S_OM_HEADER_SIZE : NULL;
+}
+
+static inline s_u8 vm_obj_kind(s_vm *vm, s_value v) {
+    const s_om_hdr *hdr = vm_obj_hdr(vm, v);
+    return hdr ? hdr->kind : 0;
+}
+
+static inline s_u32 vm_obj_count(s_vm *vm, s_value v) {
+    const s_om_hdr *hdr = vm_obj_hdr(vm, v);
+    return hdr ? hdr->count : 0;
+}
+
+/* Temp-root helpers for GC safety during marking */
+static inline bool vm_temp_root(s_vm *vm, s_value v) {
+    s_om_ref h = vm_obj_h(v);
+    if (!h) return true;
+    s_om_err err = s_vmobj_temp_root(vm->gc, h);
+    return err == S_OM_OK;
+}
+
+static inline void vm_temp_unroot(s_vm *vm, s_value v) {
+    s_om_ref h = vm_obj_h(v);
+    if (h) s_vmobj_temp_unroot(vm->gc, h);
+}
 static bool exception_matches(const s_vm *vm, s_value exception,
                               s_u32 type_index) {
     if (exception.tag != S_VAL_OBJ ||
@@ -284,70 +348,6 @@ static s_value pop(s_vm *vm) {
     return vm->st[--vm->sp];
 }
 
-/* ------------------------------------------------------------------ */
-/* Objmodel resolution helpers                                         */
-/* ------------------------------------------------------------------ */
-
-/* Inline object-model header layout (16 bytes, same as legacy s_gcobj):
- *   offset 0:  size      (s_u64)
- *   offset 4:  count      (s_u32)
- *   offset 8:  magic      (s_u32)  // slot magic for generation protection
- *   offset 12: kind        (s_u8)
- *   offset 13: colour      (s_u8)
- *   offset 14/15: flags      (s_u16)
- *
- * NOT wire-compatible with legacy s_gcobj (32 bytes). Access via
- * s_vmobj_inspect() and cast the returned base pointer. */
-typedef struct s_om_hdr {
-    s_u64 size;
-    s_u32 count;
-    s_u32 magic;
-    s_u8 kind;
-    s_u8 colour;
-    s_u16 flags;
-} s_om_hdr;
-
-static inline s_om_ref vm_obj_h(s_value v) {
-    return v.tag == S_VAL_OBJ ? v.u.idx : S_OM_REF_NONE;
-}
-
-static inline const s_om_hdr *vm_obj_hdr(s_vm *vm, s_value v) {
-    s_om_ref h = vm_obj_h(v);
-    if (!h) return NULL;
-    const void *base = NULL;
-    s_size rounded = 0;
-    s_om_err err = s_vmobj_inspect(vm->oh, h, &base, &rounded);
-    if (err != S_OM_OK || !base) return NULL;
-    return (const s_om_hdr *)base;
-}
-
-static inline void *vm_obj_payload(s_vm *vm, s_value v) {
-    const s_om_hdr *hdr = vm_obj_hdr(vm, v);
-    return hdr ? (char *)hdr + S_OM_HEADER_SIZE : NULL;
-}
-
-static inline s_u8 vm_obj_kind(s_vm *vm, s_value v) {
-    const s_om_hdr *hdr = vm_obj_hdr(vm, v);
-    return hdr ? hdr->kind : 0;
-}
-
-static inline s_u32 vm_obj_count(s_vm *vm, s_value v) {
-    const s_om_hdr *hdr = vm_obj_hdr(vm, v);
-    return hdr ? hdr->count : 0;
-}
-
-/* Temp-root helpers for GC safety during marking */
-static inline bool vm_temp_root(s_vm *vm, s_value v) {
-    s_om_ref h = vm_obj_h(v);
-    if (!h) return true;
-    s_om_err err = s_vmobj_temp_root(vm->gc, h);
-    return err == S_OM_OK;
-}
-
-static inline void vm_temp_unroot(s_vm *vm, s_value v) {
-    s_om_ref h = vm_obj_h(v);
-    if (h) s_vmobj_temp_unroot(vm->gc, h);
-}
 
 static bool push(s_vm *vm, s_value v) {
     if (!grow_stack(vm, vm->sp + 1)) {
