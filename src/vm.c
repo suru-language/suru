@@ -818,12 +818,12 @@ static bool builtin_substr(s_vm *vm) {
 
 static bool builtin_int_from_str(s_vm *vm) {
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR) {
         vm_trap(vm, "int_from_str expects a string");
         return false;
     }
-    const char *p = s_obj_str_data(s.u.o);
-    s_size n = s_obj_str_len(s.u.o);
+    const char *p = vm_obj_payload(vm, s);
+    s_size n = vm_obj_count(vm, s);
     s_size i = 0;
     bool neg = false;
     if (i < n && (p[i] == '-' || p[i] == '+')) {
