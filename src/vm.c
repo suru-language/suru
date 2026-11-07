@@ -497,8 +497,9 @@ static bool builtin_str_utf8_len(s_vm *vm) {
         vm_trap(vm, "str_utf8_len expects a string");
         return false;
     }
-    const char *bytes = s_obj_str_data(s.u.o);
-    s_size len = s_obj_str_len(s.u.o);
+    void *payload = vm_obj_payload(vm, s);
+    const char *bytes = (const char *)payload;
+    s_size len = vm_obj_count(vm, s);
     if (!valid_utf8(bytes, len)) {
         vm_trap(vm, "str_utf8_len received invalid UTF-8");
         return false;
@@ -518,11 +519,11 @@ static bool builtin_str_utf8_len(s_vm *vm) {
 
 static bool builtin_array_len(s_vm *vm) {
     s_value v = pop(vm);
-    if (v.tag != S_VAL_OBJ || v.u.o->kind != S_OBJ_ARRAY) {
+    if (v.tag != S_VAL_OBJ || vm_obj_kind(vm, v) != S_OBJ_ARRAY) {
         vm_trap(vm, "array_len expects an array");
         return false;
     }
-    return push(vm, s_val_int((s_i64)v.u.o->count));
+    return push(vm, s_val_int((s_i64)vm_obj_count(vm, v)));
 }
 
 static bool builtin_str_from_codepoint(s_vm *vm) {
@@ -592,32 +593,34 @@ static bool builtin_f64_to_bytes(s_vm *vm) {
 static bool builtin_str_byte_at(s_vm *vm) {
     s_value idx = pop(vm);
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR ||
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR ||
         idx.tag != S_VAL_INT) {
         vm_trap(vm, "str_byte_at expects (str, int)");
         return false;
     }
-    s_size len = s_obj_str_len(s.u.o);
+    s_size len = vm_obj_count(vm, s);
     s_i64 i = idx.u.i;
     if (i < 0 || (s_u64)i >= len) {
         vm_trap(vm, "str_byte_at out of range");
         return false;
     }
-    return push(vm, s_val_int((s_u8)s_obj_str_data(s.u.o)[i]));
+    void *payload = vm_obj_payload(vm, s);
+    return push(vm, s_val_int((s_u8)((const char *)payload)[i]));
 }
 
 static bool builtin_bytes_to_f64(s_vm *vm) {
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR) {
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR) {
         vm_trap(vm, "bytes_to_f64 expects a string");
         return false;
     }
-    if (s_obj_str_len(s.u.o) < 8) {
+    if (vm_obj_count(vm, s) < 8) {
         vm_trap(vm, "bytes_to_f64 needs 8 bytes");
         return false;
     }
     unsigned char buf[8];
-    memcpy(buf, s_obj_str_data(s.u.o), 8);
+    void *payload = vm_obj_payload(vm, s);
+    memcpy(buf, payload, 8);
     s_u64 bits = 0;
     for (int i = 0; i < 8; ++i) bits |= (s_u64)buf[i] << (8 * i);
     double d;
@@ -628,11 +631,11 @@ static bool builtin_bytes_to_f64(s_vm *vm) {
 static bool builtin_read_line(s_vm *vm) {
     s_size len;
     char *line = s_rt_read_line(&len);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
-    if (!o) return false;
-    if (len) memcpy(s_obj_str_data(o), line, len);
+    s_om_ref h = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)len, len, &h)) return false;
+    if (len) s_vmobj_write(vm->oh, h, 0, line, len);
     free(line);
-    return push(vm, s_val_obj(o));
+    return push(vm, s_val_obj_h(h));
 }
 
 static bool builtin_to_str(s_vm *vm) {
@@ -658,10 +661,10 @@ static bool builtin_to_str(s_vm *vm) {
         vm_trap(vm, "to_str expects an int, float, or bool");
         return false;
     }
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
-    if (!o) return false;
-    memcpy(s_obj_str_data(o), data, len);
-    return push(vm, s_val_obj(o));
+    s_om_ref h = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)len, len, &h)) return false;
+    if (len) s_vmobj_write(vm->oh, h, 0, data, len);
+    return push(vm, s_val_obj_h(h));
 }
 
 static bool builtin_type_of(s_vm *vm) {
@@ -674,7 +677,7 @@ static bool builtin_type_of(s_vm *vm) {
     case S_VAL_BOOL: s = "bool"; len = 4; break;
     case S_VAL_NONE: s = "unit"; len = 4; break;
     default:
-        switch (v.u.o->kind) {
+        switch (vm_obj_kind(vm, v)) {
         case S_OBJ_STR: s = "str"; len = 3; break;
         case S_OBJ_ARRAY: s = "array"; len = 5; break;
         case S_OBJ_RECORD: s = "record"; len = 6; break;
@@ -683,25 +686,23 @@ static bool builtin_type_of(s_vm *vm) {
         }
         break;
     }
-    s_heap_add_root(vm->heap, &v);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
-    s_heap_remove_root(vm->heap, &v);
-    if (!o) return false;
-    if (len) memcpy(s_obj_str_data(o), s, len);
-    return push(vm, s_val_obj(o));
+    s_om_ref h = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)len, len, &h)) return false;
+    if (len) s_vmobj_write(vm->oh, h, 0, s, len);
+    return push(vm, s_val_obj_h(h));
 }
 
 static bool builtin_str_compare(s_vm *vm) {
     s_value b = pop(vm);
     s_value a = pop(vm);
-    if (a.tag != S_VAL_OBJ || a.u.o->kind != S_OBJ_STR ||
-        b.tag != S_VAL_OBJ || b.u.o->kind != S_OBJ_STR) {
+    if (a.tag != S_VAL_OBJ || vm_obj_kind(vm, a) != S_OBJ_STR ||
+        b.tag != S_VAL_OBJ || vm_obj_kind(vm, b) != S_OBJ_STR) {
         vm_trap(vm, "str_compare expects two strings");
         return false;
     }
-    s_size al = s_obj_str_len(a.u.o), bl = s_obj_str_len(b.u.o);
+    s_size al = vm_obj_count(vm, a), bl = vm_obj_count(vm, b);
     s_size n = al < bl ? al : bl;
-    int c = n ? memcmp(s_obj_str_data(a.u.o), s_obj_str_data(b.u.o), n) : 0;
+    int c = n ? memcmp(vm_obj_payload(vm, a), vm_obj_payload(vm, b), n) : 0;
     if (c == 0) c = (al > bl) - (al < bl);
     return push(vm, s_val_int((s_i64)c));
 }
@@ -721,10 +722,10 @@ static bool builtin_f64_to_str(s_vm *vm) {
     char buf[64];
     s_size len = s_rt_format_f64(buf, sizeof(buf), v.u.f);
     if (len >= sizeof(buf)) len = sizeof(buf) - 1;
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)len, len);
-    if (!o) return false;
-    memcpy(s_obj_str_data(o), buf, len);
-    return push(vm, s_val_obj(o));
+    s_om_ref h = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)len, len, &h)) return false;
+    if (len) s_vmobj_write(vm->oh, h, 0, buf, len);
+    return push(vm, s_val_obj_h(h));
 }
 
 static bool builtin_ftoi(s_vm *vm) {
