@@ -1461,23 +1461,29 @@ static bool builtin_str_pad(s_vm *vm) {
 static bool builtin_array_concat(s_vm *vm) {
     s_value b = pop(vm);
     s_value a = pop(vm);
-    if (a.tag != S_VAL_OBJ || a.u.o->kind != S_OBJ_ARRAY ||
-        b.tag != S_VAL_OBJ || b.u.o->kind != S_OBJ_ARRAY) {
+    if (a.tag != S_VAL_OBJ || vm_obj_kind(vm, a) != S_OBJ_ARRAY ||
+        b.tag != S_VAL_OBJ || vm_obj_kind(vm, b) != S_OBJ_ARRAY) {
         vm_trap(vm, "array_concat expects two arrays");
         return false;
     }
-    s_u32 na = a.u.o->count, nb = b.u.o->count;
+    s_u32 na = vm_obj_count(vm, a), nb = vm_obj_count(vm, b);
     s_u32 n = na + nb;
-    s_heap_add_root(vm->heap, &a);
-    s_heap_add_root(vm->heap, &b);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, n, 0);
-    s_heap_remove_root(vm->heap, &b);
-    s_heap_remove_root(vm->heap, &a);
-    if (!o) return false;
-    s_value *dst = s_obj_array_data(o);
-    memcpy(dst, s_obj_array_data(a.u.o), sizeof(s_value) * na);
-    memcpy(dst + na, s_obj_array_data(b.u.o), sizeof(s_value) * nb);
-    return push(vm, s_val_obj(o));
+    if (!vm_temp_root(vm, a)) return false;
+    if (!vm_temp_root(vm, b)) { vm_temp_unroot(vm, a); return false; }
+    s_om_ref o = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_ARRAY, n, 0, &o)) {
+        vm_temp_unroot(vm, b);
+        vm_temp_unroot(vm, a);
+        return false;
+    }
+    vm_temp_unroot(vm, b);
+    vm_temp_unroot(vm, a);
+    s_value *dst = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
+    s_value *src_a = (s_value *)vm_obj_payload(vm, a);
+    s_value *src_b = (s_value *)vm_obj_payload(vm, b);
+    memcpy(dst, src_a, sizeof(s_value) * na);
+    memcpy(dst + na, src_b, sizeof(s_value) * nb);
+    return push(vm, s_val_obj_h(o));
 }
 
 static bool builtin_array_lookup(s_vm *vm, bool want_index) {
