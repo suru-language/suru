@@ -791,12 +791,12 @@ static bool builtin_substr(s_vm *vm) {
     s_value len = pop(vm);
     s_value start = pop(vm);
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR ||
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR ||
         start.tag != S_VAL_INT || len.tag != S_VAL_INT) {
         vm_trap(vm, "substr expects str, int, int");
         return false;
     }
-    s_i64 slen = (s_i64)s_obj_str_len(s.u.o);
+    s_i64 slen = vm_obj_count(vm, s);
     s_i64 b = start.u.i;
     if (b < 0) b = 0;
     if (b > slen) b = slen;
@@ -805,12 +805,15 @@ static bool builtin_substr(s_vm *vm) {
     s_i64 end = b + l;
     if (end > slen) end = slen;
     s_size n = (s_size)(end - b);
-    s_heap_add_root(vm->heap, &s);
-    s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)n, n);
-    s_heap_remove_root(vm->heap, &s);
-    if (!o) return false;
-    if (n) memcpy(s_obj_str_data(o), s_obj_str_data(s.u.o) + b, n);
-    return push(vm, s_val_obj(o));
+    if (!vm_temp_root(vm, s)) return false;
+    s_om_ref h = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)n, n, &h)) {
+        vm_temp_unroot(vm, s);
+        return false;
+    }
+    vm_temp_unroot(vm, s);
+    if (n) s_vmobj_write(vm->oh, h, 0, vm_obj_payload(vm, s) + b, n);
+    return push(vm, s_val_obj_h(h));
 }
 
 static bool builtin_int_from_str(s_vm *vm) {
