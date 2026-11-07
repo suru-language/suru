@@ -288,11 +288,11 @@ static void vm_uncaught_exception(s_vm *vm, s_value exception) {
 
 static bool vm_throw(s_vm *vm, s_value exception, const s_bc_module *m,
                      const s_bc_func **f, s_u32 *pc) {
-    fprintf(stderr, "DEBUG vm_throw: nhandlers=%d exception.tag=%d\n", vm->nhandlers, exception.tag);
+    fprintf(stderr, "DEBUG vm_throw: nhandlers=%zu exception.tag=%d\n", vm->nhandlers, exception.tag);
     s_size found = vm->nhandlers;
     while (found > 0) {
         --found;
-        fprintf(stderr, "DEBUG vm_throw: checking handler %d type_index=%d\n", found, vm->handlers[found].type_index);
+        fprintf(stderr, "DEBUG vm_throw: checking handler %zu type_index=%u\n", found, vm->handlers[found].type_index);
         if (exception_matches(vm, exception, vm->handlers[found].type_index)) break;
     }
     if (found == vm->nhandlers) {
@@ -300,7 +300,7 @@ static bool vm_throw(s_vm *vm, s_value exception, const s_bc_module *m,
         vm_uncaught_exception(vm, exception);
         return false;
     }
-    fprintf(stderr, "DEBUG vm_throw: handler %d matched\n", found);
+    fprintf(stderr, "DEBUG vm_throw: handler %zu matched\n", found);
     s_handler handler = vm->handlers[found];
     vm->nhandlers = found;
     vm->ncalls = handler.call_depth;
