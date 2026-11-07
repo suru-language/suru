@@ -420,17 +420,18 @@ static bool fmt_into(s_vm *vm, s_value v, s_buf *b, int depth) {
     case S_VAL_NONE:
         return buf_app(b, "unit", 4);
     case S_VAL_OBJ: {
-        s_gcobj *o = v.u.o;
-        if (o->kind == S_OBJ_STR)
-            return buf_app(b, s_obj_str_data(o), s_obj_str_len(o));
-        if (o->kind == S_OBJ_CLOSURE)
+        s_u8 kind = vm_obj_kind(vm, v);
+        if (kind == S_OBJ_STR)
+            return buf_app(b, vm_obj_payload(vm, v), vm_obj_count(vm, v));
+        if (kind == S_OBJ_CLOSURE)
             return buf_app(b, "<closure>", 9);
-        if (o->kind == S_OBJ_EXCEPTION)
+        if (kind == S_OBJ_EXCEPTION)
             return buf_app(b, "<exception>", 11);
-        if (o->kind == S_OBJ_ARRAY) {
+        if (kind == S_OBJ_ARRAY) {
             if (!buf_app(b, "[", 1)) return false;
-            s_value *el = s_obj_array_data(o);
-            for (s_u32 i = 0; i < o->count; ++i) {
+            s_value *el = (s_value *)vm_obj_payload(vm, v);
+            s_u32 cnt = vm_obj_count(vm, v);
+            for (s_u32 i = 0; i < cnt; ++i) {
                 if (i && !buf_app(b, ", ", 2)) return false;
                 if (!fmt_into(vm, el[i], b, depth + 1)) return false;
             }
@@ -438,8 +439,9 @@ static bool fmt_into(s_vm *vm, s_value v, s_buf *b, int depth) {
         }
         /* record */
         if (!buf_app(b, "{", 1)) return false;
-        s_value *f = s_obj_record_fields(o);
-        for (s_u32 i = 0; i < o->count; ++i) {
+        s_value *f = (s_value *)vm_obj_payload(vm, v);
+        s_u32 fcnt = vm_obj_count(vm, v);
+        for (s_u32 i = 0; i < fcnt; ++i) {
             if (i && !buf_app(b, ", ", 2)) return false;
             if (!fmt_into(vm, f[i], b, depth + 1)) return false;
         }
