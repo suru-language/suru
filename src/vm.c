@@ -2000,7 +2000,6 @@ int s_vm_run(s_vm *vm) {
             fields[1] = message;
             fields[2] = cause;
             if (!push(vm, s_val_obj_h(o))) return 1;
-            fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: done, pushed exception\n");
             pc++;
             break;
         }
