@@ -68,20 +68,13 @@ int s_driver_compile(const char *file, const char *src, s_size len,
 
 int s_driver_run_module_args(s_bc_module *m, int argc, char **argv) {
     if (s_driver_heap_mode() < 0) return 2;
-    s_heap *heap = s_heap_create();
-    if (!heap) {
-        fprintf(stderr, "suru: out of memory creating heap\n");
-        return 1;
-    }
     s_vm *vm = s_vm_create(m);
     if (!vm) {
-        s_heap_destroy(heap);
         return 1;
     }
     s_vm_set_args(vm, argc, argv);
-    int rc = s_vm_run(vm, heap);
+    int rc = s_vm_run(vm);
     s_vm_destroy(vm);
-    s_heap_destroy(heap);
     return rc;
 }
 

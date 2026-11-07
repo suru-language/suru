@@ -21,7 +21,7 @@ void s_vm_set_args(s_vm *vm, int argc, char **argv);
 
 /* Execute the (verified) module's entry function. Returns the process exit
  * code. On a runtime trap it prints the error to stderr and returns 1. */
-int s_vm_run(s_vm *vm, s_heap *heap);
+int s_vm_run(s_vm *vm);
 
 bool s_vm_trapped(const s_vm *vm);
 const char *s_vm_error(const s_vm *vm);

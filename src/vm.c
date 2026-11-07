@@ -144,6 +144,7 @@ static bool grow_stack(s_vm *vm, s_size need) {
     if (!n) return false;
     vm->st = n;
     vm->st_cap = ncap;
+    (void)s_vm_gc_sync(vm);
     return true;
 }
 
@@ -1728,13 +1729,12 @@ static bool cmp_b(s_vm *vm, int op) {
 /* Execution                                                           */
 /* ------------------------------------------------------------------ */
 
-int s_vm_run(s_vm *vm, s_heap *heap) {
+int s_vm_run(s_vm *vm) {
     if (!vm || !vm->m) return 1;
     if (s_verify_module(vm->m) != 0) {
         vm_trap(vm, "refusing to execute unverified bytecode");
         return 1;
     }
-    (void)heap;
     vm->sp = 0;
     vm->fp = 0;
     vm->ncalls = 0;

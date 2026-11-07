@@ -50,13 +50,11 @@ static s_bc_module caught_module(void) {
 
 static void test_caught_exception_unwinds(void) {
     s_bc_module m = caught_module();
-    s_heap *heap = s_heap_create();
     s_vm *vm = s_vm_create(&m);
     CHECK(vm != NULL);
-    CHECK_EQ_INT(s_vm_run(vm, heap), 7);
+    CHECK_EQ_INT(s_vm_run(vm), 7);
     CHECK(s_vm_trapped(vm) == false);
     s_vm_destroy(vm);
-    s_heap_destroy(heap);
     s_bc_module_dispose(&m);
 }
 
