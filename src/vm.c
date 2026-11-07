@@ -1,5 +1,6 @@
 #include "suru/vm.h"
 #include "suru/vmobj.h"
+#include "suru/objmodel.h"
 #include "suru/verify.h"
 #include "suru/stdlib.h"
 #include "suru/runtime.h"
