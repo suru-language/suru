@@ -1885,16 +1885,20 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 vm_trap(vm, "concat overflow");
                 return 1;
             }
-            s_heap_add_root(vm->heap, &a);
-            s_heap_add_root(vm->heap, &b);
-            s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
-            s_heap_remove_root(vm->heap, &b);
-            s_heap_remove_root(vm->heap, &a);
-            if (!o) return 1;
-            char *d = s_obj_str_data(o);
-            memcpy(d, s_obj_str_data(a.u.o), la);
-            memcpy(d + la, s_obj_str_data(b.u.o), lb);
-            if (!push(vm, s_val_obj(o))) return 1;
+            if (!vm_temp_root(vm, a)) return 1;
+            if (!vm_temp_root(vm, b)) { vm_temp_unroot(vm, a); return 1; }
+            s_om_ref o = S_OM_REF_NONE;
+            if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)total, total, &o)) {
+                vm_temp_unroot(vm, b);
+                vm_temp_unroot(vm, a);
+                return 1;
+            }
+            vm_temp_unroot(vm, b);
+            vm_temp_unroot(vm, a);
+            char *d = (char *)vm_obj_payload(vm, s_val_obj_h(o));
+            memcpy(d, vm_obj_payload(vm, a), la);
+            memcpy(d + la, vm_obj_payload(vm, b), lb);
+            if (!push(vm, s_val_obj_h(o))) return 1;
             pc++; break;
         }
         case BC_REPEAT_S: {
