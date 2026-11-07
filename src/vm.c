@@ -1987,7 +1987,6 @@ int s_vm_run(s_vm *vm) {
             }
             s_om_ref o = S_OM_REF_NONE;
             if (!vm_alloc_obj(vm, S_OBJ_EXCEPTION, 3, 0, &o)) {
-                fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: vm_alloc_obj failed\n");
                 vm_temp_unroot(vm, cause);
                 vm_temp_unroot(vm, message);
                 vm_temp_unroot(vm, type);
