@@ -1978,10 +1978,10 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             vm_temp_unroot(vm, cause);
             vm_temp_unroot(vm, message);
             vm_temp_unroot(vm, type);
-            s_value *f = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
-            f[0] = type;
-            f[1] = message;
-            f[2] = cause;
+            s_value *fields = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
+            fields[0] = type;
+            fields[1] = message;
+            fields[2] = cause;
             if (!push(vm, s_val_obj_h(o))) return 1;
             pc++;
             break;
@@ -1990,30 +1990,40 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
             s_value idx = pop(vm);
             s_value arr = pop(vm);
             if (arr.tag != S_VAL_OBJ || idx.tag != S_VAL_INT ||
-                (arr.u.o->kind != S_OBJ_ARRAY && arr.u.o->kind != S_OBJ_STR)) {
+                (vm_obj_kind(vm, arr) != S_OBJ_ARRAY && vm_obj_kind(vm, arr) != S_OBJ_STR)) {
                 vm_trap(vm, "index type error");
                 return 1;
             }
             s_i64 i = idx.u.i;
-            if (arr.u.o->kind == S_OBJ_STR) {
-                if (i < 0) i += (s_i64)arr.u.o->count;
-                if (i < 0 || i >= (s_i64)arr.u.o->count) {
+            if (vm_obj_kind(vm, arr) == S_OBJ_STR) {
+                s_i64 n = (s_i64)vm_obj_count(vm, arr);
+                if (i < 0) i += n;
+                if (i < 0 || i >= n) {
                     vm_trap(vm, "string index out of bounds (%lld of %u)",
-                            (long long)i, arr.u.o->count);
+                            (long long)i, (unsigned)n);
                     return 1;
                 }
-                s_gcobj *o = vm_alloc(vm, S_OBJ_STR, 1, 1);
-                if (!o) return 1;
-                s_obj_str_data(o)[0] = s_obj_str_data(arr.u.o)[i];
-                if (!push(vm, s_val_obj(o))) return 1;
+                if (!vm_temp_root(vm, arr)) return 1;
+                s_om_ref o = S_OM_REF_NONE;
+                if (!vm_alloc_obj(vm, S_OBJ_STR, 1, 1, &o)) {
+                    vm_temp_unroot(vm, arr);
+                    return 1;
+                }
+                vm_temp_unroot(vm, arr);
+                ((char *)vm_obj_payload(vm, s_val_obj_h(o)))[0] =
+                    ((const char *)vm_obj_payload(vm, arr))[i];
+                if (!push(vm, s_val_obj_h(o))) return 1;
                 pc++; break;
             }
-            if (i < 0) i += (s_i64)arr.u.o->count;
-            if (i < 0 || i >= (s_i64)arr.u.o->count) {
-                vm_trap(vm, "index out of bounds (%lld of %u)", (long long)i, arr.u.o->count);
+            s_i64 n = (s_i64)vm_obj_count(vm, arr);
+            if (i < 0) i += n;
+            if (i < 0 || i >= n) {
+                vm_trap(vm, "index out of bounds (%lld of %u)", (long long)i, (unsigned)n);
                 return 1;
             }
-            if (!push(vm, s_obj_array_data(arr.u.o)[i])) return 1;
+            if (!push(vm, ((s_value *)vm_obj_payload(vm, arr))[i])) return 1;
+            pc++; break;
+        }
             pc++; break;
         }
         case BC_IDX_ST: {
