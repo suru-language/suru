@@ -1992,7 +1992,6 @@ int s_vm_run(s_vm *vm) {
                 vm_temp_unroot(vm, type);
                 return 1;
             }
-            fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: alloc succeeded, o=%lu\n", (unsigned long)o);
             vm_temp_unroot(vm, cause);
             vm_temp_unroot(vm, message);
             vm_temp_unroot(vm, type);
