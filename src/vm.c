@@ -1971,10 +1971,6 @@ int s_vm_run(s_vm *vm) {
             s_value cause = pop(vm);
             s_value message = pop(vm);
             s_value type = pop(vm);
-            fprintf(stderr, "DEBUG BC_NEW_EXCEPTION: type tag=%d kind=%d msg tag=%d kind=%d cause tag=%d\n",
-                    type.tag, type.tag == S_VAL_OBJ ? vm_obj_kind(vm, type) : -1,
-                    message.tag, message.tag == S_VAL_OBJ ? vm_obj_kind(vm, message) : -1,
-                    cause.tag);
             if (type.tag != S_VAL_OBJ || vm_obj_kind(vm, type) != S_OBJ_STR ||
                 message.tag != S_VAL_OBJ || vm_obj_kind(vm, message) != S_OBJ_STR ||
                 (cause.tag != S_VAL_NONE &&
