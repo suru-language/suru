@@ -1076,38 +1076,42 @@ static bool builtin_args(s_vm *vm) {
 static bool builtin_str_split(s_vm *vm) {
     s_value sep = pop(vm);
     s_value s = pop(vm);
-    if (s.tag != S_VAL_OBJ || s.u.o->kind != S_OBJ_STR ||
-        sep.tag != S_VAL_OBJ || sep.u.o->kind != S_OBJ_STR) {
+    if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR ||
+        sep.tag != S_VAL_OBJ || vm_obj_kind(vm, sep) != S_OBJ_STR) {
         vm_trap(vm, "str_split expects (str, str)");
         return false;
     }
-    const char *data = s_obj_str_data(s.u.o);
-    s_size sl = s_obj_str_len(s.u.o);
-    const char *sp = s_obj_str_data(sep.u.o);
-    s_size pl = s_obj_str_len(sep.u.o);
+    const char *data = vm_obj_payload(vm, s);
+    s_size sl = vm_obj_count(vm, s);
+    const char *sp = vm_obj_payload(vm, sep);
+    s_size pl = vm_obj_count(vm, sep);
     if (pl == 0) { vm_trap(vm, "str_split separator must be non-empty"); return false; }
     s_size n = 1;
     for (s_size i = 0; i + pl <= sl; ) {
         if (memcmp(data + i, sp, pl) == 0) { n++; i += pl; }
         else i++;
     }
-    s_heap_add_root(vm->heap, &s);
-    s_heap_add_root(vm->heap, &sep);
-    s_gcobj *arr = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)n, 0);
-    if (!arr) return false;
-    {
-        s_value arrv = s_val_obj(arr);
-        s_heap_add_root(vm->heap, &arrv);
+    if (!vm_temp_root(vm, s)) return false;
+    if (!vm_temp_root(vm, sep)) { vm_temp_unroot(vm, s); return false; }
+    s_om_ref arrh = S_OM_REF_NONE;
+    if (!vm_alloc_obj(vm, S_OBJ_ARRAY, (s_u32)n, 0, &arrh)) {
+        vm_temp_unroot(vm, sep);
+        vm_temp_unroot(vm, s);
+        return false;
     }
-    s_value *dst = s_obj_array_data(arr);
+    if (!vm_temp_root(vm, s_val_obj_h(arrh))) { vm_temp_unroot(vm, sep); vm_temp_unroot(vm, s); return false; }
+    vm_temp_unroot(vm, sep);
+    vm_temp_unroot(vm, s);
+    s_value arr = s_val_obj_h(arrh);
+    s_value *dst = (s_value *)vm_obj_payload(vm, arr);
     s_size start = 0, k = 0;
     for (s_size i = 0; i + pl <= sl; ) {
         if (memcmp(data + i, sp, pl) == 0) {
             s_size ln = i - start;
-            s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)ln, ln);
-            if (!o) return false;
-            if (ln) memcpy(s_obj_str_data(o), data + start, ln);
-            dst[k++] = s_val_obj(o);
+            s_om_ref o = S_OM_REF_NONE;
+            if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)ln, ln, &o)) return false;
+            if (ln) s_vmobj_write(vm->oh, o, 0, data + start, ln);
+            dst[k++] = s_val_obj_h(o);
             i += pl;
             start = i;
         } else {
@@ -1116,18 +1120,13 @@ static bool builtin_str_split(s_vm *vm) {
     }
     {
         s_size ln = sl - start;
-        s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)ln, ln);
-        if (!o) return false;
-        if (ln) memcpy(s_obj_str_data(o), data + start, ln);
-        dst[k++] = s_val_obj(o);
+        s_om_ref o = S_OM_REF_NONE;
+        if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)ln, ln, &o)) return false;
+        if (ln) s_vmobj_write(vm->oh, o, 0, data + start, ln);
+        dst[k++] = s_val_obj_h(o);
     }
-    {
-        s_value arrv = s_val_obj(arr);
-        s_heap_remove_root(vm->heap, &arrv);
-    }
-    s_heap_remove_root(vm->heap, &sep);
-    s_heap_remove_root(vm->heap, &s);
-    return push(vm, s_val_obj(arr));
+    vm_temp_unroot(vm, arr);
+    return push(vm, arr);
 }
 
 static bool builtin_str_join(s_vm *vm) {
