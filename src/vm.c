@@ -863,18 +863,18 @@ static bool builtin_int_from_str(s_vm *vm) {
 static bool builtin_str_contains(s_vm *vm) {
     s_value needle = pop(vm);
     s_value hay = pop(vm);
-    if (hay.tag != S_VAL_OBJ || hay.u.o->kind != S_OBJ_STR ||
-        needle.tag != S_VAL_OBJ || needle.u.o->kind != S_OBJ_STR) {
+    if (hay.tag != S_VAL_OBJ || vm_obj_kind(vm, hay) != S_OBJ_STR ||
+        needle.tag != S_VAL_OBJ || vm_obj_kind(vm, needle) != S_OBJ_STR) {
         vm_trap(vm, "str_contains expects two strings");
         return false;
     }
-    s_size hn = s_obj_str_len(hay.u.o), nn = s_obj_str_len(needle.u.o);
+    s_size hn = vm_obj_count(vm, hay), nn = vm_obj_count(vm, needle);
     bool found = false;
     if (nn == 0) {
         found = true;
     } else if (nn <= hn) {
-        const char *h = s_obj_str_data(hay.u.o);
-        const char *nd = s_obj_str_data(needle.u.o);
+        const char *h = vm_obj_payload(vm, hay);
+        const char *nd = vm_obj_payload(vm, needle);
         for (s_size i = 0; i + nn <= hn; ++i) {
             if (memcmp(h + i, nd, nn) == 0) { found = true; break; }
         }
