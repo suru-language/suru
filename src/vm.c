@@ -279,7 +279,7 @@ static void maybe_collect(s_vm *vm) {
 static bool vm_alloc_obj(s_vm *vm, s_obj_kind kind, s_u32 count, s_size payload,
                           s_om_ref *out_h) {
     maybe_collect(vm);
-    if (s_vmobj_alloc_value(vm->oh, kind, count, payload, out_h) != S_OM_OK) {
+    if (s_vmobj_alloc(vm->oh, kind, count, payload, out_h) != S_OM_OK) {
         vm_trap(vm, "out of memory");
         return false;
     }
