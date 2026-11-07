@@ -18,15 +18,6 @@
 #define VM_GC_HEADROOM 4u
 #define VM_GC_INCREMENTAL_BUDGET 16u
 
-typedef struct s_om_hdr {
-    s_u64 size;
-    s_u32 count;
-    s_u32 magic;
-    s_u8 kind;
-    s_u8 colour;
-    s_u16 flags;
-} s_om_hdr;
-
 typedef struct s_cont {
     s_u32 pc;
     s_size fp;
