@@ -929,13 +929,14 @@ static bool builtin_assert(s_vm *vm) {
     s_value msg = pop(vm);
     s_value cond = pop(vm);
     if (cond.tag != S_VAL_INT || msg.tag != S_VAL_OBJ ||
-        msg.u.o->kind != S_OBJ_STR) {
+        vm_obj_kind(vm, msg) != S_OBJ_STR) {
         vm_trap(vm, "assert expects (bool, str)");
         return false;
     }
     if (cond.u.i == 0) {
-        s_size len = s_obj_str_len(msg.u.o);
-        vm_trap(vm, "assertion failed: %.*s", (int)len, s_obj_str_data(msg.u.o));
+        s_size len = vm_obj_count(vm, msg);
+        vm_trap(vm, "assertion failed: %.*s", (int)len,
+                vm_obj_payload(vm, msg));
         return false;
     }
     return push(vm, s_val_none());
