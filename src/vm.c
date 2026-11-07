@@ -1931,39 +1931,58 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
         case BC_NEW_ARRAY: {
             s_u32 n = in->a;
             if (vm->sp < n) { vm_trap(vm, "array underflow"); return 1; }
-            s_gcobj *o = vm_alloc(vm, S_OBJ_ARRAY, n, 0);
-            if (!o) return 1;
-            s_value *dst = s_obj_array_data(o);
+            s_om_ref o = S_OM_REF_NONE;
+            if (!vm_alloc_obj(vm, S_OBJ_ARRAY, n, 0, &o)) return 1;
+            s_value *dst = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
             vm->sp -= n;
             memcpy(dst, vm->st + vm->sp, sizeof(s_value) * n);
-            if (!push(vm, s_val_obj(o))) return 1;
+            if (!push(vm, s_val_obj_h(o))) return 1;
             pc++; break;
         }
         case BC_NEW_RECORD: {
             s_u32 n = in->b;
             if (vm->sp < n) { vm_trap(vm, "record underflow"); return 1; }
-            s_gcobj *o = vm_alloc(vm, S_OBJ_RECORD, n, 0);
-            if (!o) return 1;
-            s_value *dst = s_obj_record_fields(o);
+            s_om_ref o = S_OM_REF_NONE;
+            if (!vm_alloc_obj(vm, S_OBJ_RECORD, n, 0, &o)) return 1;
+            s_value *dst = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
             vm->sp -= n;
             memcpy(dst, vm->st + vm->sp, sizeof(s_value) * n);
-            if (!push(vm, s_val_obj(o))) return 1;
+            if (!push(vm, s_val_obj_h(o))) return 1;
             pc++; break;
         }
         case BC_NEW_EXCEPTION: {
             s_value cause = pop(vm);
             s_value message = pop(vm);
             s_value type = pop(vm);
-            if (type.tag != S_VAL_OBJ || type.u.o->kind != S_OBJ_STR ||
-                message.tag != S_VAL_OBJ || message.u.o->kind != S_OBJ_STR ||
+            if (type.tag != S_VAL_OBJ || vm_obj_kind(vm, type) != S_OBJ_STR ||
+                message.tag != S_VAL_OBJ || vm_obj_kind(vm, message) != S_OBJ_STR ||
                 (cause.tag != S_VAL_NONE &&
-                 (cause.tag != S_VAL_OBJ || cause.u.o->kind != S_OBJ_EXCEPTION))) {
+                 (cause.tag != S_VAL_OBJ || vm_obj_kind(vm, cause) != S_OBJ_EXCEPTION))) {
                 vm_trap(vm, "new_exception type error");
                 return 1;
             }
-            s_gcobj *o = s_heap_new_exception(vm->heap, type, message, cause);
-            if (!o) { vm_trap(vm, "out of memory"); return 1; }
-            if (!push(vm, s_val_obj(o))) return 1;
+            if (!vm_temp_root(vm, type)) return 1;
+            if (!vm_temp_root(vm, message)) { vm_temp_unroot(vm, type); return 1; }
+            if (!vm_temp_root(vm, cause)) {
+                vm_temp_unroot(vm, message);
+                vm_temp_unroot(vm, type);
+                return 1;
+            }
+            s_om_ref o = S_OM_REF_NONE;
+            if (!vm_alloc_obj(vm, S_OBJ_EXCEPTION, 3, 0, &o)) {
+                vm_temp_unroot(vm, cause);
+                vm_temp_unroot(vm, message);
+                vm_temp_unroot(vm, type);
+                return 1;
+            }
+            vm_temp_unroot(vm, cause);
+            vm_temp_unroot(vm, message);
+            vm_temp_unroot(vm, type);
+            s_value *f = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
+            f[0] = type;
+            f[1] = message;
+            f[2] = cause;
+            if (!push(vm, s_val_obj_h(o))) return 1;
             pc++;
             break;
         }
