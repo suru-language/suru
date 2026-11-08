@@ -1,5 +1,6 @@
 #include "test_framework.h"
 #include "suru/objmodel.h"
+#include "suru/value.h"
 #include "suru/objgc.h"
 #include "suru/platform_mem.h"
 
@@ -10,7 +11,8 @@ static s_om_ref arr_with_kids(s_om_heap h, const s_om_ref *kids, s_u32 n) {
     CHECK_EQ_INT((int)s_om_alloc(h, S_OBJ_ARRAY, n, 0, &o), S_OM_OK);
     s_u32 i;
     for (i = 0; i < n; ++i) {
-        CHECK_EQ_INT((int)s_om_write_u64(h, o, (s_size)i * 8, kids[i]),
+        s_value v = s_val_obj_h(kids[i]);
+        CHECK_EQ_INT((int)s_om_write(h, o, (s_size)i * sizeof(s_value), &v, sizeof(v)),
                      S_OM_OK);
     }
     return o;
@@ -68,7 +70,8 @@ static void test_cycle_reachable(void) {
     s_om_ref a = S_OM_REF_NONE, b = S_OM_REF_NONE;
     { s_om_ref k1[1] = {S_OM_REF_NONE}; a = arr_with_kids(h, k1, 1); }
     { s_om_ref k2[1] = {a}; b = arr_with_kids(h, k2, 1); }
-    CHECK_EQ_INT((int)s_om_write_u64(h, a, 0, b), S_OM_OK);
+    { s_value v = s_val_obj_h(b);
+      CHECK_EQ_INT((int)s_om_write(h, a, 0, &v, sizeof(v)), S_OM_OK); }
 
     s_om_gc *g = NULL;
     CHECK_EQ_INT((int)s_om_gc_create(h, &g), S_OM_OK);
@@ -86,7 +89,8 @@ static void test_unreachable_cycle(void) {
     s_om_ref d = S_OM_REF_NONE, e = S_OM_REF_NONE;
     { s_om_ref k1[1] = {S_OM_REF_NONE}; d = arr_with_kids(h, k1, 1); }
     { s_om_ref k2[1] = {d}; e = arr_with_kids(h, k2, 1); }
-    CHECK_EQ_INT((int)s_om_write_u64(h, d, 0, e), S_OM_OK);
+    { s_value v = s_val_obj_h(e);
+      CHECK_EQ_INT((int)s_om_write(h, d, 0, &v, sizeof(v)), S_OM_OK); }
     s_om_ref g2 = arr_with_kids(h, NULL, 0);
 
     s_om_gc *gc = NULL;
@@ -146,8 +150,9 @@ static void test_deep_chain(void) {
         s_om_ref kids[1] = {S_OM_REF_NONE};
         nodes[i] = arr_with_kids(h, kids, 1);
         if (i > 0) {
-            CHECK_EQ_INT((int)s_om_write_u64(h, nodes[i], 0, nodes[i - 1]),
-                         S_OM_OK);
+            { s_value v = s_val_obj_h(nodes[i - 1]);
+              CHECK_EQ_INT((int)s_om_write(h, nodes[i], 0, &v, sizeof(v)),
+                           S_OM_OK); }
         }
     }
     s_om_ref stray = arr_with_kids(h, NULL, 0);
@@ -233,9 +238,9 @@ static void test_collect_preserves_content(void) {
     CHECK_EQ_INT((int)s_om_gc_add_root(g, a), S_OM_OK);
     CHECK_EQ_INT((int)s_om_gc_collect(g), 1);
     CHECK_EQ_INT((int)s_om_validate(h, junk), S_OM_ENOENT);
-    s_om_ref child = S_OM_REF_NONE;
-    CHECK_EQ_INT((int)s_om_read_u64(h, a, 0, &child), S_OM_OK);
-    CHECK_EQ_INT((int)child, (int)b);
+    s_value childv;
+    CHECK_EQ_INT((int)s_om_read(h, a, 0, &childv, sizeof(childv)), S_OM_OK);
+    CHECK(childv.u.idx == (s_u64)b);
     s_om_gc_destroy(g);
 }
 
