@@ -1038,6 +1038,7 @@ static bool builtin_str_repeat(s_vm *vm) {
 static bool builtin_str_trim(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR) {
+        fprintf(stderr, "str_trim got tag=%d h=%llu kind=%d\n", s.tag, (unsigned long long)vm_obj_h(s), vm_obj_kind(vm,s));
         vm_trap(vm, "str_trim expects a string");
         return false;
     }
@@ -1113,9 +1114,12 @@ static bool builtin_str_split(s_vm *vm) {
         vm_temp_unroot(vm, s);
         return false;
     }
-    if (!vm_temp_root(vm, s_val_obj_h(arrh))) { vm_temp_unroot(vm, sep); vm_temp_unroot(vm, s); return false; }
-    vm_temp_unroot(vm, sep);
-    vm_temp_unroot(vm, s);
+    if (!vm_temp_root(vm, s_val_obj_h(arrh))) {
+        vm_temp_unroot(vm, sep);
+        vm_temp_unroot(vm, s);
+        return false;
+    }
+    /* keep s and sep live: `data`/`sp` point into them until the end */
     s_value arr = s_val_obj_h(arrh);
     s_value *dst = (s_value *)vm_obj_payload(vm, arr);
     s_size start = 0, k = 0;
@@ -1140,6 +1144,8 @@ static bool builtin_str_split(s_vm *vm) {
         dst[k++] = s_val_obj_h(o);
     }
     vm_temp_unroot(vm, arr);
+    vm_temp_unroot(vm, sep);
+    vm_temp_unroot(vm, s);
     return push(vm, arr);
 }
 
@@ -1769,8 +1775,8 @@ int s_vm_run(s_vm *vm) {
     while (!done && !vm->trapped) {
         const s_bc_ins *in = &f->ins[pc];
         if (getenv("SURU_TRACE"))
-            printf("fid=%u pc=%u op=%-10s sp=%zu fp=%zu a=%u b=%u\n",
-                   vm->cur_fid, pc, s_bc_op_table[in->op].name, vm->sp,
+            printf("fid=%u(%s) pc=%u op=%-10s sp=%zu fp=%zu a=%u b=%u\n",
+                   vm->cur_fid, m->funcs[vm->cur_fid].name?m->funcs[vm->cur_fid].name:"?", pc, s_bc_op_table[in->op].name, vm->sp,
                    vm->fp, in->a, in->b);
         switch (in->op) {
         case BC_NOP:
