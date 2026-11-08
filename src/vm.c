@@ -1373,7 +1373,7 @@ static bool builtin_read_file(s_vm *vm) {
     if (fseek(f, 0, SEEK_SET) != 0) { fclose(f); vm_trap(vm, "read_file: seek failed"); return false; }
     s_size n = (s_size)sz;
     if (n > (1u << 27)) { fclose(f); vm_trap(vm, "read_file too large"); return false; }
-    if (!vm_temp_root(vm, p)) return false;
+    if (!vm_temp_root(vm, p)) { fclose(f); return false; }
     s_om_ref h = S_OM_REF_NONE;
     if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)n, n, &h)) {
         vm_temp_unroot(vm, p);
