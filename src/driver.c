@@ -8,18 +8,6 @@
 
 #include <string.h>
 
-/* Deterministic execution heap-mode selection (Stage 11D T1).
- * Only the legacy heap is implemented; the "new" objmodel mode arrives with the
- * atomic cutover. Default is legacy. An explicit, unsupported value fails
- * clearly rather than silently selecting a mode. */
-int s_driver_heap_mode(void) {
-    const char *e = getenv("SURU_HEAP");
-    if (!e || !*e) return S_DRIVER_HEAP_LEGACY;
-    if (strcmp(e, "legacy") == 0) return S_DRIVER_HEAP_LEGACY;
-    fprintf(stderr, "suru: unsupported SURU_HEAP=\"%s\" (only \"legacy\" is implemented)\n", e);
-    return -1;
-}
-
 int s_driver_compile(const char *file, const char *src, s_size len,
                      s_bc_module *out) {
     s_arena arena;
