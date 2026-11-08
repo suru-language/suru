@@ -164,6 +164,27 @@ Builtin calls and calls to collected routine declarations are emitted as
 `repeat while`, `when`, `otherwise when`, and `otherwise` now emit concrete
 `BC_JZ`/`BC_JMP` control flow with resolved numeric targets.
 
+### Stage 12B: Natural Lexer Integration (2026-11-08)
+
+Stage 12B verified the runtime quality of the C17 bootstrap and confirmed the Natural Syntax lexer (`selfhost/compiler/natural_lexer.suru`) is integrated into the production compiler pipeline.
+
+**Runtime quality verification:**
+- GC ownership: `s_vm.gc_saved` field correctly saves the internal GC before binding an external collector and restores it on unbind. `s_vm_destroy` destroys `gc_saved` if present.
+- ASAN: Fixed missing `s_om_heap_destroy(oh)` in `test_vm_bind_sync_unbind` (the external heap `oh` was created but never destroyed).
+- File streams: `builtin_read_file` closes file handles on all error and success paths.
+- All 13 unit test suites (2253 checks) and 91 integration tests pass with ASAN enabled (0 leaks).
+
+**Natural lexer audit:**
+- 325-line SURU module with 39 keywords, numeric literals (dec/hex/bin/float), string literals with escapes and interpolation, line/block comments (nested, depth ≤ 512), Unicode identifier continuation, delimiter matching.
+- Produces textual token traces via `natural_lex_dump()`; parser-facing layer in `natural_token_stream.suru` provides structured `NToken` type.
+- Integrated via `natural_build_driver.suru` → `natural_frontend.suru` → `natural_token_stream.suru` → `natural_lexer.suru`.
+- `make selfhost-test` validates the complete lexer corpus (8 positive files, 8 negative diagnostic files) — all pass.
+
+**value.h legacy API audit:**
+- `s_gcobj *o` union member and `s_val_obj(s_gcobj *)` are unused in production; all code uses the handle-based `s_u64 idx` via `s_val_obj_h()`. Safe to remove but deferred for bytecode ABI verification.
+
+**Integration:** `suru --syntax=natural compile` invokes the SURU-written lexer through the Natural frontend pipeline. The C17 compiler remains the default; Natural syntax is an explicit opt-in mode.
+
 ### Bytecode serialization, verification, and bootstrap targets (Milestone A)
 
 The bytecode object-emitting half is now owned by SURU:
