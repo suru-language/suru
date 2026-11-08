@@ -1,5 +1,6 @@
 #include "test_framework.h"
 #include "suru/objmodel.h"
+#include "suru/value.h"
 #include "suru/platform_mem.h"
 
 static void om_reset(void) { s_om_dispose_all(); s_pm_dispose_all(); }
