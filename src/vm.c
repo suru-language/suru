@@ -1241,7 +1241,6 @@ static bool builtin_str_map(s_vm *vm, int mode) {
         return false;
     }
     char *dst = (char *)vm_obj_payload(vm, s_val_obj_h(o));
-    vm_temp_unroot(vm, s);
     if (mode == 0) {
         for (s_size i = 0; i < n; ++i) dst[i] = src[n - 1 - i];
     } else {
@@ -1252,6 +1251,7 @@ static bool builtin_str_map(s_vm *vm, int mode) {
             dst[i] = ch;
         }
     }
+    vm_temp_unroot(vm, s);
     return push(vm, s_val_obj_h(o));
 }
 
