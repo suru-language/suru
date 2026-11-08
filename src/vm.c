@@ -100,6 +100,10 @@ void s_vm_destroy(s_vm *vm) {
         s_om_gc_destroy(vm->gc);
         vm->gc = NULL;
     }
+    if (vm->gc_saved) {
+        s_om_gc_destroy(vm->gc_saved);
+        vm->gc_saved = NULL;
+    }
     s_om_heap_destroy(vm->oh);
     free(vm->st);
     free(vm->calls);
