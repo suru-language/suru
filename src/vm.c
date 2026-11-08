@@ -1038,7 +1038,6 @@ static bool builtin_str_repeat(s_vm *vm) {
 static bool builtin_str_trim(s_vm *vm) {
     s_value s = pop(vm);
     if (s.tag != S_VAL_OBJ || vm_obj_kind(vm, s) != S_OBJ_STR) {
-        fprintf(stderr, "str_trim got tag=%d h=%llu kind=%d\n", s.tag, (unsigned long long)vm_obj_h(s), vm_obj_kind(vm,s));
         vm_trap(vm, "str_trim expects a string");
         return false;
     }
@@ -1775,8 +1774,8 @@ int s_vm_run(s_vm *vm) {
     while (!done && !vm->trapped) {
         const s_bc_ins *in = &f->ins[pc];
         if (getenv("SURU_TRACE"))
-            printf("fid=%u(%s) pc=%u op=%-10s sp=%zu fp=%zu a=%u b=%u\n",
-                   vm->cur_fid, m->funcs[vm->cur_fid].name?m->funcs[vm->cur_fid].name:"?", pc, s_bc_op_table[in->op].name, vm->sp,
+            printf("fid=%u pc=%u op=%-10s sp=%zu fp=%zu a=%u b=%u\n",
+                   vm->cur_fid, pc, s_bc_op_table[in->op].name, vm->sp,
                    vm->fp, in->a, in->b);
         switch (in->op) {
         case BC_NOP:
