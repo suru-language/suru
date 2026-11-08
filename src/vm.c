@@ -1711,8 +1711,8 @@ static bool cmp_s(s_vm *vm, int op) {
     s_value b = pop(vm);
     s_value a = pop(vm);
     if (a.tag != S_VAL_OBJ || b.tag != S_VAL_OBJ) return false;
-    s_size la = s_obj_str_len(a.u.o), lb = s_obj_str_len(b.u.o);
-    int m = memcmp(s_obj_str_data(a.u.o), s_obj_str_data(b.u.o), la < lb ? la : lb);
+    s_size la = vm_obj_count(vm, a), lb = vm_obj_count(vm, b);
+    int m = memcmp(vm_obj_payload(vm, a), vm_obj_payload(vm, b), la < lb ? la : lb);
     bool r;
     switch (op) {
     case BC_EQ_S: r = (la == lb) && (m == 0); break;
