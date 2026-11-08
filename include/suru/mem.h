@@ -3,22 +3,16 @@
 
 #include "suru/base.h"
 #include "suru/value.h"
+#include "suru/objmodel.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* ------------------------------------------------------------------ */
-/* GC object                                                           */
+/* Legacy GC object — DEPRECATED: use s_om_ref / s_om_alloc instead.
+ * Kept for test_gc.c and backward compatibility during Stage 11F.        */
 /* ------------------------------------------------------------------ */
-
-typedef enum s_obj_kind {
-    S_OBJ_STR = 0,
-    S_OBJ_ARRAY = 1,
-    S_OBJ_RECORD = 2,
-    S_OBJ_CLOSURE = 3,
-    S_OBJ_EXCEPTION = 4,
-} s_obj_kind;
 
 struct s_gcobj {
     s_size chunk_size;         /* total allocated bytes incl header */
