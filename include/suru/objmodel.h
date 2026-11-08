@@ -23,16 +23,7 @@ typedef enum s_obj_kind {
 extern "C" {
 #endif
 
-/* Object kind. Shared by both the legacy (s_gcobj-based) and new (handle-based)
- * object models. Values must remain stable — they appear in object headers and
- * bytecode constants. */
-typedef enum s_obj_kind {
-    S_OBJ_STR = 0,
-    S_OBJ_ARRAY = 1,
-    S_OBJ_RECORD = 2,
-    S_OBJ_CLOSURE = 3,
-    S_OBJ_EXCEPTION = 4,
-} s_obj_kind;
+/* s_obj_kind is defined before the include guard (see top of file). */
 
 /* ------------------------------------------------------------------ */
 /* SURU-owned object model & allocator (Phase 3E / roadmap stages 1-7) */
