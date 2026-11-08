@@ -40,7 +40,6 @@ LIBSRC = \
 	src/bc.c \
 	src/bcc.c \
 	src/verify.c \
-	src/mem.c \
 	src/platform_mem.c \
 	src/objmodel.c \
 	src/objgc.c \
