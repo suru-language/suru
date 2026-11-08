@@ -825,9 +825,9 @@ static bool builtin_substr(s_vm *vm) {
         vm_temp_unroot(vm, s);
         return false;
     }
-    vm_temp_unroot(vm, s);
     if (n) s_vmobj_write(vm->oh, h, 0,
                         (const char *)vm_obj_payload(vm, s) + b, n);
+    vm_temp_unroot(vm, s);
     return push(vm, s_val_obj_h(h));
 }
 
@@ -1028,10 +1028,10 @@ static bool builtin_str_repeat(s_vm *vm) {
         vm_temp_unroot(vm, s);
         return false;
     }
-    vm_temp_unroot(vm, s);
     char *d = (char *)vm_obj_payload(vm, s_val_obj_h(h));
     for (s_i64 i = 0; i < rep; ++i)
         memcpy(d + (s_size)i * slen, src, slen);
+    vm_temp_unroot(vm, s);
     return push(vm, s_val_obj_h(h));
 }
 
@@ -1062,8 +1062,8 @@ static bool builtin_str_trim(s_vm *vm) {
         free(tmp); vm_temp_unroot(vm, s);
         return false;
     }
-    vm_temp_unroot(vm, s);
     if (n) s_vmobj_write(vm->oh, h, 0, tmp, n);
+    vm_temp_unroot(vm, s);
     free(tmp);
     return push(vm, s_val_obj_h(h));
 }
@@ -1217,12 +1217,12 @@ static bool builtin_array_slice(s_vm *vm) {
         vm_temp_unroot(vm, arr);
         return false;
     }
-    vm_temp_unroot(vm, arr);
     if (m) {
         s_value *src = (s_value *)vm_obj_payload(vm, arr);
         s_value *dst = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
         memcpy(dst, src + b, sizeof(s_value) * m);
     }
+    vm_temp_unroot(vm, arr);
     return push(vm, s_val_obj_h(o));
 }
 
@@ -1233,15 +1233,15 @@ static bool builtin_str_map(s_vm *vm, int mode) {
         return false;
     }
     s_size n = vm_obj_count(vm, s);
-    const char *src = vm_obj_payload(vm, s);
     if (!vm_temp_root(vm, s)) return false;
+    const char *src = vm_obj_payload(vm, s);
     s_om_ref o = S_OM_REF_NONE;
     if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)n, n, &o)) {
         vm_temp_unroot(vm, s);
         return false;
     }
-    vm_temp_unroot(vm, s);
     char *dst = (char *)vm_obj_payload(vm, s_val_obj_h(o));
+    vm_temp_unroot(vm, s);
     if (mode == 0) {
         for (s_size i = 0; i < n; ++i) dst[i] = src[n - 1 - i];
     } else {
@@ -1370,8 +1370,8 @@ static bool builtin_read_file(s_vm *vm) {
         fclose(f);
         return false;
     }
-    vm_temp_unroot(vm, p);
     size_t got = n ? fread(vm_obj_payload(vm, s_val_obj_h(h)), 1, n, f) : 0;
+    vm_temp_unroot(vm, p);
     fclose(f);
     if (got != n) { vm_trap(vm, "read_file: short read"); return false; }
     return push(vm, s_val_obj_h(h));
@@ -1471,10 +1471,10 @@ static bool builtin_str_pad(s_vm *vm) {
         vm_temp_unroot(vm, s);
         return false;
     }
-    vm_temp_unroot(vm, fill);
-    vm_temp_unroot(vm, s);
     memset(vm_obj_payload(vm, s_val_obj_h(o)), fc, pad);
     memcpy((char *)vm_obj_payload(vm, s_val_obj_h(o)) + pad, vm_obj_payload(vm, s), slen);
+    vm_temp_unroot(vm, fill);
+    vm_temp_unroot(vm, s);
     return push(vm, s_val_obj_h(o));
 }
 
@@ -1496,11 +1496,11 @@ static bool builtin_array_concat(s_vm *vm) {
         vm_temp_unroot(vm, a);
         return false;
     }
-    vm_temp_unroot(vm, b);
-    vm_temp_unroot(vm, a);
     s_value *dst = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
     s_value *src_a = (s_value *)vm_obj_payload(vm, a);
     s_value *src_b = (s_value *)vm_obj_payload(vm, b);
+    vm_temp_unroot(vm, b);
+    vm_temp_unroot(vm, a);
     memcpy(dst, src_a, sizeof(s_value) * na);
     memcpy(dst + na, src_b, sizeof(s_value) * nb);
     return push(vm, s_val_obj_h(o));
@@ -1912,11 +1912,11 @@ int s_vm_run(s_vm *vm) {
                 vm_temp_unroot(vm, a);
                 return 1;
             }
-            vm_temp_unroot(vm, b);
-            vm_temp_unroot(vm, a);
             char *d = (char *)vm_obj_payload(vm, s_val_obj_h(o));
             memcpy(d, vm_obj_payload(vm, a), la);
             memcpy(d + la, vm_obj_payload(vm, b), lb);
+            vm_temp_unroot(vm, b);
+            vm_temp_unroot(vm, a);
             if (!push(vm, s_val_obj_h(o))) return 1;
             pc++; break;
         }
@@ -1942,11 +1942,11 @@ int s_vm_run(s_vm *vm) {
                 vm_temp_unroot(vm, s);
                 return 1;
             }
-            vm_temp_unroot(vm, s);
             char *d = (char *)vm_obj_payload(vm, s_val_obj_h(o));
             const char *src = vm_obj_payload(vm, s);
             for (s_i64 i = 0; i < rep; ++i)
                 memcpy(d + (s_size)i * slen, src, slen);
+            vm_temp_unroot(vm, s);
             if (!push(vm, s_val_obj_h(o))) return 1;
             pc++; break;
         }
@@ -2000,13 +2000,13 @@ int s_vm_run(s_vm *vm) {
                 vm_temp_unroot(vm, type);
                 return 1;
             }
-            vm_temp_unroot(vm, cause);
-            vm_temp_unroot(vm, message);
-            vm_temp_unroot(vm, type);
             s_value *fields = (s_value *)vm_obj_payload(vm, s_val_obj_h(o));
             fields[0] = type;
             fields[1] = message;
             fields[2] = cause;
+            vm_temp_unroot(vm, cause);
+            vm_temp_unroot(vm, message);
+            vm_temp_unroot(vm, type);
             if (!push(vm, s_val_obj_h(o))) return 1;
             pc++;
             break;
@@ -2034,9 +2034,9 @@ int s_vm_run(s_vm *vm) {
                     vm_temp_unroot(vm, arr);
                     return 1;
                 }
-                vm_temp_unroot(vm, arr);
                 ((char *)vm_obj_payload(vm, s_val_obj_h(o)))[0] =
                     ((const char *)vm_obj_payload(vm, arr))[i];
+                vm_temp_unroot(vm, arr);
                 if (!push(vm, s_val_obj_h(o))) return 1;
                 pc++; break;
             }
