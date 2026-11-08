@@ -75,6 +75,7 @@ static void test_vm_bind_sync_unbind(void) {
 
     s_vm_destroy(vm); /* must invalidate registration before freeing stack */
     s_om_gc_destroy(gc);
+    s_om_heap_destroy(oh);
     s_bc_module_dispose(&m);
 }
 
