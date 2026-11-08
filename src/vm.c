@@ -81,12 +81,9 @@ s_vm *s_vm_create(const s_bc_module *m) {
         free(vm);
         return NULL;
     }
-    if (s_om_gc_create(vm->oh, &vm->gc) != S_OM_OK) {
-        s_om_heap_destroy(vm->oh);
-        free(vm->st);
-        free(vm);
-        return NULL;
-    }
+    /* GC is lazy: created on first s_vm_gc_bind or s_vm_gc_sync.
+     * s_vm_gc_bind overwrites vm->gc, so we cannot create one eagerly
+     * here or it would be orphaned when an external collector is bound. */
     return vm;
 }
 
