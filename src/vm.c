@@ -76,7 +76,7 @@ s_vm *s_vm_create(const s_bc_module *m) {
     vm->gc_min_threshold = vm->gc_threshold;
     vm->gc_incremental = false; /* STW-only in new objmodel runtime */
 
-    if (s_om_heap_create(65536, 1u << 26, &vm->oh) != S_OM_OK) {
+    if (s_om_heap_create(65536, 1u << 27, &vm->oh) != S_OM_OK) {
         free(vm->st);
         free(vm);
         return NULL;
@@ -1356,7 +1356,7 @@ static bool builtin_read_file(s_vm *vm) {
     if (sz < 0) { fclose(f); vm_trap(vm, "read_file: tell failed"); return false; }
     if (fseek(f, 0, SEEK_SET) != 0) { fclose(f); vm_trap(vm, "read_file: seek failed"); return false; }
     s_size n = (s_size)sz;
-    if (n > (1u << 26)) { fclose(f); vm_trap(vm, "read_file too large"); return false; }
+    if (n > (1u << 27)) { fclose(f); vm_trap(vm, "read_file too large"); return false; }
     if (!vm_temp_root(vm, p)) return false;
     s_om_ref h = S_OM_REF_NONE;
     if (!vm_alloc_obj(vm, S_OBJ_STR, (s_u32)n, n, &h)) {
@@ -1453,7 +1453,7 @@ static bool builtin_str_pad(s_vm *vm) {
     s_i64 w = width.u.i;
     if (w <= (s_i64)slen) return push(vm, s);
     s_size pad = (s_size)(w - (s_i64)slen);
-    if (pad > (1u << 26)) { vm_trap(vm, "str_pad too wide"); return false; }
+    if (pad > (1u << 27)) { vm_trap(vm, "str_pad too wide"); return false; }
     char fc = ' ';
     if (vm_obj_count(vm, fill) > 0) fc = ((const char *)vm_obj_payload(vm, fill))[0];
     s_size total = slen + pad;
