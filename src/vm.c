@@ -54,6 +54,7 @@ struct s_vm {
     s_u64 gc_min_threshold;
     bool gc_incremental;
     s_om_gc *gc;      /* optional bound objgc collector (Stage 11C) */
+    s_om_gc *gc_saved; /* saved internal GC when external is bound */
     bool trapped;
     char err[512];
     int exit_code;
