@@ -3,6 +3,7 @@
 
 #include "suru/base.h"
 #include "suru/objmodel.h"
+#include "suru/value.h"
 
 #ifdef __cplusplus
 extern "C" {
