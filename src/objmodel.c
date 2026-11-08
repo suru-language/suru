@@ -1,4 +1,5 @@
 #include "suru/objmodel.h"
+#include "suru/mem.h"
 #include "suru/platform_mem.h"
 #include "suru/value.h"
 

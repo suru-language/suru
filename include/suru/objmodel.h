@@ -1,6 +1,12 @@
-/* Shared definitions available without any include guard.
- * Must appear before #ifndef to be visible in every include order.
- * Both the legacy (s_gcobj-based) and new (handle-based) systems share these. */
+#ifndef SURU_OBJMODEL_H
+#define SURU_OBJMODEL_H
+
+#include "suru/base.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum s_obj_kind {
     S_OBJ_STR = 0,
     S_OBJ_ARRAY = 1,
@@ -13,17 +19,6 @@ typedef enum s_obj_kind {
 #define S_GC_GREY  1u
 #define S_GC_BLACK  2u
 #define S_OBJ_MAGIC 0x5355524Fu  /* "SURU" */
-
-#ifndef SURU_OBJMODEL_H
-#define SURU_OBJMODEL_H
-
-#include "suru/base.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* s_obj_kind is defined before the include guard (see top of file). */
 
 /* ------------------------------------------------------------------ */
 /* SURU-owned object model & allocator (Phase 3E / roadmap stages 1-7) */
