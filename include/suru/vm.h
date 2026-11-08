@@ -4,7 +4,6 @@
 #include "suru/base.h"
 #include "suru/value.h"
 #include "suru/bc.h"
-#include "suru/mem.h"
 #include "suru/objgc.h"
 
 #ifdef __cplusplus

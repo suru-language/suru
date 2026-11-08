@@ -1,6 +1,5 @@
 #include "test_framework.h"
 #include "suru/bc.h"
-#include "suru/mem.h"
 #include "suru/vm.h"
 
 static char *xdup(const char *s) {
