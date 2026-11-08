@@ -1,3 +1,19 @@
+/* Shared definitions available without any include guard.
+ * Must appear before #ifndef to be visible in every include order.
+ * Both the legacy (s_gcobj-based) and new (handle-based) systems share these. */
+typedef enum s_obj_kind {
+    S_OBJ_STR = 0,
+    S_OBJ_ARRAY = 1,
+    S_OBJ_RECORD = 2,
+    S_OBJ_CLOSURE = 3,
+    S_OBJ_EXCEPTION = 4,
+} s_obj_kind;
+
+#define S_GC_WHITE 0u
+#define S_GC_GREY  1u
+#define S_GC_BLACK  2u
+#define S_OBJ_MAGIC 0x5355524Fu  /* "SURU" */
+
 #ifndef SURU_OBJMODEL_H
 #define SURU_OBJMODEL_H
 
