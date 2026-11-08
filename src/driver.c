@@ -55,7 +55,6 @@ int s_driver_compile(const char *file, const char *src, s_size len,
 }
 
 int s_driver_run_module_args(s_bc_module *m, int argc, char **argv) {
-    if (s_driver_heap_mode() < 0) return 2;
     s_vm *vm = s_vm_create(m);
     if (!vm) {
         return 1;
