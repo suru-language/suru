@@ -1,4 +1,5 @@
 #include "suru/objgc.h"
+#include "suru/value.h"
 
 #include <stdlib.h>
 #include <string.h>
