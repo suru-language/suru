@@ -127,11 +127,17 @@ bool s_vm_trapped(const s_vm *vm) { return vm->trapped; }
 const char *s_vm_error(const s_vm *vm) { return vm->err; }
 
 void s_vm_gc_bind(s_vm *vm, s_om_gc *gc) {
-    if (vm) vm->gc = gc;
+    if (vm) {
+        vm->gc_saved = vm->gc; /* save internal GC before binding external */
+        vm->gc = gc;
+    }
 }
 
 void s_vm_gc_unbind(s_vm *vm) {
-    if (vm) vm->gc = NULL;
+    if (vm) {
+        vm->gc = vm->gc_saved; /* restore saved internal GC */
+        vm->gc_saved = NULL;
+    }
 }
 
 s_om_err s_vm_gc_sync(s_vm *vm) {
