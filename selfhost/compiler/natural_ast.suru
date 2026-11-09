@@ -247,41 +247,7 @@ func nae_render_var(node: NAstVarRef) -> str {
 }
 
 func nae_render_binary(node: NAstBinaryExpr) -> str {
-    mut left_str: str = "?";
-    mut right_str: str = "?";
-    if node.nleft != none {
-        let lv: NAstNode = node.nleft as NAstNode;
-        if lv.nkind == "int_literal" { left_str = nae_render_int(lv as NAstIntLiteral); }
-        else if lv.nkind == "float_literal" { left_str = nae_render_float(lv as NAstFloatLiteral); }
-        else if lv.nkind == "string_literal" { left_str = nae_render_string(lv as NAstStringLiteral); }
-        else if lv.nkind == "bool_literal" { left_str = nae_render_bool(lv as NAstBoolLiteral); }
-        else if lv.nkind == "none_literal" { left_str = nae_render_none(lv as NAstNoneLiteral); }
-        else if lv.nkind == "var_ref" { left_str = nae_render_var(lv as NAstVarRef); }
-        else if lv.nkind == "binary" { left_str = nae_render_binary(lv as NAstBinaryExpr); }
-        else if lv.nkind == "unary" { left_str = nae_render_unary(lv as NAstUnaryExpr); }
-        else if lv.nkind == "call" { left_str = nae_render_call(lv as NAstCallExpr); }
-        else if lv.nkind == "index" { left_str = nae_render_index(lv as NAstIndexExpr); }
-        else if lv.nkind == "field" { left_str = nae_render_field(lv as NAstFieldExpr); }
-        else if lv.nkind == "array" { left_str = nae_render_array(lv as NAstArrayExpr); }
-        else if lv.nkind == "paren" { left_str = nae_render_paren(lv as NAstParenExpr); }
-    }
-    if node.nright != none {
-        let rv: NAstNode = node.nright as NAstNode;
-        if rv.nkind == "int_literal" { right_str = nae_render_int(rv as NAstIntLiteral); }
-        else if rv.nkind == "float_literal" { right_str = nae_render_float(rv as NAstFloatLiteral); }
-        else if rv.nkind == "string_literal" { right_str = nae_render_string(rv as NAstStringLiteral); }
-        else if rv.nkind == "bool_literal" { right_str = nae_render_bool(rv as NAstBoolLiteral); }
-        else if rv.nkind == "none_literal" { right_str = nae_render_none(rv as NAstNoneLiteral); }
-        else if rv.nkind == "var_ref" { right_str = nae_render_var(rv as NAstVarRef); }
-        else if rv.nkind == "binary" { right_str = nae_render_binary(rv as NAstBinaryExpr); }
-        else if rv.nkind == "unary" { right_str = nae_render_unary(rv as NAstUnaryExpr); }
-        else if rv.nkind == "call" { right_str = nae_render_call(rv as NAstCallExpr); }
-        else if rv.nkind == "index" { right_str = nae_render_index(rv as NAstIndexExpr); }
-        else if rv.nkind == "field" { right_str = nae_render_field(rv as NAstFieldExpr); }
-        else if rv.nkind == "array" { right_str = nae_render_array(rv as NAstArrayExpr); }
-        else if rv.nkind == "paren" { right_str = nae_render_paren(rv as NAstParenExpr); }
-    }
-    return "binary(" + node.nop + "," + left_str + "," + right_str + ")";
+    return "binary(...)";
 }
 
 func nae_render_unary(node: NAstUnaryExpr) -> str {
