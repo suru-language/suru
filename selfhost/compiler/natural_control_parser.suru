@@ -251,6 +251,14 @@ func natural_control_ast_check(source: str) -> int {
                 position = nac_skip_declaration(source, first, first.text);
                 continue;
             }
+            if first.text == "expose" {
+                let after_expose = natural_next(source, first.next);
+                if after_expose.text == "routine" or after_expose.text == "record" or
+                   after_expose.text == "choice" or after_expose.text == "contract" {
+                    position = nac_skip_declaration(source, after_expose, after_expose.text);
+                    continue;
+                }
+            }
             if first.text == "bring" {
                 mut p: int = first.next;
                 while true {
