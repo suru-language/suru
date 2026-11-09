@@ -271,7 +271,7 @@ func nae_render_array(node: NAstArrayExpr) -> str {
 }
 
 func nae_render_paren(node: NAstParenExpr) -> str {
-    return "paren(" + node.ninner + ")";
+    return "paren(...)";
 }
 
 func nae_render_routine_expr(node: NAstRoutineExpr) -> str {
