@@ -78,7 +78,7 @@ type NAstIndexExpr {
 type NAstFieldExpr {
     let nkind: str;
     let nline: int;
-    let nrecord: str;
+    let nrecord: optional NAstNode;
     let nfield: str;
 }
 
