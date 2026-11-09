@@ -177,7 +177,7 @@ func nae_make_index(line: int, array: optional NAstNode, index: optional NAstNod
     return NAstIndexExpr("index", line, array, index);
 }
 
-func nae_make_field(line: int, record: str, field: str) -> NAstFieldExpr {
+func nae_make_field(line: int, record: optional NAstNode, field: str) -> NAstFieldExpr {
     return NAstFieldExpr("field", line, record, field);
 }
 
