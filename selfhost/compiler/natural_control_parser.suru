@@ -162,6 +162,24 @@ func nac_parse_ensure(source: str, first: NToken) -> [str] {
     return nac_finish(source, first.next, na_render(node), "push", "exception");
 }
 
+func nac_skip_declaration(source: str, first: NToken, decl_type: str) -> int {
+    mut p: int = first.next;
+    while true {
+        let tok = natural_next(source, p);
+        if tok.kind == NT_EOF {
+            return first.start;
+        }
+        if tok.text == "end" {
+            let after_end = natural_next(source, tok.next);
+            if after_end.text == decl_type {
+                return after_end.next;
+            }
+        }
+        p = tok.next;
+    }
+    return first.start;
+}
+
 func nac_parse_end(source: str, first: NToken, stack: [str]) -> [str] {
     if array_len(stack) == 0 { return nac_fail(first.start, "end has no open block"); }
     let kind = natural_next(source, first.next);
