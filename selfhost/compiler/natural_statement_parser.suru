@@ -105,9 +105,7 @@ func nas_parse_binding(source: str, first: NToken, mode: str) -> [str] {
     if ne_is_ok(expression) == false {
         return nas_fail(equals.next, ne_message(expression));
     }
-    let node = na_make("binding", first.line,
-                       mode + " " + name.text + annotation + " = " +
-                       ne_value(expression));
+    let node = na_make_binding(first.line, mode, name.text, annotation, ne_value(expression));
     return nas_finish(source, ne_next(expression), na_render(node));
 }
 
