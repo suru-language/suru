@@ -165,7 +165,7 @@ func nae_make_binary(line: int, op: str, left: optional NAstNode, right: optiona
     return NAstBinaryExpr("binary", line, op, left, right);
 }
 
-func nae_make_unary(line: int, op: str, operand: str) -> NAstUnaryExpr {
+func nae_make_unary(line: int, op: str, operand: optional NAstNode) -> NAstUnaryExpr {
     return NAstUnaryExpr("unary", line, op, operand);
 }
 
