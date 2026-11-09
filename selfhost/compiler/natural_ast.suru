@@ -109,9 +109,9 @@ func na_make_record(line: int, name: str, supports: str) -> NAstNode {
 }
 
 func na_make_record_field(line: int, mutable: bool, name: str, field_type: str) -> NAstNode {
-    let mut_str: str = "immutable";
-    if mutable { mut_str = "mutable"; }
-    return NAstNode("field", line, mut_str + "|" + name + "|" + field_type);
+    mut mut_flag: str = "immutable";
+    if mutable { mut_flag = "mutable"; }
+    return NAstNode("field", line, mut_flag + "|" + name + "|" + field_type);
 }
 
 func na_make_contract(line: int, name: str) -> NAstNode {

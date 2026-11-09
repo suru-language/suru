@@ -72,7 +72,7 @@ func nac_parse_repeat(source: str, first: NToken) -> [str] {
     if ne_is_ok(expression) == false {
         return nac_fail(while_word.next, ne_message(expression));
     }
-    let node = na_make("repeat", first.line, "while " + ne_value(expression));
+    let node = na_make_repeat(first.line, ne_value(expression));
     return nac_finish(source, ne_next(expression), na_render(node), "push", "repeat");
 }
 
@@ -131,19 +131,54 @@ func nac_parse_clause(source: str, first: NToken, stack: [str]) -> [str] {
     if owner != "choose" { return nac_fail(first.start, "case has no owning choose"); }
     let pattern = ne_parse_expression(source, first.next, 0);
     if ne_is_ok(pattern) == false { return nac_fail(first.next, ne_message(pattern)); }
-    let node = na_make("case", first.line, ne_value(pattern));
+    let node = na_make_case(first.line, ne_value(pattern));
     return nac_finish(source, ne_next(pattern), na_render(node), "none", "");
+}
+
+func nac_parse_attempt(source: str, first: NToken) -> [str] {
+    let node = na_make_attempt(first.line);
+    return nac_finish(source, first.next, na_render(node), "push", "attempt");
+}
+
+func nac_parse_handle(source: str, first: NToken) -> [str] {
+    let name = natural_next(source, first.next);
+    if name.kind != NT_IDENT {
+        return nac_fail(name.start, "handle requires exception name");
+    }
+    let colon = natural_next(source, name.next);
+    if colon.text != ":" {
+        return nac_fail(colon.start, "handle requires ':' after exception name");
+    }
+    let exception_type = natural_next(source, colon.next);
+    if exception_type.kind != NT_IDENT {
+        return nac_fail(exception_type.start, "handle requires exception type");
+    }
+    let node = na_make_handle(first.line, name.text, exception_type.text);
+    return nac_finish(source, exception_type.next, na_render(node), "push", "exception");
+}
+
+func nac_parse_ensure(source: str, first: NToken) -> [str] {
+    let node = na_make_ensure(first.line);
+    return nac_finish(source, first.next, na_render(node), "push", "exception");
 }
 
 func nac_parse_end(source: str, first: NToken, stack: [str]) -> [str] {
     if array_len(stack) == 0 { return nac_fail(first.start, "end has no open block"); }
     let kind = natural_next(source, first.next);
     let owner = stack[array_len(stack) - 1];
-    if kind.text != owner {
+    if kind.text == "exception" {
+        if owner != "exception" {
+            return nac_fail(kind.start, "end exception has no owning handler");
+        }
+    } else if kind.text != owner {
         return nac_fail(kind.start, "mismatched block terminator");
     }
     let node = na_make_end_block(first.line, owner);
-    return nac_finish(source, kind.next, na_render(node), "pop", owner);
+    mut pop_kind: str = owner;
+    if kind.text == "exception" { pop_kind = "exception"; }
+    else if kind.text == "attempt" { pop_kind = "attempt"; }
+    else { pop_kind = owner; }
+    return nac_finish(source, kind.next, na_render(node), "pop", pop_kind);
 }
 
 func natural_control_ast_check(source: str) -> int {
@@ -176,6 +211,12 @@ func natural_control_ast_check(source: str) -> int {
             result = nac_parse_each(source, first);
         } else if first.text == "choose" {
             result = nac_parse_choose(source, first);
+        } else if first.text == "attempt" {
+            result = nac_parse_attempt(source, first);
+        } else if first.text == "handle" {
+            result = nac_parse_handle(source, first);
+        } else if first.text == "ensure" {
+            result = nac_parse_ensure(source, first);
         } else if first.text == "otherwise" or first.text == "case" {
             result = nac_parse_clause(source, first, stack);
         } else if first.text == "end" {
