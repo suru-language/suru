@@ -169,8 +169,8 @@ func nae_make_unary(line: int, op: str, operand: str) -> NAstUnaryExpr {
     return NAstUnaryExpr("unary", line, op, operand);
 }
 
-func nae_make_call(line: int, func: str, args: [str]) -> NAstCallExpr {
-    return NAstCallExpr("call", line, func, args);
+func nae_make_call(line: int, func_name: str, args: [str]) -> NAstCallExpr {
+    return NAstCallExpr("call", line, func_name, args);
 }
 
 func nae_make_index(line: int, array: str, index: str) -> NAstIndexExpr {
