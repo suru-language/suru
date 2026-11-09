@@ -251,7 +251,7 @@ func nae_render_binary(node: NAstBinaryExpr) -> str {
 }
 
 func nae_render_unary(node: NAstUnaryExpr) -> str {
-    return "unary(" + node.nop + "," + node.noperand + ")";
+    return "unary(...)";
 }
 
 func nae_render_call(node: NAstCallExpr) -> str {
