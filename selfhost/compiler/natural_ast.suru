@@ -91,7 +91,7 @@ type NAstArrayExpr {
 type NAstParenExpr {
     let nkind: str;
     let nline: int;
-    let ninner: str;
+    let ninner: optional NAstNode;
 }
 
 type NAstRoutineExpr {
