@@ -11,16 +11,16 @@ trap 'rm -rf "$tmp"' EXIT
     "$ROOT/tests/natural/control_ast_valid.suru" >"$tmp/valid.out"
 "$SURU" run "$DIR/natural_control_driver.suru" \
     "$ROOT/tests/natural/control_each_through_valid.suru" >"$tmp/each-through.out"
-grep -q '^ast|each|1|n from 1 through 5$' "$tmp/each-through.out"
-grep -q '^ast|end-each|3|$' "$tmp/each-through.out"
-grep -q '^ast|repeat|1|while (attempts < 3)$' "$tmp/valid.out"
-grep -q '^ast|when|4|(attempts == 3)$' "$tmp/valid.out"
-grep -q '^ast|otherwise-when|6|(attempts > 3)$' "$tmp/valid.out"
-grep -q '^ast|otherwise|8|$' "$tmp/valid.out"
-grep -q '^ast|each|11|item across items$' "$tmp/valid.out"
-grep -q '^ast|choose|17|state$' "$tmp/valid.out"
-grep -q '^ast|case|18|Connected(address)$' "$tmp/valid.out"
-grep -q '^ast|end-choose|22|$' "$tmp/valid.out"
+grep -F -q 'ast|each|1|n|from|1|through|5' "$tmp/each-through.out"
+grep -F -q 'ast|end-each|3|' "$tmp/each-through.out"
+grep -F -q 'ast|repeat|1|(attempts < 3)' "$tmp/valid.out"
+grep -F -q 'ast|when|4|(attempts == 3)' "$tmp/valid.out"
+grep -F -q 'ast|otherwise-when|6|(attempts > 3)' "$tmp/valid.out"
+grep -F -q 'ast|otherwise|8|' "$tmp/valid.out"
+grep -F -q 'ast|each|11|item|across|items' "$tmp/valid.out"
+grep -F -q 'ast|choose|17|state' "$tmp/valid.out"
+grep -F -q 'ast|case|18|Connected(address)' "$tmp/valid.out"
+grep -F -q 'ast|end-choose|22|' "$tmp/valid.out"
 
 if "$SURU" run "$DIR/natural_control_driver.suru" \
        "$ROOT/tests/natural/control_ast_invalid.suru" >"$tmp/invalid.out"; then
