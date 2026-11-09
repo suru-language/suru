@@ -142,7 +142,7 @@ func nac_parse_end(source: str, first: NToken, stack: [str]) -> [str] {
     if kind.text != owner {
         return nac_fail(kind.start, "mismatched block terminator");
     }
-    let node = na_make("end-" + owner, first.line, "");
+    let node = na_make_end_block(first.line, owner);
     return nac_finish(source, kind.next, na_render(node), "pop", owner);
 }
 
