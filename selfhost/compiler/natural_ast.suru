@@ -181,7 +181,7 @@ func nae_make_field(line: int, record: optional NAstNode, field: str) -> NAstFie
     return NAstFieldExpr("field", line, record, field);
 }
 
-func nae_make_array(line: int, elements: [str]) -> NAstArrayExpr {
+func nae_make_array(line: int, elements: [optional NAstNode]) -> NAstArrayExpr {
     return NAstArrayExpr("array", line, elements);
 }
 
