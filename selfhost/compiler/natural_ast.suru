@@ -71,8 +71,8 @@ type NAstCallExpr {
 type NAstIndexExpr {
     let nkind: str;
     let nline: int;
-    let narray: str;
-    let nindex: str;
+    let narray: optional NAstNode;
+    let nindex: optional NAstNode;
 }
 
 type NAstFieldExpr {
