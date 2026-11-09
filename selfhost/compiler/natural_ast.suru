@@ -7,6 +7,299 @@ type NAstNode {
     let text: str;
 }
 
+// ============================================
+// Expression Nodes (Typed)
+// ============================================
+
+type NAstIntLiteral {
+    let kind: str;
+    let line: int;
+    let value: int;
+}
+
+type NAstFloatLiteral {
+    let kind: str;
+    let line: int;
+    let value: float;
+}
+
+type NAstStringLiteral {
+    let kind: str;
+    let line: int;
+    let value: str;
+}
+
+type NAstBoolLiteral {
+    let kind: str;
+    let line: int;
+    let value: bool;
+}
+
+type NAstNoneLiteral {
+    let kind: str;
+    let line: int;
+}
+
+type NAstVarRef {
+    let kind: str;
+    let line: int;
+    let name: str;
+}
+
+type NAstBinaryExpr {
+    let kind: str;
+    let line: int;
+    let op: str;
+    let left: str;
+    let right: str;
+}
+
+type NAstUnaryExpr {
+    let kind: str;
+    let line: int;
+    let op: str;
+    let operand: str;
+}
+
+type NAstCallExpr {
+    let kind: str;
+    let line: int;
+    let func: str;
+    let args: [str];
+}
+
+type NAstIndexExpr {
+    let kind: str;
+    let line: int;
+    let array: str;
+    let index: str;
+}
+
+type NAstFieldExpr {
+    let kind: str;
+    let line: int;
+    let record: str;
+    let field: str;
+}
+
+type NAstArrayExpr {
+    let kind: str;
+    let line: int;
+    let elements: [str];
+}
+
+type NAstParenExpr {
+    let kind: str;
+    let line: int;
+    let inner: str;
+}
+
+type NAstRoutineExpr {
+    let kind: str;
+    let line: int;
+    let params: str;
+    let ret_type: str;
+    let body: str;
+}
+
+// ============================================
+// Type Nodes (Typed)
+// ============================================
+
+type NAstPrimitiveType {
+    let kind: str;
+    let name: str;
+}
+
+type NAstArrayType {
+    let kind: str;
+    let element_type: str;
+}
+
+type NAstFunctionType {
+    let kind: str;
+    let params: [str];
+    let ret_type: str;
+}
+
+type NAstNamedType {
+    let kind: str;
+    let name: str;
+}
+
+type NAstGenericType {
+    let kind: str;
+    let name: str;
+    let args: [str];
+}
+
+// ============================================
+// Constructor functions for expression nodes
+// ============================================
+
+func nae_make_int(line: int, value: int) -> NAstIntLiteral {
+    return NAstIntLiteral("int_literal", line, value);
+}
+
+func nae_make_float(line: int, value: float) -> NAstFloatLiteral {
+    return NAstFloatLiteral("float_literal", line, value);
+}
+
+func nae_make_string(line: int, value: str) -> NAstStringLiteral {
+    return NAstStringLiteral("string_literal", line, value);
+}
+
+func nae_make_bool(line: int, value: bool) -> NAstBoolLiteral {
+    return NAstBoolLiteral("bool_literal", line, value);
+}
+
+func nae_make_none(line: int) -> NAstNoneLiteral {
+    return NAstNoneLiteral("none_literal", line);
+}
+
+func nae_make_var(line: int, name: str) -> NAstVarRef {
+    return NAstVarRef("var_ref", line, name);
+}
+
+func nae_make_binary(line: int, op: str, left: str, right: str) -> NAstBinaryExpr {
+    return NAstBinaryExpr("binary", line, op, left, right);
+}
+
+func nae_make_unary(line: int, op: str, operand: str) -> NAstUnaryExpr {
+    return NAstUnaryExpr("unary", line, op, operand);
+}
+
+func nae_make_call(line: int, func: str, args: [str]) -> NAstCallExpr {
+    return NAstCallExpr("call", line, func, args);
+}
+
+func nae_make_index(line: int, array: str, index: str) -> NAstIndexExpr {
+    return NAstIndexExpr("index", line, array, index);
+}
+
+func nae_make_field(line: int, record: str, field: str) -> NAstFieldExpr {
+    return NAstFieldExpr("field", line, record, field);
+}
+
+func nae_make_array(line: int, elements: [str]) -> NAstArrayExpr {
+    return NAstArrayExpr("array", line, elements);
+}
+
+func nae_make_paren(line: int, inner: str) -> NAstParenExpr {
+    return NAstParenExpr("paren", line, inner);
+}
+
+func nae_make_routine_expr(line: int, params: str, ret_type: str, body: str) -> NAstRoutineExpr {
+    return NAstRoutineExpr("routine_expr", line, params, ret_type, body);
+}
+
+// ============================================
+// Constructor functions for type nodes
+// ============================================
+
+func nat_make_primitive(name: str) -> NAstPrimitiveType {
+    return NAstPrimitiveType("primitive_type", name);
+}
+
+func nat_make_array(element_type: str) -> NAstArrayType {
+    return NAstArrayType("array_type", element_type);
+}
+
+func nat_make_function(params: [str], ret_type: str) -> NAstFunctionType {
+    return NAstFunctionType("function_type", params, ret_type);
+}
+
+func nat_make_named(name: str) -> NAstNamedType {
+    return NAstNamedType("named_type", name);
+}
+
+func nat_make_generic(name: str, args: [str]) -> NAstGenericType {
+    return NAstGenericType("generic_type", name, args);
+}
+
+// ============================================
+// Expression render functions (for debugging)
+// ============================================
+
+func nae_render_int(node: NAstIntLiteral) -> str {
+    return "int(" + to_str(node.value) + ")";
+}
+
+func nae_render_float(node: NAstFloatLiteral) -> str {
+    return "float(" + to_str(node.value) + ")";
+}
+
+func nae_render_string(node: NAstStringLiteral) -> str {
+    return "string(\"" + node.value + "\")";
+}
+
+func nae_render_bool(node: NAstBoolLiteral) -> str {
+    if node.value { return "bool(true)"; }
+    return "bool(false)";
+}
+
+func nae_render_none(node: NAstNoneLiteral) -> str {
+    return "none";
+}
+
+func nae_render_var(node: NAstVarRef) -> str {
+    return "var(" + node.name + ")";
+}
+
+func nae_render_binary(node: NAstBinaryExpr) -> str {
+    return "binary(" + node.op + "," + node.left + "," + node.right + ")";
+}
+
+func nae_render_unary(node: NAstUnaryExpr) -> str {
+    return "unary(" + node.op + "," + node.operand + ")";
+}
+
+func nae_render_call(node: NAstCallExpr) -> str {
+    return "call(" + node.func + ",[" + str_join(node.args, ",") + "])";
+}
+
+func nae_render_index(node: NAstIndexExpr) -> str {
+    return "index(" + node.array + "," + node.index + ")";
+}
+
+func nae_render_field(node: NAstFieldExpr) -> str {
+    return "field(" + node.record + "." + node.field + ")";
+}
+
+func nae_render_array(node: NAstArrayExpr) -> str {
+    return "array([" + str_join(node.elements, ",") + "])";
+}
+
+func nae_render_paren(node: NAstParenExpr) -> str {
+    return "paren(" + node.inner + ")";
+}
+
+func nae_render_routine_expr(node: NAstRoutineExpr) -> str {
+    return "routine_expr(" + node.params + "->" + node.ret_type + "," + node.body + ")";
+}
+
+func nae_render_expr(kind: str, line: int, value: str) -> str {
+    if kind == "int_literal" {
+        return "int(" + value + ")";
+    }
+    if kind == "float_literal" {
+        return "float(" + value + ")";
+    }
+    if kind == "string_literal" {
+        return "string(\"" + value + "\")";
+    }
+    if kind == "bool_literal" {
+        return "bool(" + value + ")";
+    }
+    if kind == "none_literal" {
+        return "none";
+    }
+    if kind == "var_ref" {
+        return "var(" + value + ")";
+    }
+    return value;
+}
+
 // Binding modes
 const BINDING_VALUE: str = "value";
 const BINDING_CHANGE: str = "change";
