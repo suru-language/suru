@@ -173,7 +173,7 @@ func nae_make_call(line: int, func_name: str, args: [str]) -> NAstCallExpr {
     return NAstCallExpr("call", line, func_name, args);
 }
 
-func nae_make_index(line: int, array: str, index: str) -> NAstIndexExpr {
+func nae_make_index(line: int, array: optional NAstNode, index: optional NAstNode) -> NAstIndexExpr {
     return NAstIndexExpr("index", line, array, index);
 }
 
