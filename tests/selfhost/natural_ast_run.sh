@@ -17,8 +17,8 @@ grep -F -q 'ast|give|5|answer' "$tmp/valid.out"
 
 "$SURU" run "$DIR/natural_ast_driver.suru" \
     "$ROOT/tests/natural/ast_routine_expression_valid.suru" >"$tmp/routine.out"
-grep -F -q 'ast|binding|1|value|f|=routine(x: Whole) -> Whole' "$tmp/routine.out"
-grep -F -q 'ast|binding|4|value|g|=routine() -> Unit' "$tmp/routine.out"
+grep -F -q 'ast|binding|1|value|f||routine(x: Whole) -> Whole' "$tmp/routine.out"
+grep -F -q 'ast|binding|4|value|g||routine() -> Unit' "$tmp/routine.out"
 
 if "$SURU" run "$DIR/natural_ast_driver.suru" \
        "$ROOT/tests/natural/ast_statement_invalid.suru" >"$tmp/invalid.out"; then
