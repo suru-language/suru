@@ -64,8 +64,8 @@ type NAstUnaryExpr {
 type NAstCallExpr {
     let nkind: str;
     let nline: int;
-    let nfunc: str;
-    let nargs: [str];
+    let nfunc: optional NAstNode;
+    let nargs: [optional NAstNode];
 }
 
 type NAstIndexExpr {
