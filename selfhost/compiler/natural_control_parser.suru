@@ -279,6 +279,10 @@ func natural_control_ast_check(source: str) -> int {
         }
         println(nac_node(result));
         if nac_action(result) == "push" {
+            if array_len(stack) >= 512 {
+                println("control-error|" + to_str(first.line) + "|nesting depth exceeds 512");
+                return 1;
+            }
             stack = array_concat(stack, [nac_kind(result)]);
         } else if nac_action(result) == "pop" {
             stack = slice(stack, 0, array_len(stack) - 1);
