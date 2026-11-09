@@ -168,11 +168,11 @@ func ne_parse_expression(source: str, position: int, minimum: int) -> [str] {
                 if count > 0 { value = value + ","; }
                 value = value + ne_value(item);
                 count += 1;
+                next = ne_skip_lines(source, ne_next(item));
+                let separator = natural_next(source, next);
                 if count > 1048576 {
                     return ne_fail(separator.next, "array element count exceeds 1048576");
                 }
-                next = ne_skip_lines(source, ne_next(item));
-                let separator = natural_next(source, next);
                 if separator.text == "," {
                     next = separator.next;
                     continue;
