@@ -5,12 +5,14 @@
 // it is a partial codegen gate, not a full-program checker.
 
 use "natural_parser.suru";
+use "natural_control_parser.suru";
 use "natural_semantic.suru";
 use "natural_declaration_semantic.suru";
 use "natural_effect_semantic.suru";
 
 func natural_frontend_check(source: str) -> int {
     if natural_parse_check(source) != 0 { return 1; }
+    if natural_control_ast_check(source) != 0 { return 5; }
     if natural_semantic_check(source) != 0 { return 2; }
     if natural_declaration_check(source) != 0 { return 3; }
     if natural_effect_check(source) != 0 { return 4; }
