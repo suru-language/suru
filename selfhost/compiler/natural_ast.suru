@@ -1,6 +1,5 @@
-// Initial Natural Syntax AST node representation.
-// The compiler will replace the textual payload with typed child nodes as the
-// full self-hosted AST is ported.
+// Natural Syntax AST node representation with typed fields.
+// Rendered format: "ast|kind|line|field1|field2|..."
 
 type NAstNode {
     let kind: str;
@@ -8,10 +7,133 @@ type NAstNode {
     let text: str;
 }
 
+// Binding modes
+const BINDING_VALUE: str = "value";
+const BINDING_CHANGE: str = "change";
+const BINDING_CONSTANT: str = "constant";
+
+// Each iteration modes
+const EACH_ACROSS: str = "across";
+const EACH_FROM: str = "from";
+
 func na_make(kind: str, line: int, text: str) -> NAstNode {
     return NAstNode(kind, line, text);
 }
 
 func na_render(node: NAstNode) -> str {
     return "ast|" + node.kind + "|" + to_str(node.line) + "|" + node.text;
+}
+
+// Typed constructors for statements
+
+func na_make_binding(line: int, mode: str, name: str, annotation: str, value: str) -> NAstNode {
+    return NAstNode("binding", line, mode + "|" + name + "|" + annotation + "|" + value);
+}
+
+func na_make_assignment(line: int, target: str, value: str) -> NAstNode {
+    return NAstNode("assignment", line, target + "|" + value);
+}
+
+func na_make_show(line: int, expression: str) -> NAstNode {
+    return NAstNode("show", line, expression);
+}
+
+func na_make_give(line: int, value: str) -> NAstNode {
+    return NAstNode("give", line, value);
+}
+
+func na_make_show_give(line: int) -> NAstNode {
+    return NAstNode("give", line, "");
+}
+
+// Typed constructors for control flow
+
+func na_make_when(line: int, condition: str) -> NAstNode {
+    return NAstNode("when", line, condition);
+}
+
+func na_make_otherwise_when(line: int, condition: str) -> NAstNode {
+    return NAstNode("otherwise-when", line, condition);
+}
+
+func na_make_otherwise(line: int) -> NAstNode {
+    return NAstNode("otherwise", line, "");
+}
+
+func na_make_repeat(line: int, condition: str) -> NAstNode {
+    return NAstNode("repeat", line, condition);
+}
+
+func na_make_each(line: int, item: str, mode: str, source: str) -> NAstNode {
+    return NAstNode("each", line, item + "|" + mode + "|" + source);
+}
+
+func na_make_each_from(line: int, item: str, start: str, until_through: str, finish: str) -> NAstNode {
+    return NAstNode("each", line, item + "|from|" + start + "|" + until_through + "|" + finish);
+}
+
+func na_make_choose(line: int, condition: str) -> NAstNode {
+    return NAstNode("choose", line, condition);
+}
+
+func na_make_case(line: int, pattern: str) -> NAstNode {
+    return NAstNode("case", line, pattern);
+}
+
+func na_make_end_block(line: int, block_kind: str) -> NAstNode {
+    return NAstNode("end-" + block_kind, line, "");
+}
+
+// Attempt/handle/ensure
+
+func na_make_attempt(line: int) -> NAstNode {
+    return NAstNode("attempt", line, "");
+}
+
+func na_make_handle(line: int, name: str, exception_type: str) -> NAstNode {
+    return NAstNode("handle", line, name + "|" + exception_type);
+}
+
+func na_make_ensure(line: int) -> NAstNode {
+    return NAstNode("ensure", line, "");
+}
+
+// Typed constructors for declarations
+
+func na_make_routine(line: int, name: str, params: str, return_type: str, throws: str) -> NAstNode {
+    return NAstNode("routine", line, name + "|" + params + "|" + return_type + "|" + throws);
+}
+
+func na_make_record(line: int, name: str, supports: str) -> NAstNode {
+    return NAstNode("record", line, name + "|" + supports);
+}
+
+func na_make_record_field(line: int, mutable: bool, name: str, field_type: str) -> NAstNode {
+    let mut_str: str = "immutable";
+    if mutable { mut_str = "mutable"; }
+    return NAstNode("field", line, mut_str + "|" + name + "|" + field_type);
+}
+
+func na_make_contract(line: int, name: str) -> NAstNode {
+    return NAstNode("contract", line, name);
+}
+
+func na_make_contract_signature(line: int, name: str, params: str, return_type: str, throws: str) -> NAstNode {
+    return NAstNode("signature", line, name + "|" + params + "|" + return_type + "|" + throws);
+}
+
+func na_make_choice(line: int, name: str) -> NAstNode {
+    return NAstNode("choice", line, name);
+}
+
+func na_make_choice_variant(line: int, name: str, payload: str) -> NAstNode {
+    return NAstNode("variant", line, name + "|" + payload);
+}
+
+func na_make_constant(line: int, name: str, annotation: str, value: str) -> NAstNode {
+    return NAstNode("constant", line, name + "|" + annotation + "|" + value);
+}
+
+func na_make_bring(line: int, path: str, alias: str) -> NAstNode {
+    return NAstNode("bring", line, path + "|" + alias);
 }
