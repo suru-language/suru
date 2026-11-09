@@ -85,7 +85,7 @@ type NAstFieldExpr {
 type NAstArrayExpr {
     let nkind: str;
     let nline: int;
-    let nelements: [str];
+    let nelements: [optional NAstNode];
 }
 
 type NAstParenExpr {
