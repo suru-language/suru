@@ -122,8 +122,7 @@ func nas_parse_assignment(source: str, first: NToken) -> [str] {
     if ne_is_ok(expression) == false {
         return nas_fail(to_word.next, ne_message(expression));
     }
-    let node = na_make("assignment", first.line,
-                       ne_value(target) + " to " + ne_value(expression));
+    let node = na_make_assignment(first.line, ne_value(target), ne_value(expression));
     return nas_finish(source, ne_next(expression), na_render(node));
 }
 
@@ -136,7 +135,7 @@ func nas_parse_show(source: str, first: NToken) -> [str] {
     }
     let close = natural_next(source, nas_skip_lines(source, ne_next(expression)));
     if close.text != ")" { return nas_fail(close.start, "show requires ')'"); }
-    let node = na_make("show", first.line, ne_value(expression));
+    let node = na_make_show(first.line, ne_value(expression));
     return nas_finish(source, close.next, na_render(node));
 }
 
