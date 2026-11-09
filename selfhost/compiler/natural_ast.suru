@@ -50,8 +50,8 @@ type NAstBinaryExpr {
     let nkind: str;
     let nline: int;
     let nop: str;
-    let nleft: str;
-    let nright: str;
+    let nleft: optional NAstNode;
+    let nright: optional NAstNode;
 }
 
 type NAstUnaryExpr {
