@@ -246,6 +246,11 @@ func natural_control_ast_check(source: str) -> int {
                 position = nas_next(statement);
                 continue;
             }
+            if first.text == "routine" or first.text == "record" or
+               first.text == "choice" or first.text == "contract" {
+                position = nac_skip_declaration(source, first, first.text);
+                continue;
+            }
             result = nac_fail(first.start, nas_message(statement));
         }
         if nac_is_ok(result) == false {
