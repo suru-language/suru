@@ -251,6 +251,18 @@ func natural_control_ast_check(source: str) -> int {
                 position = nac_skip_declaration(source, first, first.text);
                 continue;
             }
+            if first.text == "bring" {
+                mut p: int = first.next;
+                while true {
+                    let tok = natural_next(source, p);
+                    if tok.kind == NT_NEWLINE or tok.kind == NT_EOF {
+                        position = tok.next;
+                        break;
+                    }
+                    p = tok.next;
+                }
+                continue;
+            }
             result = nac_fail(first.start, nas_message(statement));
         }
         if nac_is_ok(result) == false {
