@@ -166,21 +166,33 @@ func nac_parse_declaration(source: str, first: NToken) -> [str] {
     let dtype: str = first.text;
     let name_tok = natural_next(source, first.next);
     let name: str = name_tok.text;
-    let end_pos = nac_skip_declaration(source, first, dtype);
+
+    mut node: NAstNode;
     if dtype == "routine" {
-        let node = na_make_routine(first.line, name, "", "", "");
-        return nac_finish(source, end_pos, na_render(node), "skip", "");
+        node = na_make_routine(first.line, name, "", "", "");
     } else if dtype == "record" {
-        let node = na_make_record(first.line, name, "");
-        return nac_finish(source, end_pos, na_render(node), "skip", "");
+        node = na_make_record(first.line, name, "");
     } else if dtype == "choice" {
-        let node = na_make_choice(first.line, name);
-        return nac_finish(source, end_pos, na_render(node), "skip", "");
+        node = na_make_choice(first.line, name);
     } else if dtype == "contract" {
-        let node = na_make_contract(first.line, name);
-        return nac_finish(source, end_pos, na_render(node), "skip", "");
+        node = na_make_contract(first.line, name);
     } else {
         return nac_fail(first.start, "unknown declaration type");
+    }
+
+    mut p: int = first.next;
+    while true {
+        let tok = natural_next(source, p);
+        if tok.kind == NT_EOF {
+            return nac_finish(source, first.start, na_render(node), "skip", "");
+        }
+        if tok.text == "end" {
+            let after_end = natural_next(source, tok.next);
+            if after_end.text == dtype {
+                return nac_finish(source, after_end.next, na_render(node), "skip", "");
+            }
+        }
+        p = tok.next;
     }
 }
 
