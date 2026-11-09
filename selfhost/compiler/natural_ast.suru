@@ -58,40 +58,40 @@ type NAstUnaryExpr {
     let nkind: str;
     let nline: int;
     let nop: str;
-    let noperand: optional NAstNode;
+    let noperand: str;
 }
 
 type NAstCallExpr {
     let nkind: str;
     let nline: int;
-    let nfunc: optional NAstNode;
-    let nargs: [optional NAstNode];
+    let nfunc: str;
+    let nargs: [str];
 }
 
 type NAstIndexExpr {
     let nkind: str;
     let nline: int;
-    let narray: optional NAstNode;
-    let nindex: optional NAstNode;
+    let narray: str;
+    let nindex: str;
 }
 
 type NAstFieldExpr {
     let nkind: str;
     let nline: int;
-    let nrecord: optional NAstNode;
+    let nrecord: str;
     let nfield: str;
 }
 
 type NAstArrayExpr {
     let nkind: str;
     let nline: int;
-    let nelements: [optional NAstNode];
+    let nelements: [str];
 }
 
 type NAstParenExpr {
     let nkind: str;
     let nline: int;
-    let ninner: optional NAstNode;
+    let ninner: str;
 }
 
 type NAstRoutineExpr {
@@ -161,11 +161,11 @@ func nae_make_var(line: int, name: str) -> NAstVarRef {
     return NAstVarRef("var_ref", line, name);
 }
 
-func nae_make_binary(line: int, op: str, left: optional NAstNode, right: optional NAstNode) -> NAstBinaryExpr {
+func nae_make_binary(line: int, op: str, left: str, right: str) -> NAstBinaryExpr {
     return NAstBinaryExpr("binary", line, op, left, right);
 }
 
-func nae_make_unary(line: int, op: str, operand: optional NAstNode) -> NAstUnaryExpr {
+func nae_make_unary(line: int, op: str, operand: str) -> NAstUnaryExpr {
     return NAstUnaryExpr("unary", line, op, operand);
 }
 
@@ -173,19 +173,19 @@ func nae_make_call(line: int, func_name: str, args: [str]) -> NAstCallExpr {
     return NAstCallExpr("call", line, func_name, args);
 }
 
-func nae_make_index(line: int, array: optional NAstNode, index: optional NAstNode) -> NAstIndexExpr {
+func nae_make_index(line: int, array: str, index: str) -> NAstIndexExpr {
     return NAstIndexExpr("index", line, array, index);
 }
 
-func nae_make_field(line: int, record: optional NAstNode, field: str) -> NAstFieldExpr {
+func nae_make_field(line: int, record: str, field: str) -> NAstFieldExpr {
     return NAstFieldExpr("field", line, record, field);
 }
 
-func nae_make_array(line: int, elements: [optional NAstNode]) -> NAstArrayExpr {
+func nae_make_array(line: int, elements: [str]) -> NAstArrayExpr {
     return NAstArrayExpr("array", line, elements);
 }
 
-func nae_make_paren(line: int, inner: optional NAstNode) -> NAstParenExpr {
+func nae_make_paren(line: int, inner: str) -> NAstParenExpr {
     return NAstParenExpr("paren", line, inner);
 }
 
@@ -247,11 +247,11 @@ func nae_render_var(node: NAstVarRef) -> str {
 }
 
 func nae_render_binary(node: NAstBinaryExpr) -> str {
-    return "binary(...)";
+    return "binary(" + node.nop + "," + node.nleft + "," + node.nright + ")";
 }
 
 func nae_render_unary(node: NAstUnaryExpr) -> str {
-    return "unary(...)";
+    return "unary(" + node.nop + "," + node.noperand + ")";
 }
 
 func nae_render_call(node: NAstCallExpr) -> str {
@@ -259,7 +259,7 @@ func nae_render_call(node: NAstCallExpr) -> str {
 }
 
 func nae_render_index(node: NAstIndexExpr) -> str {
-    return "index(...)";
+    return "index(" + node.narray + "," + node.nindex + ")";
 }
 
 func nae_render_field(node: NAstFieldExpr) -> str {
@@ -271,7 +271,7 @@ func nae_render_array(node: NAstArrayExpr) -> str {
 }
 
 func nae_render_paren(node: NAstParenExpr) -> str {
-    return "paren(...)";
+    return "paren(" + node.ninner + ")";
 }
 
 func nae_render_routine_expr(node: NAstRoutineExpr) -> str {
