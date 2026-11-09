@@ -153,7 +153,7 @@ func nas_parse_give(source: str, first: NToken) -> [str] {
     } else {
         position = next.start;
     }
-    let node = na_make("give", first.line, value);
+    let node = na_make_give(first.line, value);
     return nas_finish(source, position, na_render(node));
 }
 

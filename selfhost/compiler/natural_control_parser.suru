@@ -59,7 +59,7 @@ func nac_parse_when(source: str, first: NToken) -> [str] {
     if ne_is_ok(expression) == false {
         return nac_fail(first.next, ne_message(expression));
     }
-    let node = na_make("when", first.line, ne_value(expression));
+    let node = na_make_when(first.line, ne_value(expression));
     return nac_finish(source, ne_next(expression), na_render(node), "push", "when");
 }
 
@@ -87,8 +87,7 @@ func nac_parse_each(source: str, first: NToken) -> [str] {
         if ne_is_ok(expression) == false {
             return nac_fail(mode.next, ne_message(expression));
         }
-        let node = na_make("each", first.line,
-                           item.text + " across " + ne_value(expression));
+        let node = na_make_each(first.line, item.text, EACH_ACROSS, ne_value(expression));
         return nac_finish(source, ne_next(expression), na_render(node), "push", "each");
     }
     if mode.text != "from" {
@@ -102,9 +101,7 @@ func nac_parse_each(source: str, first: NToken) -> [str] {
     }
     let finish = ne_parse_expression(source, range_mode.next, 0);
     if ne_is_ok(finish) == false { return nac_fail(range_mode.next, ne_message(finish)); }
-    let node = na_make("each", first.line,
-                       item.text + " from " + ne_value(start) + " " +
-                       range_mode.text + " " + ne_value(finish));
+    let node = na_make_each_from(first.line, item.text, ne_value(start), range_mode.text, ne_value(finish));
     return nac_finish(source, ne_next(finish), na_render(node), "push", "each");
 }
 
@@ -113,7 +110,7 @@ func nac_parse_choose(source: str, first: NToken) -> [str] {
     if ne_is_ok(expression) == false {
         return nac_fail(first.next, ne_message(expression));
     }
-    let node = na_make("choose", first.line, ne_value(expression));
+    let node = na_make_choose(first.line, ne_value(expression));
     return nac_finish(source, ne_next(expression), na_render(node), "push", "choose");
 }
 
@@ -125,10 +122,10 @@ func nac_parse_clause(source: str, first: NToken, stack: [str]) -> [str] {
         if next.text == "when" {
             let expression = ne_parse_expression(source, next.next, 0);
             if ne_is_ok(expression) == false { return nac_fail(next.next, ne_message(expression)); }
-            let node = na_make("otherwise-when", first.line, ne_value(expression));
+            let node = na_make_otherwise_when(first.line, ne_value(expression));
             return nac_finish(source, ne_next(expression), na_render(node), "none", "");
         }
-        let node = na_make("otherwise", first.line, "");
+        let node = na_make_otherwise(first.line);
         return nac_finish(source, first.next, na_render(node), "none", "");
     }
     if owner != "choose" { return nac_fail(first.start, "case has no owning choose"); }
