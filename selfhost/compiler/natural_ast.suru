@@ -179,11 +179,11 @@ func nae_make_var(line: int, name: str) -> NAstVarRef {
     return NAstVarRef("var_ref", line, name);
 }
 
-func nae_make_binary(line: int, op: str, left: str, right: str) -> NAstBinaryExpr {
+func nae_make_binary(line: int, op: str, left: NAstNodeRef, right: NAstNodeRef) -> NAstBinaryExpr {
     return NAstBinaryExpr("binary", line, op, left, right);
 }
 
-func nae_make_unary(line: int, op: str, operand: str) -> NAstUnaryExpr {
+func nae_make_unary(line: int, op: str, operand: NAstNodeRef) -> NAstUnaryExpr {
     return NAstUnaryExpr("unary", line, op, operand);
 }
 
