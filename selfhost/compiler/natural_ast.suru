@@ -180,11 +180,11 @@ func nae_make_var(line: int, name: str) -> NAstVarRef {
 }
 
 func nae_make_binary(line: int, op: str, left: str, right: str) -> NAstBinaryExpr {
-    return NAstBinaryExpr("binary", line, op, na_ref_node(left), na_ref_node(right));
+    return NAstBinaryExpr("binary", line, op, left, right);
 }
 
 func nae_make_unary(line: int, op: str, operand: str) -> NAstUnaryExpr {
-    return NAstUnaryExpr("unary", line, op, na_ref_node(operand));
+    return NAstUnaryExpr("unary", line, op, operand);
 }
 
 func nae_make_call(line: int, func_name: str, args: [str]) -> NAstCallExpr {
