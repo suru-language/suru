@@ -7,6 +7,24 @@ type NAstNode {
     let text: str;
 }
 
+// NAstNodeRef: Structured node reference with marker convention
+// This replaces optional NAstNode (which doesn't compile in SURU)
+type NAstNodeRef {
+    let has_value: bool;
+    let node_text: str;  // "~none~" when has_value=false, rendered AST when has_value=true
+}
+
+// None marker constant
+const NAST_NONE: str = "~none~";
+
+func na_ref_none() -> NAstNodeRef {
+    return NAstNodeRef(false, NAST_NONE);
+}
+
+func na_ref_node(text: str) -> NAstNodeRef {
+    return NAstNodeRef(true, text);
+}
+
 // ============================================
 // Expression Nodes (Typed)
 // ============================================
@@ -50,15 +68,15 @@ type NAstBinaryExpr {
     let nkind: str;
     let nline: int;
     let nop: str;
-    let nleft: str;
-    let nright: str;
+    let nleft: NAstNodeRef;
+    let nright: NAstNodeRef;
 }
 
 type NAstUnaryExpr {
     let nkind: str;
     let nline: int;
     let nop: str;
-    let noperand: str;
+    let noperand: NAstNodeRef;
 }
 
 type NAstCallExpr {
