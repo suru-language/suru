@@ -152,23 +152,34 @@ func nac_skip_to_end(source: str, position: int, end_kind: str) -> int {
     while depth > 0 {
         let t = natural_next(source, pos);
         if t.kind == NT_EOF { return -1; }
+        if t.text == "end" {
+            let next = natural_next(source, t.next);
+            if next.text == end_kind {
+                let after = natural_next(source, next.next);
+                if after.text == end_kind and after.kind == NT_WORD {
+                    depth += 1;
+                    pos = after.next;
+                } else if after.kind == NT_NEWLINE or after.kind == NT_EOF {
+                    depth -= 1;
+                    if depth == 0 { return t.next; }
+                    pos = next.next;
+                } else {
+                    pos = next.next;
+                }
+            } else {
+                pos = t.next;
+            }
+            continue;
+        }
         if t.text == end_kind and t.kind == NT_WORD {
             let next = natural_next(source, t.next);
             if next.text == end_kind {
                 depth += 1;
                 pos = next.next;
-                continue;
-            }
-            if next.kind == NT_NEWLINE or next.kind == NT_EOF or next.text == "" {
+            } else if next.kind == NT_NEWLINE or next.kind == NT_EOF {
                 depth -= 1;
                 if depth == 0 { return t.next; }
             }
-            pos = t.next;
-            continue;
-        }
-        if t.kind == NT_NEWLINE or t.kind == NT_EOF {
-            pos = t.next;
-            continue;
         }
         pos = t.next;
     }
