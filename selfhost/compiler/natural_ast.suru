@@ -203,7 +203,7 @@ func nae_make_array(line: int, elements: [str]) -> NAstArrayExpr {
     return NAstArrayExpr("array", line, elements);
 }
 
-func nae_make_paren(line: int, inner: NAstNodeRef) -> NAstParenExpr {
+func nae_make_paren(line: int, inner: str) -> NAstParenExpr {
     return NAstParenExpr("paren", line, inner);
 }
 
