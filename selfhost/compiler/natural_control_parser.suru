@@ -146,6 +146,47 @@ func nac_parse_end(source: str, first: NToken, stack: [str]) -> [str] {
     return nac_finish(source, kind.next, na_render(node), "pop", owner);
 }
 
+func nac_skip_to_end(source: str, position: int, end_kind: str) -> int {
+    mut depth: int = 1;
+    while depth > 0 {
+        let t = natural_next(source, position);
+        if t.kind == NT_EOF { return -1; }
+        if t.text == end_kind and t.kind == NT_WORD {
+            let next = natural_next(source, t.next);
+            if next.text == end_kind {
+                depth += 1;
+                position = next.next;
+                continue;
+            }
+            if next.kind == NT_NEWLINE or next.kind == NT_EOF or next.text == "" {
+                depth -= 1;
+                if depth == 0 { return t.next; }
+            }
+            position = t.next;
+            continue;
+        }
+        if t.kind == NT_NEWLINE or t.kind == NT_EOF {
+            position = t.next;
+            continue;
+        }
+        position = t.next;
+    }
+    return -1;
+}
+
+func nac_skip_declaration(source: str, first: NToken) -> [str] {
+    let kind: str = first.text;
+    if kind != "routine" and kind != "record" and kind != "choice" and kind != "contract" {
+        return nac_fail(first.start, "not a declaration");
+    }
+    let end_pos = nac_skip_to_end(source, first.next, kind);
+    if end_pos < 0 {
+        return nac_fail(first.start, "unterminated " + kind);
+    }
+    let t = natural_next(source, end_pos);
+    return nac_ok(t.next, "", "skip", kind);
+}
+
 func natural_control_ast_check(source: str) -> int {
     mut position: int = 0;
     mut stack: [str] = [];
@@ -180,6 +221,8 @@ func natural_control_ast_check(source: str) -> int {
             result = nac_parse_clause(source, first, stack);
         } else if first.text == "end" {
             result = nac_parse_end(source, first, stack);
+        } else if first.text == "routine" or first.text == "record" or first.text == "choice" or first.text == "contract" {
+            result = nac_skip_declaration(source, first);
         } else {
             let statement = nas_statement(source, position);
             if nas_is_ok(statement) {
