@@ -68,15 +68,15 @@ type NAstBinaryExpr {
     let nkind: str;
     let nline: int;
     let nop: str;
-    let nleft: str;
-    let nright: str;
+    let nleft: NAstNodeRef;
+    let nright: NAstNodeRef;
 }
 
 type NAstUnaryExpr {
     let nkind: str;
     let nline: int;
     let nop: str;
-    let noperand: str;
+    let noperand: NAstNodeRef;
 }
 
 type NAstCallExpr {
