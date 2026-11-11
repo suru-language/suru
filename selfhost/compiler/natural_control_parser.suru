@@ -241,6 +241,13 @@ func natural_control_ast_check(source: str) -> int {
                 t = natural_next(source, t.next);
             }
             result = nac_ok(t.next, "", "skip", "bring");
+        } else if first.text == "expose" {
+            let next = natural_next(source, first.next);
+            if next.text == "routine" {
+                result = nac_skip_declaration(source, next);
+            } else {
+                result = nac_fail(first.start, "expose must precede routine");
+            }
         } else {
             let statement = nas_statement(source, position);
             if nas_is_ok(statement) {
