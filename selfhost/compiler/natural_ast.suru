@@ -265,11 +265,11 @@ func nae_render_var(node: NAstVarRef) -> str {
 }
 
 func nae_render_binary(node: NAstBinaryExpr) -> str {
-    return "binary(" + node.nop + "," + node.nleft + "," + node.nright + ")";
+    return "binary(" + node.nop + "," + node.nleft.node_text + "," + node.nright.node_text + ")";
 }
 
 func nae_render_unary(node: NAstUnaryExpr) -> str {
-    return "unary(" + node.nop + "," + node.noperand + ")";
+    return "unary(" + node.nop + "," + node.noperand.node_text + ")";
 }
 
 func nae_render_call(node: NAstCallExpr) -> str {
@@ -289,7 +289,7 @@ func nae_render_array(node: NAstArrayExpr) -> str {
 }
 
 func nae_render_paren(node: NAstParenExpr) -> str {
-    return "paren(" + node.ninner + ")";
+    return "paren(" + node.ninner.node_text + ")";
 }
 
 func nae_render_routine_expr(node: NAstRoutineExpr) -> str {
