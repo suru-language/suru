@@ -236,7 +236,7 @@ func natural_control_ast_check(source: str) -> int {
         } else if first.text == "routine" or first.text == "record" or first.text == "choice" or first.text == "contract" {
             result = nac_skip_declaration(source, first);
         } else if first.text == "bring" {
-            let t = natural_next(source, first.next);
+            mut t = natural_next(source, first.next);
             while t.kind != NT_NEWLINE and t.kind != NT_EOF {
                 t = natural_next(source, t.next);
             }
