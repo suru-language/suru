@@ -68,15 +68,15 @@ type NAstBinaryExpr {
     let nkind: str;
     let nline: int;
     let nop: str;
-    let nleft: NAstNodeRef;
-    let nright: NAstNodeRef;
+    let nleft: str;
+    let nright: str;
 }
 
 type NAstUnaryExpr {
     let nkind: str;
     let nline: int;
     let nop: str;
-    let noperand: NAstNodeRef;
+    let noperand: str;
 }
 
 type NAstCallExpr {
@@ -109,7 +109,7 @@ type NAstArrayExpr {
 type NAstParenExpr {
     let nkind: str;
     let nline: int;
-    let ninner: NAstNodeRef;
+    let ninner: str;
 }
 
 type NAstRoutineExpr {
@@ -179,11 +179,11 @@ func nae_make_var(line: int, name: str) -> NAstVarRef {
     return NAstVarRef("var_ref", line, name);
 }
 
-func nae_make_binary(line: int, op: str, left: NAstNodeRef, right: NAstNodeRef) -> NAstBinaryExpr {
+func nae_make_binary(line: int, op: str, left: str, right: str) -> NAstBinaryExpr {
     return NAstBinaryExpr("binary", line, op, left, right);
 }
 
-func nae_make_unary(line: int, op: str, operand: NAstNodeRef) -> NAstUnaryExpr {
+func nae_make_unary(line: int, op: str, operand: str) -> NAstUnaryExpr {
     return NAstUnaryExpr("unary", line, op, operand);
 }
 
@@ -203,7 +203,7 @@ func nae_make_array(line: int, elements: [str]) -> NAstArrayExpr {
     return NAstArrayExpr("array", line, elements);
 }
 
-func nae_make_paren(line: int, inner: NAstNodeRef) -> NAstParenExpr {
+func nae_make_paren(line: int, inner: str) -> NAstParenExpr {
     return NAstParenExpr("paren", line, inner);
 }
 
@@ -265,11 +265,11 @@ func nae_render_var(node: NAstVarRef) -> str {
 }
 
 func nae_render_binary(node: NAstBinaryExpr) -> str {
-    return "binary(" + node.nop + "," + node.nleft.node_text + "," + node.nright.node_text + ")";
+    return "binary(" + node.nop + "," + node.nleft + "," + node.nright + ")";
 }
 
 func nae_render_unary(node: NAstUnaryExpr) -> str {
-    return "unary(" + node.nop + "," + node.noperand.node_text + ")";
+    return "unary(" + node.nop + "," + node.noperand + ")";
 }
 
 func nae_render_call(node: NAstCallExpr) -> str {
@@ -289,7 +289,7 @@ func nae_render_array(node: NAstArrayExpr) -> str {
 }
 
 func nae_render_paren(node: NAstParenExpr) -> str {
-    return "paren(" + node.ninner.node_text + ")";
+    return "paren(" + node.ninner + ")";
 }
 
 func nae_render_routine_expr(node: NAstRoutineExpr) -> str {
