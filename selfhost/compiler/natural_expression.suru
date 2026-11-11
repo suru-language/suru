@@ -4,8 +4,8 @@
 use "natural_token_stream.suru";
 use "natural_ast.suru";
 
-func ne_ok(next: int, value: str) -> [str] {
-    return [to_str(next), "ok", value, ""];
+func ne_ok(next: int, value: NAstNodeRef) -> [str] {
+    return [to_str(next), "ok", "typed:" + value.node_text, ""];
 }
 
 func ne_fail(next: int, message: str) -> [str] {
@@ -26,6 +26,14 @@ func ne_value(result: [str]) -> str {
 
 func ne_message(result: [str]) -> str {
     return result[3];
+}
+
+func ne_is_typed(result: [str]) -> bool {
+    return str_len(ne_value(result)) > 6 and substr(ne_value(result), 0, 6) == "typed:";
+}
+
+func ne_get_typed(result: [str]) -> str {
+    return substr(ne_value(result), 6, str_len(ne_value(result)) - 6);
 }
 
 func ne_skip_lines(source: str, position: int) -> int {
