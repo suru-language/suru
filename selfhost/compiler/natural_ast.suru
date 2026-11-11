@@ -183,7 +183,7 @@ func nae_make_binary(line: int, op: str, left: NAstNodeRef, right: NAstNodeRef) 
     return NAstBinaryExpr("binary", line, op, left, right);
 }
 
-func nae_make_unary(line: int, op: str, operand: str) -> NAstUnaryExpr {
+func nae_make_unary(line: int, op: str, operand: NAstNodeRef) -> NAstUnaryExpr {
     return NAstUnaryExpr("unary", line, op, operand);
 }
 
@@ -203,7 +203,7 @@ func nae_make_array(line: int, elements: [str]) -> NAstArrayExpr {
     return NAstArrayExpr("array", line, elements);
 }
 
-func nae_make_paren(line: int, inner: str) -> NAstParenExpr {
+func nae_make_paren(line: int, inner: NAstNodeRef) -> NAstParenExpr {
     return NAstParenExpr("paren", line, inner);
 }
 
