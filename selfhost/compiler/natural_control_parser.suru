@@ -236,12 +236,12 @@ func natural_control_ast_check(source: str) -> int {
         } else if first.text == "routine" or first.text == "record" or first.text == "choice" or first.text == "contract" {
             result = nac_skip_declaration(source, first);
         } else if first.text == "bring" {
-            println("DEBUG: handling bring");
-            let next = natural_next(source, first.next);
-            result = nac_ok(next.next, "", "skip", "bring");
+            let t = natural_next(source, first.next);
+            while t.kind != NT_NEWLINE and t.kind != NT_EOF {
+                t = natural_next(source, t.next);
+            }
+            result = nac_ok(t.next, "", "skip", "bring");
         } else {
-            println("DEBUG: falling through with first.text=[" + first.text + "]");
-            let statement = nas_statement(source, position);
             if nas_is_ok(statement) {
                 println(nas_node(statement));
                 position = nas_next(statement);
