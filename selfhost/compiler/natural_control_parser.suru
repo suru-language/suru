@@ -242,6 +242,7 @@ func natural_control_ast_check(source: str) -> int {
             }
             result = nac_ok(t.next, "", "skip", "bring");
         } else {
+            let statement = nas_statement(source, position);
             if nas_is_ok(statement) {
                 println(nas_node(statement));
                 position = nas_next(statement);
