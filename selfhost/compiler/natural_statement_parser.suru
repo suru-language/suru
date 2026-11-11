@@ -181,7 +181,8 @@ func nas_parse_show(source: str, first: NToken) -> [str] {
     }
     let close = natural_next(source, nas_skip_lines(source, ne_next(expression)));
     if close.text != ")" { return nas_fail(close.start, "show requires ')'"); }
-    let node = na_make_show(first.line, ne_value(expression));
+    let parsed_expr = nas_parse_expr_str(ne_value(expression), first.line);
+    let node = na_make_show(first.line, parsed_expr);
     return nas_finish(source, close.next, na_render(node));
 }
 
@@ -194,7 +195,7 @@ func nas_parse_give(source: str, first: NToken) -> [str] {
         if ne_is_ok(expression) == false {
             return nas_fail(first.next, ne_message(expression));
         }
-        value = ne_value(expression);
+        value = nas_parse_expr_str(ne_value(expression), first.line);
         position = ne_next(expression);
     } else {
         position = next.start;
