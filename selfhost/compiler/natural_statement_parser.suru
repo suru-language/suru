@@ -28,63 +28,6 @@ func nas_message(result: [str]) -> str {
     return result[3];
 }
 
-func nas_find_top(text: str, needle: str) -> int {
-    mut depth: int = 0;
-    mut i: int = 0;
-    while i + str_len(needle) <= str_len(text) {
-        if text[i] == "(" { depth += 1; }
-        if text[i] == ")" { depth -= 1; }
-        if depth == 0 and substr(text, i, str_len(needle)) == needle {
-            return i;
-        }
-        i += 1;
-    }
-    return -1;
-}
-
-func nas_parse_expr_str(expr: str, line: int) -> str {
-    if str_len(expr) >= 7 and substr(expr, 0, 7) == "binary(" {
-        let content = substr(expr, 7, str_len(expr) - 8);
-        let comma1 = nas_find_top(content, ",");
-        if comma1 >= 0 {
-            let op = str_trim(substr(content, 0, comma1));
-            let rest = substr(content, comma1 + 1, str_len(content) - comma1 - 1);
-            let comma2 = nas_find_top(rest, ",");
-            if comma2 >= 0 {
-                let left_str = str_trim(substr(rest, 0, comma2));
-                let right_str = str_trim(substr(rest, comma2 + 1, str_len(rest) - comma2 - 1));
-                let left_node = nas_parse_expr_str(left_str, line);
-                let right_node = nas_parse_expr_str(right_str, line);
-                let binary = nae_make_binary(line, op, left_node, right_node);
-                return nae_render_binary(binary);
-            }
-        }
-    }
-    if str_len(expr) >= 6 and substr(expr, 0, 6) == "unary(" {
-        let content = substr(expr, 6, str_len(expr) - 7);
-        let comma = nas_find_top(content, ",");
-        if comma >= 0 {
-            let op = str_trim(substr(content, 0, comma));
-            let operand_str = str_trim(substr(content, comma + 1, str_len(content) - comma - 1));
-            let operand_node = nas_parse_expr_str(operand_str, line);
-            let unary = nae_make_unary(line, op, operand_node);
-            return nae_render_unary(unary);
-        }
-    }
-    if str_len(expr) >= 4 and substr(expr, 0, 4) == "var(" {
-        let name = substr(expr, 4, str_len(expr) - 5);
-        let var_node = nae_make_var(line, name);
-        return nae_render_var(var_node);
-    }
-    if str_len(expr) >= 6 and substr(expr, 0, 6) == "paren(" {
-        let inner = substr(expr, 6, str_len(expr) - 7);
-        let inner_node = nas_parse_expr_str(inner, line);
-        let paren = nae_make_paren(line, inner_node);
-        return nae_render_paren(paren);
-    }
-    return expr;
-}
-
 func nas_skip_lines(source: str, position: int) -> int {
     mut p: int = position;
     while true {
