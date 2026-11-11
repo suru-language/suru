@@ -1,7 +1,8 @@
 // Precedence-aware Natural Syntax expression parser.
-// Results are serialized AST shapes until the full self-hosted AST is added.
+// Returns typed AST nodes (NAstNodeRef) for proper structure representation.
 
 use "natural_token_stream.suru";
+use "natural_ast.suru";
 
 func ne_ok(next: int, value: str) -> [str] {
     return [to_str(next), "ok", value, ""];
