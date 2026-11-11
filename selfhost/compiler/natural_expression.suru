@@ -1,10 +1,11 @@
 // Precedence-aware Natural Syntax expression parser.
-// Results are serialized AST shapes until the full self-hosted AST is added.
+// Returns typed AST nodes (NAstNodeRef) for proper structure representation.
 
 use "natural_token_stream.suru";
+use "natural_ast.suru";
 
-func ne_ok(next: int, value: str) -> [str] {
-    return [to_str(next), "ok", value, ""];
+func ne_ok(next: int, value: NAstNodeRef) -> [str] {
+    return [to_str(next), "ok", value.node_text, ""];
 }
 
 func ne_fail(next: int, message: str) -> [str] {
@@ -25,6 +26,14 @@ func ne_value(result: [str]) -> str {
 
 func ne_message(result: [str]) -> str {
     return result[3];
+}
+
+func ne_wrap(value: str) -> NAstNodeRef {
+    return na_ref_node(value);
+}
+
+func ne_wrap_none() -> NAstNodeRef {
+    return na_ref_none();
 }
 
 func ne_skip_lines(source: str, position: int) -> int {
