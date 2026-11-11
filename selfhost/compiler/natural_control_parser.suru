@@ -233,7 +233,7 @@ func natural_control_ast_check(source: str) -> int {
             result = nac_parse_clause(source, first, stack);
         } else if first.text == "end" {
             result = nac_parse_end(source, first, stack);
-        } else if first.text == "routine" or first.text == "record" or first.text == "choice" or first.text == "contract" {
+        } else if first.text == "routine" or first.text == "record" or first.text == "choice" or first.text == "contract" or first.text == "attempt" {
             result = nac_skip_declaration(source, first);
         } else if first.text == "bring" {
             mut t = natural_next(source, first.next);
