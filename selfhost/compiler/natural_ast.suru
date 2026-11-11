@@ -7,22 +7,32 @@ type NAstNode {
     let text: str;
 }
 
-// NAstNodeRef: Structured node reference with marker convention
-// This replaces optional NAstNode (which doesn't compile in SURU)
-type NAstNodeRef {
-    let has_value: bool;
-    let node_text: str;  // "~none~" when has_value=false, rendered AST when has_value=true
-}
+// NAstNodeRef: Integer index into AST arena.
+// This replaces optional NAstNode (which doesn't compile in SURU).
+// 0 = NAST_NO_NODE (no reference / optional absent)
+// Positive integers = valid references into NAstArena
+type NAstNodeRef = int;
 
-// None marker constant
-const NAST_NONE: str = "~none~";
+// Arena limits
+const NAST_MAX_NODES: int = 1048576;
+const NAST_MAX_DEPTH: int = 512;
+const NAST_MAX_ARRAY_ELEMENTS: int = 1048576;
+const NAST_NO_NODE: int = 0;
 
+// Sentinel helper
 func na_ref_none() -> NAstNodeRef {
-    return NAstNodeRef(false, NAST_NONE);
+    return NAST_NO_NODE;
 }
 
-func na_ref_node(text: str) -> NAstNodeRef {
-    return NAstNodeRef(true, text);
+func na_ref_is_valid(ref: NAstNodeRef) -> bool {
+    return ref > 0;
+}
+
+func na_ref_require_valid(ref: NAstNodeRef, context: str) -> bool {
+    if ref == NAST_NO_NODE {
+        return false;
+    }
+    return true;
 }
 
 // ============================================
