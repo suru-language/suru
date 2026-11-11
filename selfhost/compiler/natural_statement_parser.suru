@@ -148,7 +148,8 @@ func nas_parse_binding(source: str, first: NToken, mode: str) -> [str] {
     if ne_is_ok(expression) == false {
         return nas_fail(equals.next, ne_message(expression));
     }
-    let node = na_make_binding(first.line, mode, name.text, annotation, ne_value(expression));
+    let parsed_value = nas_parse_expr_str(ne_value(expression), first.line);
+    let node = na_make_binding(first.line, mode, name.text, annotation, parsed_value);
     return nas_finish(source, ne_next(expression), na_render(node));
 }
 
@@ -165,7 +166,9 @@ func nas_parse_assignment(source: str, first: NToken) -> [str] {
     if ne_is_ok(expression) == false {
         return nas_fail(to_word.next, ne_message(expression));
     }
-    let node = na_make_assignment(first.line, ne_value(target), ne_value(expression));
+    let parsed_target = nas_parse_expr_str(ne_value(target), first.line);
+    let parsed_value = nas_parse_expr_str(ne_value(expression), first.line);
+    let node = na_make_assignment(first.line, parsed_target, parsed_value);
     return nas_finish(source, ne_next(expression), na_render(node));
 }
 
