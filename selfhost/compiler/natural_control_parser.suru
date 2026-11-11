@@ -233,8 +233,11 @@ func natural_control_ast_check(source: str) -> int {
             result = nac_parse_clause(source, first, stack);
         } else if first.text == "end" {
             result = nac_parse_end(source, first, stack);
-        } else if first.text == "routine" or first.text == "record" or first.text == "choice" or first.text == "contract" or first.text == "bring" {
+        } else if first.text == "routine" or first.text == "record" or first.text == "choice" or first.text == "contract" {
             result = nac_skip_declaration(source, first);
+        } else if first.text == "bring" {
+            let next = natural_next(source, first.next);
+            result = nac_ok(next.next, "", "skip", "bring");
         } else {
             let statement = nas_statement(source, position);
             if nas_is_ok(statement) {
