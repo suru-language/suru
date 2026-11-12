@@ -49,6 +49,11 @@ func nas_finish(source: str, position: int, node: str) -> [str] {
 func nas_parse_type(source: str, position: int) -> [str] {
     let first = natural_next(source, position);
     let text: str = first.text;
+    if first.text == "optional" {
+        let inner = nas_parse_type(source, first.next);
+        if inner[0] != "ok" { return inner; }
+        return nas_ok(inner[1], "optional " + inner[2]);
+    }
     if first.kind == NT_PUNCT and text == "[" {
         let inner = nas_parse_type(source, first.next);
         if inner[0] != "ok" { return inner; }
