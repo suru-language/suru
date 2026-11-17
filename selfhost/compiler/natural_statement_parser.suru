@@ -52,7 +52,7 @@ func nas_parse_type(source: str, position: int) -> [str] {
     if first.text == "optional" {
         let inner = nas_parse_type(source, first.next);
         if inner[0] != "ok" { return inner; }
-        return nas_ok(inner[1], "optional " + inner[2]);
+        return nas_ok(int_from_str(inner[1]), "optional " + inner[2]);
     }
     if first.kind == NT_PUNCT and text == "[" {
         let inner = nas_parse_type(source, first.next);
