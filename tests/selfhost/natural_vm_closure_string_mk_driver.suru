@@ -12,11 +12,12 @@ func main() {
     let fn_frames: [int] = [1, 1];
     let fn_maxdepths: [int] = [1024, 1024];
 
-    // main: const_str 0; mkclosure_v(use_env, captures=1); call_v(0); ret_unit
-    let ops0: [int] = [3, 61, 62, 65];
-    let as0: [int] = [0, 1, 0, 0];
-    let bs0: [int] = [0, 1, 0, 0];
-    let cs0: [int] = [0, 0, 0, 0];
+    // main: make a closure over the managed string, allocate an unrelated
+    // empty array (forcing a collection), then call the still-rooted closure.
+    let ops0: [int] = [3, 61, 51, 7, 62, 65];
+    let as0: [int] = [0, 1, 0, 0, 0, 0];
+    let bs0: [int] = [0, 1, 0, 0, 0, 0];
+    let cs0: [int] = [0, 0, 0, 0, 0, 0];
 
     // use_env: load managed capture array; load index 0; print string; return.
     let ops1: [int] = [5, 1, 54, 63, 65];
