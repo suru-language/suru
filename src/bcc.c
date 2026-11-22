@@ -118,6 +118,7 @@ static bool em_push(s_emit *e, s_u8 op, s_u32 a, s_u32 b, s_u32 c) {
 #define LABEL_UNPLACED 0xFFFFFFFFu
 
 typedef struct s_labelmgr {
+    const char *owner;
     s_u32 *pos;
     s_u32 nlabels, caplabels;
     s_u32 *pins;      /* instruction indices awaiting patch */
@@ -126,10 +127,18 @@ typedef struct s_labelmgr {
 } s_labelmgr;
 
 static s_u32 new_label(s_labelmgr *m) {
+    if (m->owner && strcmp(m->owner, "nbc_render_section") == 0 &&
+        getenv("SURU_LABEL_DEBUG"))
+        fprintf(stderr, "[label] new id=%u cap=%u\n", m->nlabels, m->caplabels);
     if (m->nlabels >= m->caplabels) {
         s_u32 ncap = m->caplabels ? m->caplabels * 2 : 8;
         s_u32 *n = realloc(m->pos, (s_size)ncap * sizeof(s_u32));
-        if (!n) return 0;
+        if (!n) {
+            if (m->owner && strcmp(m->owner, "nbc_render_section") == 0)
+                fprintf(stderr, "[label] realloc failed id=%u cap=%u\n",
+                        m->nlabels, ncap);
+            return 0;
+        }
         m->pos = n;
         m->caplabels = ncap;
     }
@@ -167,6 +176,10 @@ static bool em_jump(s_emit *e, s_labelmgr *m, s_u8 op, s_u32 lab) {
 }
 
 static void place_label(s_emit *e, s_labelmgr *m, s_u32 lab) {
+    if (m->owner && strcmp(m->owner, "nbc_render_section") == 0 &&
+        getenv("SURU_LABEL_DEBUG"))
+        fprintf(stderr, "[label] place id=%u at=%u nlabels=%u\n",
+                lab, e->nins, m->nlabels);
     m->pos[lab] = e->nins;
     for (s_u32 i = 0; i < m->npatches; ++i) {
         if (m->plab[i] == lab) {
@@ -929,6 +942,7 @@ bool s_bcc_run(const s_module *ast, s_arena *arena, s_diag_ctx *diag,
         g.e.nins = 0;
         g.e.cap = 0;
         g.e.ins = NULL;
+        g.labels.owner = fn->name;
         g.labels.nlabels = 0;
         g.labels.npatches = 0;
         g.frame_max = fn->max_frame_slots;
