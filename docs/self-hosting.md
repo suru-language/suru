@@ -419,6 +419,16 @@ The SURU-written module AST parser now recognizes top-level routine declarations
 
 ## Stage 1 AST-driven bytecode lowering
 
-A first AST-driven bytecode collector is now available as `natural_ast_bytecode.suru`. It consumes routine/module AST nodes and attached expression-node IDs directly for a deliberately small executable subset: typed routine parameters and returns, local bindings, local assignments, `show`, and `give`. It emits the same intermediate instruction records consumed by the existing SURU verifier and module writer. A differential gate compiles the same two-routine program with the reference frontend and the AST-driven collector, requires byte-identical `.sbc` output, and executes the AST-produced module.
+The AST-driven bytecode collector `natural_ast_bytecode.suru` now consumes typed routine/module AST nodes and attached expression-node IDs for:
+- Typed routine parameters and returns, local bindings and local assignments.
+- `show` and `give`.
+- `when`, `otherwise when`, and `otherwise` with symbolic branch/merge labels.
+- `repeat while` with a conditional exit and resolved back edge.
+- `each item across array`, plus integer ranges using exclusive `until` and inclusive `through`. Array loops cache the iterable, use a typed element slot and perform bounds-checked indexed loads; range loops use typed Whole slots and the corresponding comparison opcode.
 
-The existing source-scanning collector remains the reference for control flow, records, choices, exceptions, and the wider language. The next lowering increments should move those constructs onto module AST nodes, then remove source-line collection from the normal Stage 1 compiler path.
+The regression driver compares the routine and conditional/loop modules byte-for-byte against the reference compiler, then executes the AST-generated modules. The array/range each fixture executes the generated module and checks its exact output. The implementation preserves bytecode v1 and feeds the same instruction records into the SURU verifier and module writer.
+
+This remains an incremental AST compiler, not yet the default Stage 1 CLI backend. It still uses the existing source prepass to collect routine, record and choice declarations. `choose/case`, `break/continue`, exceptions, closures, full lexical scope handling, and complete module semantics are not yet lowered by this AST collector. The next work is to move declaration collection and the remaining control constructs onto typed module AST nodes, then make the AST collector the normal Stage 1 compiler path.
+
+
+The AST control-flow and `each` lowering increment passed the full Stage 1 scratch-clone workflow on `c8727b7bffc22bff035a2752a0a297be26e91c49` ([run 45017449513](https://github.com/suru-language/suru/actions/runs/45017449513)): normal/self-host tests, determinism, incremental and interval-one GC, static analysis, ASan/UBSan, Clang, and final clean-worktree checks all passed.
