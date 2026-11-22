@@ -8,13 +8,13 @@ routine main() -> Unit
     value flag: Bool = true
     value chosen: Whole = flag ? 10 : 20
     show(chosen)
-    value xs: [Whole] = [4, 5, 6]
+    change xs: [Whole] = [4, 5, 6]
     set xs[1] to 8
     show(xs[1])
     value p: Point = none
     set p.x to 7
     show(p.x)
-    value total: Whole = 0
+    change total: Whole = 0
     set total to total + 2
     show(total)
     value text: Text = "a" + "bc"
