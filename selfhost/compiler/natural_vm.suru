@@ -256,7 +256,8 @@ func natural_run_module(bytes: str) -> int {
     let initial_gc_metrics: [str] = [
         "0", "0", "0", "0", "1048576", "1048576", "0"
     ];
-    mut gc_state: [[str]] = [heap, [], initial_gc_metrics];
+    let initial_gc_work: [str] = [];
+    mut gc_state: [[str]] = [heap, initial_gc_work, initial_gc_metrics];
     mut hdlrs: [str] = [];
     mut hdlr_frames: [int] = [];
     mut guard: int = 0;
