@@ -113,7 +113,6 @@ func main() {
         println("FAIL incremental allocation survivor"); exit(1);
     }
 
-    println("heap checkpoint: before size classes");
     // Size classes retain each slot's reserved capacity after sweeping.
     mut classes: [str] = [];
     classes = sh_alloc(classes, "str", "a", no_children);
@@ -183,7 +182,6 @@ func main() {
         println("FAIL child reservation growth"); exit(1);
     }
 
-    println("heap checkpoint: before GC accounting");
     // The GC scheduler saturates its allocation trigger at 512 and records
     // cumulative logical bytes and completed collection cycles.
     mut scheduled: [[str]] = sh_mark_idle(
