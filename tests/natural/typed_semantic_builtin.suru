@@ -1,0 +1,2 @@
+value length: Whole = str_len("hello")
+show(length)
