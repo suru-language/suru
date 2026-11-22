@@ -12,6 +12,8 @@
 
 static int cmd_compile_natural(const char *path, const char *outpath,
                                const char *argv0);
+static int cmd_compile_natural_selfhost(const char *path, const char *outpath,
+                                        const char *argv0);
 
 static char *read_file(const char *path, s_size *len) {
     s_u8 *bytes = NULL;
@@ -37,9 +39,14 @@ static int cmd_compile_natural_native(const char *path, const char *outpath,
                                       const char *argv0);
 
 static int cmd_run(const char *path, int argc, char **argv, int natural,
-                   int native_backend, const char *argv0) {
+                   int native_backend, int selfhost_compiler,
+                   const char *argv0) {
     if (natural) {
         if (native_backend) {
+            if (selfhost_compiler) {
+                fprintf(stderr, "suru: --compiler=selfhost does not yet support --backend=native\n");
+                return 2;
+            }
             char elf[512];
             snprintf(elf, sizeof elf, "/tmp/suru_native_%d.elf", (int)getpid());
             if (cmd_compile_natural_native(path, elf, argv0) != 0) return 1;
@@ -57,7 +64,10 @@ static int cmd_run(const char *path, int argc, char **argv, int natural,
         }
         char out[512];
         snprintf(out, sizeof out, "/tmp/suru_nat_%d.sbc", (int)getpid());
-        if (cmd_compile_natural(path, out, argv0) != 0) return 1;
+        int compile_rc = selfhost_compiler
+            ? cmd_compile_natural_selfhost(path, out, argv0)
+            : cmd_compile_natural(path, out, argv0);
+        if (compile_rc != 0) return 1;
         int rc = cmd_exec(out, argc, argv);
         remove(out);
         return rc;
@@ -114,6 +124,53 @@ static int resolve_driver(char *out, size_t n, const char *argv0,
     return -1;
 }
 
+static bool shell_append_arg(char *command, size_t capacity, size_t *used,
+                             const char *argument) {
+    if (!command || !used || !argument || *used >= capacity) return false;
+    size_t extra = (*used > 0 ? 1u : 0u) + 2u; /* separator + quotes */
+    for (size_t i = 0; argument[i] != '\0'; ++i)
+        extra += argument[i] == 39 ? 4u : 1u;
+    if (extra + 1u > capacity - *used) return false;
+    if (*used > 0) command[(*used)++] = ' ';
+    command[(*used)++] = 39;
+    for (size_t i = 0; argument[i] != '\0'; ++i) {
+        if (argument[i] == 39) {
+            command[(*used)++] = 39;
+            command[(*used)++] = 92;
+            command[(*used)++] = 39;
+            command[(*used)++] = 39;
+        } else {
+            command[(*used)++] = argument[i];
+        }
+    }
+    command[(*used)++] = 39;
+    command[*used] = '\0';
+    return true;
+}
+
+/* Run the complete SURU-written frontend -> bytecode -> verifier -> writer
+ * pipeline under the Stage-0 VM. This is an explicit Stage-1 compiler path;
+ * the reference C reassembly remains available until parity is complete. */
+static int cmd_compile_natural_selfhost(const char *path, const char *outpath,
+                                        const char *argv0) {
+    char driver[2048];
+    if (resolve_driver(driver, sizeof driver, argv0,
+                       "natural_build_driver.suru") != 0) {
+        fprintf(stderr, "suru: self-hosted compiler driver not found\n");
+        return 1;
+    }
+    char command[8192] = "";
+    size_t used = 0;
+    if (!shell_append_arg(command, sizeof command, &used, argv0) ||
+        !shell_append_arg(command, sizeof command, &used, "run") ||
+        !shell_append_arg(command, sizeof command, &used, driver) ||
+        !shell_append_arg(command, sizeof command, &used, path) ||
+        !shell_append_arg(command, sizeof command, &used, outpath)) {
+        fprintf(stderr, "suru: self-hosted compiler command is too long\n");
+        return 1;
+    }
+    return system(command) == 0 ? 0 : 1;
+}
 static int bc_op_id(const char *name) {
     char norm[64];
     size_t k = 0;
@@ -352,8 +409,17 @@ static int cmd_compile_natural(const char *path, const char *outpath,
     return 0;
 }
 
-static int cmd_check(const char *path, int natural, const char *argv0) {
+static int cmd_check(const char *path, int natural, int selfhost_compiler,
+                     const char *argv0) {
     if (natural) {
+        if (selfhost_compiler) {
+            char output[512];
+            snprintf(output, sizeof output, "/tmp/suru_selfhost_check_%d.sbc",
+                     (int)getpid());
+            int rc = cmd_compile_natural_selfhost(path, output, argv0);
+            (void)remove(output);
+            return rc;
+        }
         char driver[2048];
         if (natural_frontend_path(driver, sizeof driver, argv0) != 0) {
             fprintf(stderr, "suru: --syntax=natural frontend driver not found\n");
@@ -378,9 +444,12 @@ static int cmd_check(const char *path, int natural, const char *argv0) {
 }
 
 static int cmd_compile(const char *path, const char *outpath, int natural,
-                       int native_backend, const char *argv0) {
+                       int native_backend, int selfhost_compiler,
+                       const char *argv0) {
     if (natural) {
         if (native_backend) return cmd_compile_natural_native(path, outpath, argv0);
+        if (selfhost_compiler)
+            return cmd_compile_natural_selfhost(path, outpath, argv0);
         return cmd_compile_natural(path, outpath, argv0);
     }
     s_size len;
@@ -466,6 +535,7 @@ static void usage(void) {
             "  compile <file.suru> <out.sbc>  compile to bytecode module\n"
             "  exec   <module.sbc> [args...]  run a precompiled bytecode module\n"
             "  --syntax selects the language edition; legacy is the default.\n"
+            "  --compiler=selfhost uses the SURU-written Natural compiler.\n"
             "  --vm=natural runs an exec module through the SURU-written VM.\n"
             "  --backend=native compiles Natural to a standalone x86-64 ELF64\n"
             "    executable (no C compiler/linker) for the supported subset.\n");
@@ -487,6 +557,7 @@ int main(int argc, char **argv) {
     int natural = 0;
     int vm_natural = 0;
     int native_backend = 0;
+    int selfhost_compiler = 0;
     int w = 1;
     for (int r = 1; r < argc; ++r) {
         if (strncmp(argv[r], "--syntax=", 9) == 0) {
@@ -495,6 +566,14 @@ int main(int argc, char **argv) {
             else if (strcmp(v, "legacy") == 0) natural = 0;
             else {
                 fprintf(stderr, "suru: unknown syntax '%s'\n", v);
+                return 2;
+            }
+        } else if (strncmp(argv[r], "--compiler=", 11) == 0) {
+            const char *v = argv[r] + 11;
+            if (strcmp(v, "selfhost") == 0) selfhost_compiler = 1;
+            else if (strcmp(v, "reference") == 0) selfhost_compiler = 0;
+            else {
+                fprintf(stderr, "suru: unknown compiler '%s'\n", v);
                 return 2;
             }
         } else if (strncmp(argv[r], "--vm=", 5) == 0) {
@@ -517,6 +596,15 @@ int main(int argc, char **argv) {
     }
     argc = w;
 
+    if (selfhost_compiler && !natural) {
+        fprintf(stderr, "suru: --compiler=selfhost requires --syntax=natural\n");
+        return 2;
+    }
+    if (selfhost_compiler && native_backend) {
+        fprintf(stderr, "suru: --compiler=selfhost does not yet support --backend=native\n");
+        return 2;
+    }
+
     if (argc < 3) {
         usage();
         return 2;
@@ -524,17 +612,19 @@ int main(int argc, char **argv) {
     const char *cmd = argv[1];
     const char *path = argv[2];
     if (strcmp(cmd, "run") == 0) {
-        return cmd_run(path, argc - 3, argv + 3, natural, native_backend, argv[0]);
+        return cmd_run(path, argc - 3, argv + 3, natural, native_backend,
+                       selfhost_compiler, argv[0]);
     }
     if (strcmp(cmd, "check") == 0) {
-        return cmd_check(path, natural, argv[0]);
+        return cmd_check(path, natural, selfhost_compiler, argv[0]);
     }
     if (strcmp(cmd, "compile") == 0) {
         if (argc < 4) {
             usage();
             return 2;
         }
-        return cmd_compile(path, argv[3], natural, native_backend, argv[0]);
+        return cmd_compile(path, argv[3], natural, native_backend,
+                            selfhost_compiler, argv[0]);
     }
     if (strcmp(cmd, "exec") == 0) {
         if (vm_natural) return cmd_exec_natural_vm(path, argv[0]);
