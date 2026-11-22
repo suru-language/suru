@@ -129,14 +129,15 @@ func vm_heap_roots(stack: [str], frames: [[str]]) -> [int] {
     return roots;
 }
 
-// Perform one bounded mark slice per managed allocation. When the grey
-// queue drains, sweep and immediately seed the next cycle from current roots.
+// Perform a bounded mark slice per managed allocation. The fixed budget
+// amortizes large root/work queues without allowing an unbounded collection
+// pause. When the grey queue drains, sweep and seed the next cycle from roots.
 // The new object is shaded grey by sh_alloc_incremental before it is returned.
 func vm_heap_alloc(state: [[str]], stack: [str], frames: [[str]],
                    kind: str, payload: str, children: [int]) -> [[str]] {
     let roots: [int] = vm_heap_roots(stack, frames);
     mut next: [[str]] = [state[0], state[1], state[2]];
-    next = sh_mark_step(next, 1, roots);
+    next = sh_mark_step(next, 128, roots);
     if sh_mark_pending(next) == 0 {
         let swept: [str] = sh_sweep(next[0]);
         next = sh_mark_begin(swept, roots);
