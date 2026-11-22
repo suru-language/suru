@@ -3,6 +3,59 @@ use "../../selfhost/compiler/natural_bytecode.suru";
 use "../../selfhost/compiler/natural_module_writer.suru";
 use "../../selfhost/compiler/natural_elf_writer.suru";
 
+func nw_elf_string_value(instructions: [str], index: int) -> [str] {
+    mut seen: int = -1;
+    mut found: bool = false;
+    mut value: str = "";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], "#str|") {
+            seen += 1;
+            if seen == index {
+                let raw: str = substr(instructions[i], 5, str_len(instructions[i]));
+                if str_len(raw) >= 2 and raw[0] == "\"" and
+                   raw[str_len(raw) - 1] == "\"" {
+                    value = substr(raw, 1, str_len(raw) - 2);
+                } else {
+                    value = raw;
+                }
+                found = true;
+            }
+        }
+        i += 1;
+    }
+    return [found ? "1" : "0", value];
+}
+
+func nw_elf_string_messages(ins: [str], instructions: [str]) -> [str] {
+    let invalid: [str] = ["#invalid"];
+    if array_len(ins) < 4 { return invalid; }
+    mut messages: [str] = [];
+    mut pc: int = 0;
+    while pc + 2 < array_len(ins) {
+        let constant: [str] = str_split(ins[pc], "|");
+        let output: [str] = str_split(ins[pc + 1], "|");
+        let cleanup: [str] = str_split(ins[pc + 2], "|");
+        if array_len(constant) < 2 or array_len(output) < 2 or
+           array_len(cleanup) < 1 or nw_norm(constant[0]) != "const_str" or
+           nw_norm(output[0]) != "builtin" or output[1] != "1" or
+           nw_norm(cleanup[0]) != "pop" {
+            return invalid;
+        }
+        let value: [str] = nw_elf_string_value(
+            instructions, int_from_str(constant[1]));
+        if value[0] != "1" { return invalid; }
+        messages = array_concat(messages, [value[1] + "\n"]);
+        pc += 3;
+    }
+    if pc != array_len(ins) - 1 { return invalid; }
+    let terminal: [str] = str_split(ins[pc], "|");
+    if array_len(terminal) == 0 or nw_norm(terminal[0]) != "ret_unit" {
+        return invalid;
+    }
+    return messages;
+}
+
 // Minimal native backend: compiles a Natural program whose bytecode uses only
 // the supported integer/control/print subset into a standalone x86-64 ELF64
 // executable. `show("literal")` uses the message emitter; everything else uses
@@ -18,38 +71,14 @@ func main() {
     let nfuncs: int = array_len(fns);
     if nfuncs == 0 { exit(2); }
 
-    // String special-case: single function of shape show("literal").
+    // Constant-string output subset: one or more show("literal") statements.
+    // This path writes all message bytes from the ELF image itself.
     if nfuncs == 1 {
         let ins0: [str] = nw_emit_ins(fns[0]);
-        if array_len(ins0) == 4 {
-            let h0: [str] = str_split(ins0[0], "|");
-            let h1: [str] = str_split(ins0[1], "|");
-            if nw_norm(h0[0]) == "const_str" and
-               nw_norm(h1[0]) == "builtin" and h1[1] == "1" {
-                let sidx: int = int_from_str(h0[1]);
-                mut found: int = -1;
-                mut val: str = "";
-                mut pi: int = 0;
-                while pi < array_len(instructions) {
-                    if nbc_has_prefix(instructions[pi], "#str|") {
-                        found += 1;
-                        if found == sidx {
-                            let raw: str = substr(instructions[pi], 5, str_len(instructions[pi]));
-                            if str_len(raw) >= 2 and raw[0] == "\"" and
-                               raw[str_len(raw) - 1] == "\"" {
-                                val = substr(raw, 1, str_len(raw) - 2);
-                            } else {
-                                val = raw;
-                            }
-                        }
-                    }
-                    pi += 1;
-                }
-                if val != "" {
-                    write_file(args(1), nw_emit_elf_message(val + "\n"));
-                    exit(0);
-                }
-            }
+        let messages: [str] = nw_elf_string_messages(ins0, instructions);
+        if array_len(messages) > 0 and messages[0] != "#invalid" {
+            write_file(args(1), nw_emit_elf_messages(messages));
+            exit(0);
         }
     }
 
