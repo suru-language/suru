@@ -27,6 +27,14 @@ if "$SURU" --syntax=natural check "$ROOT/tests/natural/control_valid.suru" >/dev
     echo "ok: syntax-natural-check"
 else
     echo "FAIL: syntax-natural-check"
+    debug_dir="$(mktemp -d)"
+    "$SURU" run "$ROOT/tests/selfhost/natural_frontend_driver.suru" \
+        "$ROOT/tests/natural/control_valid.suru" >"$debug_dir/stdout" 2>"$debug_dir/stderr"
+    debug_code=$?
+    echo "  direct frontend driver exit: $debug_code"
+    sed 's/^/    stdout: /' "$debug_dir/stdout"
+    sed 's/^/    stderr: /' "$debug_dir/stderr"
+    rm -rf "$debug_dir"
     fail=$((fail + 1))
 fi
 badnat="$(mktemp)"
