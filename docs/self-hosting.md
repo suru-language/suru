@@ -392,15 +392,17 @@ exposed for tests and threshold tuning; byte values are logical SURU table
 estimates, not measurements of host memory. The incremental state also tracks
 allocations since the last completed cycle, completed cycle count, cumulative
 logical allocation bytes, the current threshold, and the cycle's before-live
-snapshot. The SURU VM now matches the C VM's 512-allocation / 1 MiB live-byte
-trigger. While a cycle is active it scans 16 grey objects per allocation, then
-sweeps, resets the interval counter, and adapts the next threshold to four
-times the surviving bytes with the same minimum, maximum, and high-survival
-anti-thrashing rules.
+snapshot. The heap module implements and tests the C VM's 512-allocation /
+1 MiB live-byte trigger and four-times-survivor threshold adaptation, including
+minimum/maximum clamps and the high-survival anti-thrashing rule. The
+SURU-written VM currently advances a bounded 128-object mark slice at every
+managed allocation; wiring the C-compatible interval/threshold trigger into
+the VM remains gated on complete runtime safepoint and root coverage. This
+conservative schedule is the version validated against the full VM corpus.
 The regression driver exercises shared references, unreachable cycles,
 exception causes, dropping roots, full reclamation, class-aware slot reuse,
 large first-fit reuse, capacity growth, incremental root discovery, allocation
-shading, and the write barrier.
+shading, write barriers, and trigger/threshold policy.
 
 The SURU-written interpreter in `natural_vm.suru` now stores text
 constants/results, bytecode arrays, records, and typed exceptions as managed
