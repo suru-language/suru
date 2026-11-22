@@ -896,7 +896,7 @@ func nbc_typed_statement(line: str) -> [str] {
 }
 
 func nbc_typed_statement_nodes(statement: [str]) -> [str] {
-    if array_len(statement) <= 3 { return []; }
+    if array_len(statement) <= 3 { return slice(statement, 3, 3); }
     return slice(statement, 3, array_len(statement));
 }
 
