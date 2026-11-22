@@ -492,13 +492,21 @@ func natural_run_module(bytes: str) -> int {
                 elems = array_concat(elems, [stack[n - cnt + k]]);
                 k += 1;
             }
+            // Materialize the capture environment as a managed array first.
+            // Keep that handle on the operand stack while allocating its closure
+            // so the next collection sees it as a root.
             heap = sh_collect(heap, vm_heap_roots(stack, fr_locals));
-            let closure_id: int = sh_find_free(heap);
-            let env: str = vm_arr_build(cnt, elems);
-            heap = sh_alloc(heap, "closure", to_str(a) + "|" + env,
-                            vm_heap_refs(elems));
+            let env_id: int = sh_find_free(heap);
+            let env_payload: str = vm_arr_build(cnt, elems);
+            heap = sh_alloc(heap, "array", env_payload, vm_heap_refs(elems));
             k = 0;
             while k < cnt { stack = vm_pop(stack); k += 1; }
+            let env_handle: str = "H" + to_str(env_id);
+            stack = vm_push(stack, env_handle);
+            heap = sh_collect(heap, vm_heap_roots(stack, fr_locals));
+            let closure_id: int = sh_find_free(heap);
+            heap = sh_alloc(heap, "closure", to_str(a) + "|" + env_handle, [env_id]);
+            stack = vm_pop(stack);
             stack = vm_push(stack, "H" + to_str(closure_id));
         } else if op == 62 {
             let nargs: int = a;
