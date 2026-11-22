@@ -113,6 +113,63 @@ func main() {
         println("FAIL incremental allocation survivor"); exit(1);
     }
 
+    // Size classes retain each slot's reserved capacity after sweeping.
+    mut classes: [str] = [];
+    classes = sh_alloc(classes, "str", "a", no_children);
+    classes = sh_alloc(classes, "str", "12345678901234567", no_children);
+    if sh_capacity(classes, 0) != 48 or sh_capacity(classes, 1) != 64 {
+        println("FAIL 16-byte allocation classes"); exit(1);
+    }
+    if sh_live_bytes(classes) != 112 or sh_reserved_bytes(classes) != 112 {
+        println("FAIL heap capacity accounting"); exit(1);
+    }
+    classes = sh_collect(classes, no_roots);
+    if sh_live_bytes(classes) != 0 or sh_reserved_bytes(classes) != 112 or
+       sh_free_class_count(classes, 48) != 1 or
+       sh_free_class_count(classes, 64) != 1 {
+        println("FAIL swept size-class retention"); exit(1);
+    }
+    classes = sh_alloc(classes, "str", "b", no_children);
+    if sh_kind(classes, 0) != "str" or sh_capacity(classes, 0) != 48 {
+        println("FAIL matching small size-class reuse"); exit(1);
+    }
+    classes = sh_alloc(classes, "str", "12345678901234567", no_children);
+    if sh_kind(classes, 1) != "str" or sh_capacity(classes, 1) != 64 {
+        println("FAIL larger size-class reuse"); exit(1);
+    }
+
+    // Large slots use first-fit among free chunks with enough capacity.
+    let large_free: [str] = [
+        "", "0", "4144", "", "",
+        "", "0", "4224", "", ""
+    ];
+    if sh_find_free(large_free, 4112) != 0 or
+       sh_find_free(large_free, 4208) != 1 {
+        println("FAIL large-object first-fit reuse"); exit(1);
+    }
+
+    // Payload/child growth increases logical reservation without changing the
+    // stable handle index; shrinking does not reduce its reserved class.
+    mut growing: [str] = [];
+    growing = sh_alloc(growing, "array", "x", no_children);
+    let original_capacity: int = sh_capacity(growing, 0);
+    growing = sh_set_payload(growing, 0,
+        "0123456789012345678901234567890123456789");
+    if sh_capacity(growing, 0) <= original_capacity or
+       sh_kind(growing, 0) != "array" or
+       sh_payload(growing, 0) != "0123456789012345678901234567890123456789" {
+        println("FAIL payload reservation growth"); exit(1);
+    }
+    let grown_capacity: int = sh_capacity(growing, 0);
+    growing = sh_set_payload(growing, 0, "x");
+    if sh_capacity(growing, 0) != grown_capacity {
+        println("FAIL reservation shrank after payload update"); exit(1);
+    }
+    growing = sh_set_children(growing, 0, [1, 2, 3, 4, 5, 6, 7, 8]);
+    if sh_capacity(growing, 0) < grown_capacity {
+        println("FAIL child reservation growth"); exit(1);
+    }
+
     println("SURU heap: reachability, cycles, write barrier, root reseeding, allocation shading and sweep passed");
     exit(0);
 }
