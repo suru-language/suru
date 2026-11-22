@@ -383,9 +383,16 @@ iteratively, safely collects unreachable cycles, and reuses reclaimed handle
 slots. The incremental API advances a bounded number of grey objects per
 slice, re-seeds roots on each slice, shades new allocations during a mark
 cycle, and applies a tri-colour write barrier when a black object receives a
-white child. The regression driver exercises shared references, unreachable
-cycles, exception causes, dropping roots, full reclamation, slot reuse,
-incremental root discovery, allocation shading, and the write barrier.
+white child. Allocation slots now retain a logical reservation size: small
+objects use ascending 16-byte classes through 4096 bytes, and larger slots use
+first-fit reuse when their capacity is sufficient. Sweeping retains the
+capacity class, while payload/reference growth raises the reservation without
+changing the stable handle. Live and reserved byte estimates are exposed for
+tests; these are logical SURU table estimates, not measurements of host memory.
+The regression driver exercises shared references, unreachable cycles,
+exception causes, dropping roots, full reclamation, class-aware slot reuse,
+large first-fit reuse, capacity growth, incremental root discovery, allocation
+shading, and the write barrier.
 
 The SURU-written interpreter in `natural_vm.suru` now stores text
 constants/results, bytecode arrays, records, and typed exceptions as managed
