@@ -129,13 +129,27 @@ func vm_heap_roots(stack: [str], frames: [[str]]) -> [int] {
     return roots;
 }
 
-func vm_alloc_string(heap: [str], stack: [str],
-                        frames: [[str]], value: str) -> [[str]] {
+// Perform one bounded mark slice per managed allocation. When the grey
+// queue drains, sweep and immediately seed the next cycle from current roots.
+// The new object is shaded grey by sh_alloc_incremental before it is returned.
+func vm_heap_alloc(state: [[str]], stack: [str], frames: [[str]],
+                   kind: str, payload: str, children: [int]) -> [[str]] {
+    let roots: [int] = vm_heap_roots(stack, frames);
+    mut next: [[str]] = [state[0], state[1], state[2]];
+    next = sh_mark_step(next, 1, roots);
+    if sh_mark_pending(next) == 0 {
+        let swept: [str] = sh_sweep(next[0]);
+        next = sh_mark_begin(swept, roots);
+    }
+    let id: int = sh_find_free(next[0]);
+    next = sh_alloc_incremental(next, kind, payload, children);
+    return [next[0], next[1], next[2], ["H" + to_str(id)]];
+}
+
+func vm_alloc_string(state: [[str]], stack: [str],
+                     frames: [[str]], value: str) -> [[str]] {
     let no_children: [int] = [];
-    let next: [str] = sh_collect(heap, vm_heap_roots(stack, frames));
-    let id: int = sh_find_free(next);
-    let updated: [str] = sh_alloc(next, "str", value, no_children);
-    return [updated, ["H" + to_str(id)]];
+    return vm_heap_alloc(state, stack, frames, "str", value, no_children);
 }
 
 func natural_run_module(bytes: str) -> int {
@@ -239,6 +253,7 @@ func natural_run_module(bytes: str) -> int {
 
     mut stack: [str] = [];
     mut heap: [str] = [];
+    mut gc_state: [[str]] = sh_mark_begin(heap, []);
     mut hdlrs: [str] = [];
     mut hdlr_frames: [int] = [];
     mut guard: int = 0;
