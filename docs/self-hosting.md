@@ -502,18 +502,17 @@ the top frame's locals and the operand stack, must be scanned at allocation
 safepoints. The runner is included in both make selfhost-test and
 make selfhost-compare.
 
-This fixture intentionally validates root reachability under the already-validated
-per-allocation mark-slice scheduler; it does not claim that the SURU VM has
-adopted the production C VM's 512-allocation / live-byte collection trigger.
-Keeping those acceptance questions separate makes a failure attributable to
-root coverage rather than a change in collection scheduling.
+The SURU VM now invokes the production-style allocation policy rather than
+running a mark slice on every allocation. A cycle starts when the current
+allocation reaches the 512-object interval or logical live reservations exceed
+the 1 MiB starting threshold. Marking advances in 128-object slices at
+allocation safepoints. New allocations during an active cycle are shaded, and
+each slice republishes roots from the operand stack and every active frame.
+The 520-allocation suspended-caller fixture therefore exercises both the
+production-style trigger and the suspended-frame root invariant.
 
-
-The SURU VM now invokes the same allocation-trigger policy as the production
-collector: a cycle begins when the current allocation reaches the 512-object
-interval or logical live reservations exceed the 1 MiB starting threshold.
-Marking advances in 128-object slices at allocation safepoints. New allocations
-during an active cycle are shaded, and each slice republishes roots from the
-operand stack and every active frame. The 520-allocation suspended-caller
-fixture therefore exercises the production scheduling path, not just a
-manually forced mark cycle.
+The Stage-0 C bootstrap heap also received a correctness fix discovered while
+running this regression: large free blocks now keep their capacity field intact
+while using a separate link for the large-object free list. A unit regression
+ensures first-fit reuse skips undersized blocks. This is a bootstrap safety
+fix; the managed heap and VM integration under test remain written in SURU.
