@@ -16,8 +16,8 @@ jobs:
       - name: Create an exact-revision scratch clone
         env:
           REPOSITORY: ${{ github.repository }}
-          TARGET_REF: ${{ github.ref_name }}
-          TARGET_SHA: ${{ github.sha }}
+          TARGET_REF: ${{ github.head_ref || github.ref_name }}
+          TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           git clone --no-checkout --branch "${TARGET_REF}" \
             "https://github.com/${REPOSITORY}.git" "${RUNNER_TEMP}/suru-stage1-scratch"
