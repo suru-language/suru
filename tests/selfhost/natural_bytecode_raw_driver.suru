@@ -1,0 +1,12 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_bytecode.suru";
+
+func main() {
+    let source: str = source_load(args(0));
+    let instructions: [str] = nbc_collect(source);
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        println(to_str(i) + "|" + instructions[i]);
+        i += 1;
+    }
+}
