@@ -372,6 +372,23 @@ and preservation of fixed parameter positions during slot compaction. The build 
 SURU-writer bytecode with the reference and executes the result.
 The full SURU VM, managed runtime/GC, native backend completion, and
 C-independent self-rebuild remain later acceptance gates.
+
+### Stage 2: SURU-managed heap foundation
+
+`selfhost/runtime/heap.suru` begins the managed-memory port in SURU. It
+represents heap objects using stable integer handles and a flat object table,
+with a kind, payload, and child-reference list for strings, arrays, records,
+closures, and exceptions. Its stop-the-world mark/sweep pass seeds roots,
+traverses the object graph iteratively, safely collects unreachable cycles,
+and reuses reclaimed handle slots. The regression driver exercises shared
+references, unreachable cycles, exception causes, dropping roots, full
+reclamation, and slot reuse.
+
+This is a first runtime component, not yet a replacement for `src/mem.c`:
+the current C VM still owns the production heap and GC. Incremental marking,
+write barriers, allocation accounting/reuse policy parity, VM root registration,
+and switching VM aggregate values from inline encodings to managed handles
+remain subsequent Stage 2 work.
 The next Stage 1 AST increment adds `NAstModule`, a typed collection of
 `NAstNode` records with parse-error metadata. The statement parser's serialized
 nodes are rehydrated into the module array. The module driver is compared
