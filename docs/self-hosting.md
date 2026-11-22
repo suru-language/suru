@@ -312,7 +312,8 @@ The first Stage 1 slot-isolation increment is implemented on the
 `stage1-per-function-slots` branch. Compiler slot and type markers are scoped
 by the active routine, keeping parameter slots ordered from zero within each
 function. The regression `tests/natural/per_function_slots.suru` reuses
-`shared` as a parameter at different positions in two routines; the build
-gate compares SURU-writer bytecode with the reference and executes the result.
+`shared` with different types and parameter positions in two routines, so it
+checks both slot and type-marker isolation. The build gate compares
+SURU-writer bytecode with the reference and executes the result.
 The full SURU VM, managed runtime/GC, native backend completion, and
 C-independent self-rebuild remain later acceptance gates.
