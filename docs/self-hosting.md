@@ -378,17 +378,20 @@ C-independent self-rebuild remain later acceptance gates.
 `selfhost/runtime/heap.suru` begins the managed-memory port in SURU. It
 represents heap objects using stable integer handles and a flat object table,
 with a kind, payload, and child-reference list for strings, arrays, records,
-closures, and exceptions. Its stop-the-world mark/sweep pass seeds roots,
-traverses the object graph iteratively, safely collects unreachable cycles,
-and reuses reclaimed handle slots. The regression driver exercises shared
-references, unreachable cycles, exception causes, dropping roots, full
-reclamation, and slot reuse.
+closures, and exceptions. Its mark/sweep pass seeds roots and traverses the object graph
+iteratively, safely collects unreachable cycles, and reuses reclaimed handle
+slots. The incremental API advances a bounded number of grey objects per
+slice, re-seeds roots on each slice, shades new allocations during a mark
+cycle, and applies a tri-colour write barrier when a black object receives a
+white child. The regression driver exercises shared references, unreachable
+cycles, exception causes, dropping roots, full reclamation, slot reuse,
+incremental root discovery, allocation shading, and the write barrier.
 
 This is a first runtime component, not yet a replacement for `src/mem.c`:
-the current C VM still owns the production heap and GC. Incremental marking,
-write barriers, allocation accounting/reuse policy parity, VM root registration,
-and switching VM aggregate values from inline encodings to managed handles
-remain subsequent Stage 2 work.
+the current C VM still owns the production heap and GC. Allocation accounting,
+the production VM's actual stack/frame/handler root registration, and switching
+VM aggregate values from inline encodings to managed handles remain subsequent
+Stage 2 work.
 The next Stage 1 AST increment adds `NAstModule`, a typed collection of
 `NAstNode` records with parse-error metadata. The statement parser's serialized
 nodes are rehydrated into the module array. The module driver is compared
