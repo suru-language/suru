@@ -14,7 +14,8 @@ jobs:
         env:
           REPOSITORY: ${{ github.repository }}
         run: |
-          git clone --depth=1 --branch m0-trustworthy-baseline \
+          TARGET_REF="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          git clone --depth=1 --branch "${TARGET_REF}" \
             "https://github.com/${REPOSITORY}.git" "${RUNNER_TEMP}/suru-m0-scratch"
           cd "${RUNNER_TEMP}/suru-m0-scratch"
           test -s .kilo/plans/1794948281385-m0-trustworthy-baseline.md

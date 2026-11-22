@@ -333,3 +333,16 @@ routine-expression, and conditional nodes with child indices. The initial
 conformance gate checks operator precedence and logical/comparison tree shape
 against the existing expression parser. The expression tree is not yet attached
 to statement nodes or consumed by bytecode lowering; that is the next step.
+
+
+### Stage 1: typed expression attachment
+
+The module AST now carries one flat `NAstExpr` table. Each `NAstNode` stores
+zero or more root indices into that table. The module collector parses and
+attaches expression roots for binding initializers, assignment targets and
+values, `show`, `give`, `when`, `repeat while`, `each across/from/until/through`,
+`choose`, `case`, and `otherwise when`. The new typed-AST gate checks
+operator precedence, child indices, and statement-to-expression root links.
+The original source-shaped node payload remains available for diagnostics and
+differential comparison. The next increment is to lower this AST directly to
+bytecode and compare it against the existing source-shaped emitter.

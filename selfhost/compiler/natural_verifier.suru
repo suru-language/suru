@@ -201,7 +201,7 @@ func natural_verify(instructions: [str]) -> int {
         mut items: [str] = [];
         if nfuncs > 1 or array_len(fns) > 0 { items = fns[i]; }
         let ins: [str] = nw_emit_ins(items);
-        let map: [int] = nw_slotmap(ins);
+        let map: [int] = nw_slotmap(ins, nparams);
         let nslots: int = array_len(map);
         mut frame: int = nslots < nparams ? nparams : nslots;
         if frame == 0 { frame = 1; }
