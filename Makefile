@@ -154,6 +154,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/effect_runtime_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_bytecode_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_ast_bytecode_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_ast_control_bytecode_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_compile_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_verify_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_build_run.sh $(BINDIR)/suru

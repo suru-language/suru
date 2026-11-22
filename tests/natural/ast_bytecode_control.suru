@@ -1,0 +1,12 @@
+routine main() -> Unit
+    value x: Whole = 2
+    when x > 1
+        show("yes")
+    otherwise
+        show("no")
+    end when
+    repeat while x < 4
+        show(x)
+        set x to x + 1
+    end repeat
+end routine
