@@ -501,3 +501,9 @@ guards the VM root-set contract: every active call frame's locals, not merely
 the top frame's locals and the operand stack, must be scanned at allocation
 safepoints. The runner is included in both make selfhost-test and
 make selfhost-compare.
+
+This fixture intentionally validates root reachability under the already-validated
+per-allocation mark-slice scheduler; it does not claim that the SURU VM has
+adopted the production C VM's 512-allocation / live-byte collection trigger.
+Keeping those acceptance questions separate makes a failure attributable to
+root coverage rather than a change in collection scheduling.
