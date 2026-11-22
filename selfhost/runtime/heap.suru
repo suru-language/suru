@@ -208,10 +208,14 @@ func sh_live_count(heap: [str]) -> int {
     return count;
 }
 
-// Incremental collection state is [heap, grey-worklist, active-flag].
-// Grey IDs are strings so the complete state is representable as [[str]].
-func sh_mark_begin(heap: [str], roots: [int]) -> [[str]] {
+// Incremental collection state is [heap, grey-worklist, metadata].
+// Metadata is [active, allocations-since-GC, collection-count,
+// cumulative-logical-allocation-bytes].
+func sh_mark_begin_with_metrics(heap: [str], roots: [int],
+                                metrics: [str]) -> [[str]] {
     let next: [str] = heap;
+    mut gc_metrics: [str] = metrics;
+    gc_metrics[0] = "1";
     let count: int = sh_object_count(next);
     mut id: int = 0;
     while id < count {
@@ -229,7 +233,36 @@ func sh_mark_begin(heap: [str], roots: [int]) -> [[str]] {
         }
         r += 1;
     }
-    return [next, work, ["1"]];
+    return [next, work, gc_metrics];
+}
+
+func sh_mark_begin(heap: [str], roots: [int]) -> [[str]] {
+    let metrics: [str] = ["1", "0", "0", "0"];
+    return sh_mark_begin_with_metrics(heap, roots, metrics);
+}
+
+func sh_mark_idle(heap: [str], metrics: [str]) -> [[str]] {
+    mut gc_metrics: [str] = metrics;
+    gc_metrics[0] = "0";
+    return [heap, [], gc_metrics];
+}
+
+func sh_mark_finish(state: [[str]]) -> [[str]] {
+    if array_len(state) < 3 { return state; }
+    let swept: [str] = sh_sweep(state[0]);
+    mut metrics: [str] = state[2];
+    metrics[0] = "0";
+    metrics[1] = "0";
+    metrics[2] = to_str(int_from_str(metrics[2]) + 1);
+    return [swept, [], metrics];
+}
+
+func sh_gc_stats(state: [[str]]) -> [int] {
+    if array_len(state) < 3 { return [0, 0, 0, 0, 0]; }
+    let metrics: [str] = state[2];
+    let active: int = metrics[0] == "1" ? 1 : 0;
+    return [int_from_str(metrics[1]), int_from_str(metrics[2]),
+            int_from_str(metrics[3]), active, array_len(state[1])];
 }
 
 func sh_mark_pending(state: [[str]]) -> int {
@@ -289,7 +322,13 @@ func sh_alloc_incremental(state: [[str]], kind: str, payload: str,
         next[id * 5 + 1] = "1";
         work = array_concat(work, [to_str(id)]);
     }
-    return [next, work, state[2]];
+    mut metrics: [str] = state[2];
+    let allocated_since_gc: int = int_from_str(metrics[1]);
+    if allocated_since_gc < 512 {
+        metrics[1] = to_str(allocated_since_gc + 1);
+    }
+    metrics[3] = to_str(int_from_str(metrics[3]) + required);
+    return [next, work, metrics];
 }
 
 func sh_write_barrier(state: [[str]], destination: int,
