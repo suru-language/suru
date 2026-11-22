@@ -45,7 +45,8 @@ type NAstNodeAttachment {
 }
 
 func na_make(kind: str, line: int, text: str) -> NAstNode {
-    return NAstNode(kind, line, text, []);
+    let roots: [int] = [];
+    return NAstNode(kind, line, text, roots);
 }
 
 func na_with_roots(node: NAstNode, roots: [int]) -> NAstNode {
