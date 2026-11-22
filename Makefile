@@ -65,7 +65,8 @@ SELFHOST_DRIVERS = tests/selfhost/lexer_driver.suru \
 	tests/selfhost/natural_module_driver.suru \
 	tests/selfhost/natural_effect_driver.suru \
 	tests/selfhost/effect_runtime_driver.suru \
-	tests/selfhost/natural_bytecode_driver.suru
+	tests/selfhost/natural_bytecode_driver.suru \
+	tests/selfhost/natural_bytecode_after_frontend_driver.suru
 SELFHOST_REF = $(UNITDIR)/selfhost_reference_lexer
 
 all: $(BINDIR)/suru
