@@ -387,21 +387,23 @@ white child. The regression driver exercises shared references, unreachable
 cycles, exception causes, dropping roots, full reclamation, slot reuse,
 incremental root discovery, allocation shading, and the write barrier.
 
-The SURU-written interpreter in `natural_vm.suru` now stores bytecode
-arrays and records as managed heap handles. Array/field reads and writes
-dereference those handles; nested aggregate references are recorded in the
+The SURU-written interpreter in `natural_vm.suru` now stores text
+constants/results, bytecode arrays, and records as managed heap handles.
+String concatenation, comparisons, printing/conversion, length, substring, and
+contains operations resolve managed strings through the heap. Array/field reads
+and writes dereference handles; nested object references are recorded in the
 object graph, and shared aliases observe mutations through the same handle.
-Before aggregate allocation the interpreter seeds the collector from its
-operand stack and all active call-frame locals. Inline arrays remain temporarily
-for closure capture environments, while strings and exception values still use
-their transitional tagged-string representations.
+Before object allocation the interpreter seeds the collector from its operand
+stack and all active call-frame locals. Inline arrays remain temporarily for
+closure capture environments, and exception records still use their
+transitional inline representation.
 
 This remains a Stage 2 port, not a replacement for `src/mem.c` or the default
 C VM: the SURU interpreter itself still runs under the Stage 0 C17 VM. The
-current interpreter performs a full SURU heap collection before aggregate
-allocation; integrating incremental slices with the mutator, moving closure,
-exception and string values onto managed objects, porting allocation accounting,
-and making the native/default runtime independent of C remain open work.
+current interpreter performs a full SURU heap collection before object
+allocation; integrating incremental slices with every mutator, moving closure
+and exception values onto managed objects, porting allocation accounting, and
+making the native/default runtime independent of C remain open work.
 The next Stage 1 AST increment adds `NAstModule`, a typed collection of
 `NAstNode` records with parse-error metadata. The statement parser's serialized
 nodes are rehydrated into the module array. The module driver is compared
