@@ -27,7 +27,7 @@ run_case() {
         fail=$((fail + 1))
         return
     fi
-    if ! s=$(SURU_GC_ALLOC_INTERVAL=1000000 SURU_GC_THRESHOLD=1099511627776 "$SURU" run "$DIR/natural_vm_driver.suru" \
+    if ! s=$("$SURU" run "$DIR/natural_vm_driver.suru" \
             "$tmp/$name.sbc" 2>&1); then
         echo "FAIL $name: SURU VM failed: [$s]" >&2
         fail=$((fail + 1))
@@ -68,7 +68,7 @@ if "$SURU" --syntax=natural compile "$ROOT/tests/natural/control_valid.suru" \
         "$tmp/control_valid.sbc" 2>/dev/null; then
     tests=$((tests + 1))
     c=$("$SURU" exec "$tmp/control_valid.sbc" 2>&1)
-    s=$(SURU_GC_ALLOC_INTERVAL=1000000 SURU_GC_THRESHOLD=1099511627776 "$SURU" run "$DIR/natural_vm_driver.suru" \
+    s=$("$SURU" run "$DIR/natural_vm_driver.suru" \
         "$tmp/control_valid.sbc" 2>&1)
     if [ "$s" != "$c" ]; then
         echo "FAIL control_valid: C=[$c] SURU=[$s]" >&2
