@@ -305,5 +305,14 @@ The deferred self-rebuild identity gate (rebuilding the compiler twice yields
 byte-identical bytecode) still depends on the compiler itself being written in
 Natural syntax; the current build driver is a legacy host program that the
 Natural frontend does not accept, so self-compilation of the driver is not yet
-possible. That gate, together with the SURU VM/runtime/memory/GC port
-(Stage 2 remainder) and the native ELF64 backend (Stages 3-4), remain open.
+possible.
+
+The next Stage 1 increment scopes compiler slot and type markers by the active
+routine. This is required because parameter slots must remain ordered from
+zero within each function; a name first used in another routine must not
+change that mapping. The regression `tests/natural/per_function_slots.suru`
+uses `shared` as a parameter in two routines but places it at different
+parameter positions, and the build gate requires the SURU writer to match the
+reference bytecode and execute with the expected result. The full SURU VM,
+managed runtime/GC, native backend completion, and C-independent self-rebuild
+remain later acceptance gates.
