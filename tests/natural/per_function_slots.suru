@@ -1,4 +1,4 @@
-routine first(shared: Whole) -> Whole
+routine first(shared: Text) -> Text
     give shared
 end routine
 
