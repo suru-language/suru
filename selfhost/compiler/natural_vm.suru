@@ -450,7 +450,7 @@ func natural_run_module(bytes: str) -> int {
                 let parts: [str] = vm_arr_parts(sh_payload(heap, obj_id));
                 stack = vm_push(stack, parts[idx]);
             } else {
-                // Legacy inline arrays remain for closure capture environments.
+                // Legacy bytecode fixtures may still pass inline capture arrays.
                 let parts: [str] = vm_arr_parts(ar);
                 stack = vm_push(stack, parts[idx]);
             }
@@ -476,8 +476,8 @@ func natural_run_module(bytes: str) -> int {
                 heap = gc_state[0];
                 stack = vm_push(stack, ar);
             } else {
-                // Preserve the old immutable-inline update convention until all
-                // closure environments are represented by managed objects.
+                // Preserve immutable-inline update semantics for legacy closure fixtures;
+                // current closure environments use managed array handles.
                 let parts: [str] = vm_arr_parts(ar);
                 let cnt: int = array_len(parts);
                 parts[idx] = val;
@@ -564,8 +564,8 @@ func natural_run_module(bytes: str) -> int {
                     callee = args;
                 }
             } else {
-                // Transitional compatibility for inline closures from older
-                // bytecode fixtures while all closure objects move to handles.
+                // Transitional compatibility for older bytecode fixtures that still
+                // encode closure values inline rather than as managed handles.
                 let bar: int = nbc_find(cl, "|");
                 fid2 = bar < 0 ?
                     int_from_str(substr(cl, 1, str_len(cl) - 1)) :
