@@ -24,6 +24,9 @@ for input in "$ROOT"/tests/natural/*.suru; do
         tests=$((tests + 1))
         if ! cmp -s "$tmp/c.sbc" "$tmp/b.sbc"; then
             echo "FAIL: build output differs from C on $(basename "$input")" >&2
+            echo "  C bytes: $(wc -c < "$tmp/c.sbc"), SURU bytes: $(wc -c < "$tmp/b.sbc")" >&2
+            echo "  first differing offsets (1-based):" >&2
+            cmp -l "$tmp/c.sbc" "$tmp/b.sbc" | head -20 >&2 || true
             fail=$((fail + 1))
         fi
     fi
