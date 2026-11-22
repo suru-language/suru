@@ -4,11 +4,11 @@
 // emitting output through SURU's own print/println. Differential parity with
 // the C VM is the acceptance gate.
 //
-// Interpreter values use tagged strings for immediates and text. Arrays and
-// records use "H"<stable heap handle>; closure capture environments and
-// exception records retain transitional inline encodings. The SURU heap traces
-// handles from the operand stack, all call-frame locals, closure environments,
-// and exception causes before aggregate allocation.
+// Interpreter immediates use tagged strings. Text, arrays, and records use
+// "H"<stable heap handle>; closure capture environments and exception records
+// retain transitional inline encodings. The SURU heap traces handles from the
+// operand stack, all call-frame locals, closure environments, and exception
+// causes before object allocation.
 
 use "natural_module_reader.suru";
 use "../runtime/heap.suru";
