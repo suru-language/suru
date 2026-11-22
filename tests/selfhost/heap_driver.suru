@@ -204,6 +204,60 @@ func main() {
         println("FAIL GC completion counters"); exit(1);
     }
 
-    println("SURU heap: reachability, cycles, write barrier, root reseeding, allocation shading and sweep passed");
+    // The production VM counts the allocation about to happen: 511 prior
+    // allocations do not trigger; the 512th allocation does.
+    let interval_510: [[str]] = sh_mark_idle(empty_heap,
+        ["0", "510", "0", "0", "1048576", "1048576", "0"]);
+    let interval_511: [[str]] = sh_mark_idle(empty_heap,
+        ["0", "511", "0", "0", "1048576", "1048576", "0"]);
+    if sh_gc_should_collect(interval_510, 512) or
+       not sh_gc_should_collect(interval_511, 512) {
+        println("FAIL 512-allocation GC interval"); exit(1);
+    }
+
+    // The byte threshold is an independent trigger, even before the interval.
+    let threshold_heap: [str] = sh_alloc([], "str",
+        "0123456789012345678901234567890123456789", no_children);
+    let under_threshold: [[str]] = sh_mark_idle(threshold_heap,
+        ["0", "0", "0", "0", "80", "64", "0"]);
+    let over_threshold: [[str]] = sh_mark_idle(threshold_heap,
+        ["0", "0", "0", "0", "79", "64", "0"]);
+    if sh_gc_should_collect(under_threshold, 512) or
+       not sh_gc_should_collect(over_threshold, 512) {
+        println("FAIL live-byte GC threshold"); exit(1);
+    }
+
+    // A threshold-triggered collection reclaims dead objects, records the
+    // cycle, and grows the next threshold to four times the surviving set.
+    mut adaptive_heap: [str] = [];
+    adaptive_heap = sh_alloc(adaptive_heap, "str", "r", no_children);
+    adaptive_heap = sh_alloc(adaptive_heap, "str", "g1", no_children);
+    adaptive_heap = sh_alloc(adaptive_heap, "str", "g2", no_children);
+    adaptive_heap = sh_alloc(adaptive_heap, "str", "g3", no_children);
+    let adaptive_metrics: [str] = [
+        "0", "0", "0", "0", "1048576", "64", "0"
+    ];
+    mut adaptive_state: [[str]] = sh_mark_idle(adaptive_heap, adaptive_metrics);
+    adaptive_state = sh_gc_advance(adaptive_state, [0], 512, 16);
+    let adaptive_stats: [int] = sh_gc_stats(adaptive_state);
+    if adaptive_stats[0] != 0 or adaptive_stats[1] != 1 or
+       adaptive_stats[3] != 0 or sh_live_count(adaptive_state[0]) != 1 or
+       adaptive_stats[5] != 192 {
+        println("FAIL adaptive GC threshold/sweep"); exit(1);
+    }
+
+    // High survival ratios retain the existing threshold to avoid thrashing.
+    let retained_threshold: int = sh_gc_next_threshold(100, 80,
+        1024, 64, 4096);
+    let expanded_threshold: int = sh_gc_next_threshold(500, 80,
+        1024, 64, 4096);
+    let clamped_threshold: int = sh_gc_next_threshold(9000, 2000,
+        1024, 64, 4096);
+    if retained_threshold != 1024 or expanded_threshold != 320 or
+       clamped_threshold != 4096 {
+        println("FAIL adaptive threshold headroom/clamps"); exit(1);
+    }
+
+    println("SURU heap: reachability, cycles, barriers, size classes, allocation accounting and GC threshold policy passed");
     exit(0);
 }
