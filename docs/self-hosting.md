@@ -332,8 +332,8 @@ atom/unary/binary/conditional/array/index/field/call node graph. The statement
 collector still identifies statement boundaries from source lines; replacing
 that remaining source-shaped collection with the typed module AST is the next
 compiler increment. `tests/natural/typed_expression_lowering.suru` exercises
-precedence, unary negation, ternary selection, arrays/indexing, records/fields,
-string concatenation, builtins, and exact bytecode parity against the reference
+operator precedence, ternary selection, arrays/indexing, records/fields, string
+concatenation, builtins, and exact bytecode parity against the reference
 compiler.
 
 
@@ -349,6 +349,17 @@ The Stage 1 CLI gate checks byte-identical output against the reference
 compiler, check/run behavior, module execution, and paths containing spaces.
 The corpus-wide build parity gate now exercises the public
 `--compiler=selfhost` interface instead of invoking the driver directly.
+
+The exact-revision Stage 1 workflow passed all gates on
+`cfa5e7faa41d342051986536fba482c1ca6a9e53`
+([run 45011111835](https://github.com/suru-language/suru/actions/runs/45011111835)).
+The self-hosted bytecode builder currently accepts **19** of the **59** Natural
+fixtures that the Stage-0 compiler accepts; the remaining **40** are reported
+explicitly as unsupported by `natural_build_run.sh`. Five additional Natural
+fixtures are rejected by the Stage-0 reference and are not counted as supported
+compiler inputs. This is a measured partial-compiler milestone, not full
+language parity or C independence.
+
 
 
 The first Stage 1 slot-isolation increment is implemented on the
