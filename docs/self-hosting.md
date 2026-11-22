@@ -507,3 +507,13 @@ per-allocation mark-slice scheduler; it does not claim that the SURU VM has
 adopted the production C VM's 512-allocation / live-byte collection trigger.
 Keeping those acceptance questions separate makes a failure attributable to
 root coverage rather than a change in collection scheduling.
+
+
+The SURU VM now invokes the same allocation-trigger policy as the production
+collector: a cycle begins when the current allocation reaches the 512-object
+interval or logical live reservations exceed the 1 MiB starting threshold.
+Marking advances in 128-object slices at allocation safepoints. New allocations
+during an active cycle are shaded, and each slice republishes roots from the
+operand stack and every active frame. The 520-allocation suspended-caller
+fixture therefore exercises the production scheduling path, not just a
+manually forced mark cycle.
