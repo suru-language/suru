@@ -255,8 +255,9 @@ func sh_mark_finish(state: [[str]]) -> [[str]] {
     metrics[0] = "0";
     metrics[1] = "0";
     metrics[2] = to_str(int_from_str(metrics[2]) + 1);
-    let no_work: [str] = [];
-    return [swept, no_work, metrics];
+    // The mark queue is already drained; reuse it rather than allocating a
+    // second empty array while finishing a collection.
+    return [swept, state[1], metrics];
 }
 
 func sh_gc_stats(state: [[str]]) -> [int] {
