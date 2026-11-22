@@ -266,8 +266,9 @@ The bytecode object-emitting half is now owned by SURU:
   is accepted by the full build pipeline (writer/build/verifier/reader gates
   all include it), and now **executes** on the default C path, emitting the
   expected comma-separated token stream (`natural_tokenizer_run.sh`). Local
-  variable names in the seed are unique across routines to avoid a known
-  emitter limitation (global slot namespace). The SURU VM was extended with the
+  variable names in the seed were initially unique across routines to avoid a
+  global slot namespace limitation; Stage 1 now scopes slot/type markers by
+  routine and adds a regression for repeated parameter names. The SURU VM was extended with the
   string/boolean builtins this program uses (`str_len`, `substr`,
   `str_contains`, `bit_and`, `bit_or`, `eq_s`), and the tokenizer now also
   **executes on the SURU VM** matching the C path; it is included in the VM
@@ -279,13 +280,13 @@ The bytecode object-emitting half is now owned by SURU:
   fixture and was dropped.) Executing it on the SURU VM is still unstable due to
   the host GC aliasing bug, which remains the main blocker for running a
   compiler written in Natural end-to-end. A root cause for one execution
-  failure was diagnosed: the legacy bytecode emitter uses a **global slot
-  namespace** (`#slot|name|`), so two routines that use the same local/param
-  name collide on one frame slot (e.g. `tokenize`'s local `c` aliases
-  `is_letter`'s parameter). A per-function slot-scoping fix was implemented but
-  exposed a separate latent writer bug (unresolved `@label` jumps in
-  exception-heavy bodies with `PUSH_HANDLER`), so it was reverted to keep the
-  suite green; fixing both is follow-up work. The bootstrap/rebuild loop
+  failure was traced to the legacy bytecode emitter's global slot namespace:
+  a name reused in another routine could receive a slot ID that violated that
+  routine's parameter ordering. Stage 1 now scopes `#slot` and `#type`
+  markers by the active routine. The module writer continues to compact slots
+  independently per function, and `tests/natural/per_function_slots.suru`
+  verifies that a parameter reused at a different position in another routine
+  preserves correct argument order. The bootstrap/rebuild loop
   (`selfhost-bootstrap` builds the SURU-written compiler driver into
   `build/bin/natural_compiler.sbc`; `selfhost-rebuild` runs it and requires
   output byte-identical to the C reassembly path) is now part of `make test`. (A native array attempt required a second loadable segment, which
@@ -307,12 +308,11 @@ Natural syntax; the current build driver is a legacy host program that the
 Natural frontend does not accept, so self-compilation of the driver is not yet
 possible.
 
-The next Stage 1 increment scopes compiler slot and type markers by the active
-routine. This is required because parameter slots must remain ordered from
-zero within each function; a name first used in another routine must not
-change that mapping. The regression `tests/natural/per_function_slots.suru`
-uses `shared` as a parameter in two routines but places it at different
-parameter positions, and the build gate requires the SURU writer to match the
-reference bytecode and execute with the expected result. The full SURU VM,
-managed runtime/GC, native backend completion, and C-independent self-rebuild
-remain later acceptance gates.
+The first Stage 1 slot-isolation increment is implemented on the
+`stage1-per-function-slots` branch. Compiler slot and type markers are scoped
+by the active routine, keeping parameter slots ordered from zero within each
+function. The regression `tests/natural/per_function_slots.suru` reuses
+`shared` as a parameter at different positions in two routines; the build
+gate compares SURU-writer bytecode with the reference and executes the result.
+The full SURU VM, managed runtime/GC, native backend completion, and
+C-independent self-rebuild remain later acceptance gates.
