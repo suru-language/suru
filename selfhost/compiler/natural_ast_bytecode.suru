@@ -1,5 +1,6 @@
-// First module-AST-driven bytecode collector.
-// The supported slice is typed routines, local bindings/assignments, show and give.
+// Module-AST-driven Stage 1 bytecode collector.
+// Supports typed routines, bindings, assignments, show/give, control flow,
+// each array/range loops, and indexed array stores.
 // The legacy source collector remains the reference for other constructs.
 use "natural_ast_module.suru";
 use "natural_bytecode.suru";
