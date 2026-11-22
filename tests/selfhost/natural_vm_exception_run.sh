@@ -13,7 +13,7 @@ if ! c="$("$SURU" exec "$tmp/exception.sbc" 2>&1)"; then
     echo "FAIL managed exception: C VM failed: [$c]" >&2
     exit 1
 fi
-if ! s="$("$SURU" run "$DIR/natural_vm_driver.suru" "$tmp/exception.sbc" 2>&1)"; then
+if ! s="$(SURU_GC_ALLOC_INTERVAL=1000000 "$SURU" run "$DIR/natural_vm_driver.suru" "$tmp/exception.sbc" 2>&1)"; then
     echo "FAIL managed exception: SURU VM failed: [$s]" >&2
     exit 1
 fi
