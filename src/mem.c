@@ -35,12 +35,16 @@ typedef struct s_freed_debug {
     s_u64 collection;
 } s_freed_debug;
 
-static s_freed_debug s_freed_ring[8192];
+#define SU_GC_DEBUG_FREED_HISTORY (1u << 20)
+static s_freed_debug s_freed_ring[SU_GC_DEBUG_FREED_HISTORY];
 static s_size s_freed_ring_next;
 
 static const s_freed_debug *debug_find_freed(const void *pointer) {
-    for (s_size i = 0; i < sizeof(s_freed_ring) / sizeof(s_freed_ring[0]); ++i) {
-        if (s_freed_ring[i].pointer == pointer) return &s_freed_ring[i];
+    /* Search newest-first in case the same chunk address was recycled. */
+    for (s_size i = 0; i < SU_GC_DEBUG_FREED_HISTORY; ++i) {
+        s_size index = (s_freed_ring_next + SU_GC_DEBUG_FREED_HISTORY - 1 - i) %
+                       SU_GC_DEBUG_FREED_HISTORY;
+        if (s_freed_ring[index].pointer == pointer) return &s_freed_ring[index];
     }
     return NULL;
 }
@@ -425,7 +429,7 @@ static void free_object(s_heap *h, s_gcobj *o) {
             o, (s_u32)o->kind, (s_u32)o->count, h->collections
         };
         s_freed_ring_next = (s_freed_ring_next + 1) %
-            (sizeof(s_freed_ring) / sizeof(s_freed_ring[0]));
+            SU_GC_DEBUG_FREED_HISTORY;
     }
     h->live_objects--;
     h->live_bytes -= o->chunk_size;
