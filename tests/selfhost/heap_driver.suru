@@ -216,7 +216,8 @@ func main() {
     }
 
     // The byte threshold is an independent trigger, even before the interval.
-    let threshold_heap: [str] = sh_alloc([], "str",
+    let empty_threshold_heap: [str] = [];
+    let threshold_heap: [str] = sh_alloc(empty_threshold_heap, "str",
         "0123456789012345678901234567890123456789", no_children);
     let under_threshold: [[str]] = sh_mark_idle(threshold_heap,
         ["0", "0", "0", "0", "80", "64", "0"]);
