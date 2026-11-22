@@ -348,7 +348,8 @@ func net_builtin_call(name: str, args: [str]) -> [str] {
 
 func net_check_expression(source: str, names: [str], types: [str],
                           field_names: [str], field_types: [str]) -> int {
-    let parsed = nea_parse_expression(source, 0, 0, []);
+    let empty_nodes: [str] = [];
+    let parsed = nea_parse_expression(source, 0, 0, empty_nodes);
     if nea_is_ok(parsed) == false {
         println("type-error|" + nea_message(parsed));
         return 1;
