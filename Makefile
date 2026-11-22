@@ -115,13 +115,17 @@ determinism-test: $(BINDIR)/suru
 		echo "determinism: bytecode outputs match"
 
 .PHONY: test
-test: unit integration selfhost-test
+test: unit selfhost-test integration
 
 .PHONY: selfhost-check
 selfhost-check: $(BINDIR)/suru $(SELFHOST_SRC) $(SELFHOST_DRIVERS)
 	@$(foreach d,$(SELFHOST_DRIVERS), \
 		echo "check $(d)"; \
-		$(BINDIR)/suru check "$(d)" >/dev/null || exit 1; )
+		if [ "$(d)" = "tests/selfhost/natural_bytecode_driver.suru" ]; then \
+			$(BINDIR)/suru check "$(d)" || { echo "selfhost-check failed: $(d)" >&2; exit 1; }; \
+		else \
+			$(BINDIR)/suru check "$(d)" || { echo "selfhost-check failed: $(d)" >&2; exit 1; }; \
+		fi; )
 
 $(SELFHOST_REF): tests/selfhost/reference_lexer.c $(LIBOBJ) | $(UNITDIR)
 	$(CC) $(CFLAGS) -Itests/unit $< $(LIBOBJ) $(LDFLAGS) -o $@
@@ -146,6 +150,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_compile_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_verify_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_build_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_cli_selfhost_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_reader_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_corpus_run.sh $(BINDIR)/suru

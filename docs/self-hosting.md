@@ -304,9 +304,63 @@ The bytecode object-emitting half is now owned by SURU:
 
 The deferred self-rebuild identity gate (rebuilding the compiler twice yields
 byte-identical bytecode) still depends on the compiler itself being written in
-Natural syntax; the current build driver is a legacy host program that the
-Natural frontend does not accept, so self-compilation of the driver is not yet
-possible.
+Natural syntax; the current build driver is a legacy-syntax SURU program that
+the Natural frontend does not accept, so self-compilation of the driver is not
+yet possible.
+
+### Stage 1: public self-hosted compiler entry point
+
+The C17 CLI now exposes the SURU-written Stage 1 bytecode compiler explicitly:
+
+```text
+suru --syntax=natural --compiler=selfhost check source.suru
+suru --syntax=natural --compiler=selfhost compile source.suru output.sbc
+suru --syntax=natural --compiler=selfhost run source.suru
+```
+
+This route runs `tests/selfhost/natural_build_driver.suru` under the Stage 0
+C17 VM. That SURU driver performs the Natural frontend checks, emits bytecode,
+runs the SURU-written verifier, and serializes the module with the SURU module
+writer. The default Natural CLI route remains the C reference implementation
+until the self-hosted route reaches complete language and diagnostic parity.
+The native backend is not yet part of this flag; it remains a separate Stage 3
+path.
+
+Expression lowering in `natural_bytecode.suru` now parses each expression
+through `natural_expression_ast.suru` and recursively lowers the resulting
+atom/unary/binary/conditional/array/index/field/call node graph. The statement
+collector still identifies statement boundaries from source lines; replacing
+that remaining source-shaped collection with the typed module AST is the next
+compiler increment. `tests/natural/typed_expression_lowering.suru` exercises
+operator precedence, ternary selection, arrays/indexing, records/fields, string
+concatenation, builtins, and exact bytecode parity against the reference
+compiler.
+
+
+The C17 bytecode compiler now publishes every function's name and
+parameter count before verifying individual function bodies. This is required
+for forward calls: the verifier uses the callee's parameter count to compute
+the caller's stack effect even when the callee appears later in source order.
+`tests/integration/forward_call_late_declaration.suru` keeps a three-argument
+forward call inside a loop so a missing signature prepass is caught as a
+branch-stack merge mismatch.
+
+The Stage 1 CLI gate checks byte-identical output against the reference
+compiler, check/run behavior, module execution, and paths containing spaces.
+The corpus-wide build parity gate now exercises the public
+`--compiler=selfhost` interface instead of invoking the driver directly.
+
+The exact-revision Stage 1 workflow passed all gates on
+`cfa5e7faa41d342051986536fba482c1ca6a9e53`
+([run 45011111835](https://github.com/suru-language/suru/actions/runs/45011111835)).
+The self-hosted bytecode builder currently accepts **19** of the **59** Natural
+fixtures that the Stage-0 compiler accepts; the remaining **40** are reported
+explicitly as unsupported by `natural_build_run.sh`. Five additional Natural
+fixtures are rejected by the Stage-0 reference and are not counted as supported
+compiler inputs. This is a measured partial-compiler milestone, not full
+language parity or C independence.
+
+
 
 The first Stage 1 slot-isolation increment is implemented on the
 `stage1-per-function-slots` branch. Compiler slot and type markers are scoped

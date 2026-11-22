@@ -2,6 +2,8 @@
 // Pass one collects instructions and symbolic labels. Pass two removes labels
 // and resolves every branch/handler target to a native instruction index.
 
+use "natural_expression_ast.suru";
+
 func nbc_word(line: str) -> str {
     mut i: int = 0;
     while i < str_len(line) and line[i] != " " and line[i] != "\t" { i += 1; }
@@ -599,191 +601,281 @@ func nbc_collect_functions(instructions: [str], lines: [str]) -> [str] {
     return result;
 }
 
-func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
+func nbc_ast_children(nodes: [str], node: int) -> [int] {
+    let empty_children: [int] = [];
+    if node < 0 or node >= array_len(nodes) / 3 { return empty_children; }
+    let encoded: str = nodes[node * 3 + 2];
+    if encoded == "" { return empty_children; }
+    let parts: [str] = str_split(encoded, ",");
+    mut children: [int] = [];
+    mut i: int = 0;
+    while i < array_len(parts) {
+        children = array_concat(children, [int_from_str(parts[i])]);
+        i += 1;
+    }
+    return children;
+}
+
+func nbc_ast_kind(nodes: [str], node: int) -> str {
+    if node < 0 or node >= array_len(nodes) / 3 { return ""; }
+    return nodes[node * 3];
+}
+
+func nbc_ast_value(nodes: [str], node: int) -> str {
+    if node < 0 or node >= array_len(nodes) / 3 { return ""; }
+    return nodes[node * 3 + 1];
+}
+
+func nbc_ast_type(instructions: [str], nodes: [str], node: int) -> str {
+    let kind: str = nbc_ast_kind(nodes, node);
+    let value: str = nbc_ast_value(nodes, node);
+    let children: [int] = nbc_ast_children(nodes, node);
+    if kind == "atom" {
+        if nbc_is_integer(value) { return "Whole"; }
+        if nbc_is_float(value) { return "Real"; }
+        if value == "true" or value == "false" { return "Truth"; }
+        if value == "none" { return "Unit"; }
+        if str_len(value) >= 2 and value[0] == "\"" { return "Text"; }
+        return nbc_find_type(instructions, value);
+    }
+    if kind == "unary" {
+        if array_len(children) == 0 { return ""; }
+        return nbc_ast_type(instructions, nodes, children[0]);
+    }
+    if kind == "binary" {
+        if value == "==" or value == "!=" or value == "<" or
+           value == "<=" or value == ">" or value == ">=" or
+           value == "and" or value == "or" {
+            return "Truth";
+        }
+        if array_len(children) < 2 { return ""; }
+        let left_type: str = nbc_ast_type(instructions, nodes, children[0]);
+        let right_type: str = nbc_ast_type(instructions, nodes, children[1]);
+        if value == "+" and (left_type == "Text" or right_type == "Text") {
+            return "Text";
+        }
+        if left_type == "Real" or right_type == "Real" { return "Real"; }
+        return "Whole";
+    }
+    if kind == "array" { return "Array"; }
+    if kind == "call" {
+        if array_len(children) == 0 { return ""; }
+        let callee: str = nbc_ast_value(nodes, children[0]);
+        if callee == "to_str" or callee == "read_line" or
+           callee == "substr" or callee == "read_file" or callee == "args" {
+            return "Text";
+        }
+        if callee == "str_contains" { return "Truth"; }
+        if callee == "str_len" or callee == "array_len" or
+           callee == "str_compare" { return "Whole"; }
+    }
+    return "";
+}
+
+func nbc_ast_emit_arguments(instructions: [str], nodes: [str],
+                            children: [int], first: int) -> [str] {
     mut result: [str] = instructions;
-    mut text: str = str_trim(nbc_outer_parens(str_trim(expression)));
-    let ternary = nbc_split_ternary(text);
-    if ternary[0] != "" {
+    mut i: int = first;
+    while i < array_len(children) {
+        result = nbc_emit_ast_node(result, nodes, children[i]);
+        i += 1;
+    }
+    return result;
+}
+
+func nbc_emit_ast_node(instructions: [str], nodes: [str], node: int) -> [str] {
+    let kind: str = nbc_ast_kind(nodes, node);
+    let value: str = nbc_ast_value(nodes, node);
+    let children: [int] = nbc_ast_children(nodes, node);
+    mut result: [str] = instructions;
+
+    if kind == "atom" {
+        if nbc_is_integer(value) {
+            return nbc_const(result, "int", "BC_CONST_INT", value);
+        }
+        if nbc_is_float(value) {
+            return nbc_const(result, "float", "BC_CONST_FLOAT", value);
+        }
+        if value == "true" or value == "false" {
+            return nbc_const(result, "int", "BC_CONST_INT",
+                             value == "true" ? "1" : "0");
+        }
+        if value == "none" { return nbc_emit(result, "BC_CONST_NONE", ""); }
+        if str_len(value) >= 2 and value[0] == "\"" and
+           value[str_len(value) - 1] == "\"" {
+            return nbc_const(result, "str", "BC_CONST_STR", value);
+        }
+        if nbc_is_variant(result, value) {
+            let tag: int = nbc_variant_tag(result, nbc_variant_choice(result, value), value);
+            return nbc_const(result, "int", "BC_CONST_INT", to_str(tag));
+        }
+        let slot: int = nbc_slot(result, value);
+        if slot >= 0 { return nbc_emit(result, "BC_LD_LOCAL", to_str(slot)); }
+        return nbc_emit(result, "BC_TRAP", "unknown expression: " + value);
+    }
+
+    if kind == "unary" {
+        if array_len(children) != 1 {
+            return nbc_emit(result, "BC_TRAP", "invalid unary expression AST");
+        }
+        let child: int = children[0];
+        result = nbc_emit_ast_node(result, nodes, child);
+        if value == "-" {
+            return nbc_emit(result,
+                nbc_ast_type(instructions, nodes, child) == "Real"
+                    ? "BC_NEG_F" : "BC_NEG_I", "");
+        }
+        if value == "not" { return nbc_emit(result, "BC_NOT", ""); }
+        if value == "~" { return nbc_emit(result, "BC_BIT_NOT", ""); }
+        return nbc_emit(result, "BC_TRAP", "unsupported unary operator: " + value);
+    }
+
+    if kind == "binary" {
+        if array_len(children) != 2 {
+            return nbc_emit(result, "BC_TRAP", "invalid binary expression AST");
+        }
+        let left: int = children[0];
+        let right: int = children[1];
+        let left_type: str = nbc_ast_type(instructions, nodes, left);
+        let right_type: str = nbc_ast_type(instructions, nodes, right);
+        result = nbc_emit_ast_node(result, nodes, left);
+        result = nbc_emit_ast_node(result, nodes, right);
+        if value == "and" { return nbc_emit(result, "BC_BIT_AND", ""); }
+        if value == "or" { return nbc_emit(result, "BC_BIT_OR", ""); }
+        if value == "|" { return nbc_emit(result, "BC_BIT_OR", ""); }
+        if value == "^" { return nbc_emit(result, "BC_BIT_XOR", ""); }
+        if value == "&" { return nbc_emit(result, "BC_BIT_AND", ""); }
+        if value == "<<" { return nbc_emit(result, "BC_SHL", ""); }
+        if value == ">>" { return nbc_emit(result, "BC_SHR", ""); }
+
+        if value == "==" or value == "!=" or value == "<" or
+           value == "<=" or value == ">" or value == ">=" {
+            mut suffix: str = "I";
+            if left_type == "Text" and right_type == "Text" { suffix = "S"; }
+            else if left_type == "Real" or right_type == "Real" { suffix = "F"; }
+            mut op: str = "BC_EQ_" + suffix;
+            if value == "!=" { op = "BC_NE_" + suffix; }
+            if value == "<" { op = "BC_LT_" + suffix; }
+            if value == "<=" { op = "BC_LE_" + suffix; }
+            if value == ">" { op = "BC_GT_" + suffix; }
+            if value == ">=" { op = "BC_GE_" + suffix; }
+            return nbc_emit(result, op, "");
+        }
+
+        let real_case: bool = left_type == "Real" or right_type == "Real";
+        if value == "+" {
+            if left_type == "Text" or right_type == "Text" {
+                return nbc_emit(result, "BC_CONCAT_S", "");
+            }
+            return nbc_emit(result, real_case ? "BC_ADD_F" : "BC_ADD_I", "");
+        }
+        if value == "-" {
+            return nbc_emit(result, real_case ? "BC_SUB_F" : "BC_SUB_I", "");
+        }
+        if value == "*" {
+            return nbc_emit(result, real_case ? "BC_MUL_F" : "BC_MUL_I", "");
+        }
+        if value == "/" {
+            return nbc_emit(result, real_case ? "BC_DIV_F" : "BC_DIV_I", "");
+        }
+        if value == "%" { return nbc_emit(result, "BC_MOD_I", ""); }
+        return nbc_emit(result, "BC_TRAP", "unsupported binary operator: " + value);
+    }
+
+    if kind == "conditional" {
+        if array_len(children) != 3 {
+            return nbc_emit(result, "BC_TRAP", "invalid conditional expression AST");
+        }
         let base: int = array_len(result);
-        let else_label: str = "ternary-else-" + to_str(base);
-        let end_label: str = "ternary-end-" + to_str(base + 1);
-        result = nbc_emit_expression(result, ternary[0]);
+        let else_label: str = "ast-ternary-else-" + to_str(base);
+        let end_label: str = "ast-ternary-end-" + to_str(base + 1);
+        result = nbc_emit_ast_node(result, nodes, children[0]);
         result = nbc_emit(result, "BC_JZ", "@" + else_label);
-        result = nbc_emit_expression(result, ternary[1]);
+        result = nbc_emit_ast_node(result, nodes, children[1]);
         result = nbc_emit(result, "BC_JMP", "@" + end_label);
         result = nbc_label(result, else_label);
-        result = nbc_emit_expression(result, ternary[2]);
-        result = nbc_label(result, end_label);
-        return result;
+        result = nbc_emit_ast_node(result, nodes, children[2]);
+        return nbc_label(result, end_label);
     }
-    let logical = nbc_top_operator(text, [" or ", " and "]);
-    if int_from_str(logical[0]) >= 0 {
-        let at: int = int_from_str(logical[0]);
-        let op: str = logical[1];
-        result = nbc_emit_expression(result, substr(text, 0, at));
-        result = nbc_emit_expression(result,
-            substr(text, at + str_len(op), str_len(text)));
-        return nbc_emit(result, op == " and " ? "BC_BIT_AND" : "BC_BIT_OR", "");
-    }
-    let comparison = nbc_top_operator(text, [" == ", " != ", " <= ", " >= ", " < ", " > "]);
-    if int_from_str(comparison[0]) >= 0 {
-        let at: int = int_from_str(comparison[0]);
-        let op: str = comparison[1];
-        let left: str = str_trim(substr(text, 0, at));
-        let right: str = str_trim(substr(text, at + str_len(op), str_len(text)));
-        result = nbc_emit_expression(result, left);
-        result = nbc_emit_expression(result, right);
-        mut suffix: str = "I";
-        if nbc_is_text(result, left) and nbc_is_text(result, right) {
-            suffix = "S";
-        } else if nbc_is_real(result, left) or nbc_is_real(result, right) {
-            suffix = "F";
+
+    if kind == "array" {
+        mut i: int = 0;
+        while i < array_len(children) {
+            result = nbc_emit_ast_node(result, nodes, children[i]);
+            i += 1;
         }
-        mut byte_op: str = "BC_EQ_" + suffix;
-        if op == " != " { byte_op = "BC_NE_" + suffix; }
-        if op == " < " { byte_op = "BC_LT_" + suffix; }
-        if op == " <= " { byte_op = "BC_LE_" + suffix; }
-        if op == " > " { byte_op = "BC_GT_" + suffix; }
-        if op == " >= " { byte_op = "BC_GE_" + suffix; }
-        return nbc_emit(result, byte_op, "");
+        return nbc_emit(result, "BC_NEW_ARRAY", to_str(array_len(children)));
     }
-    let arithmetic = nbc_top_operator(text, [" + ", " - "]);
-    if int_from_str(arithmetic[0]) >= 0 {
-        let at: int = int_from_str(arithmetic[0]);
-        let op: str = arithmetic[1];
-        let left: str = str_trim(substr(text, 0, at));
-        let right: str = str_trim(substr(text, at + str_len(op), str_len(text)));
-        result = nbc_emit_expression(result, left);
-        result = nbc_emit_expression(result, right);
-        mut byte_op: str = "BC_ADD_I";
-        if op == " - " {
-            if nbc_is_real(result, left) or nbc_is_real(result, right) {
-                byte_op = "BC_SUB_F";
-            } else {
-                byte_op = "BC_SUB_I";
-            }
-        } else if nbc_is_text(result, left) or nbc_is_text(result, right) {
-            byte_op = "BC_CONCAT_S";
-        } else if nbc_is_real(result, left) or nbc_is_real(result, right) {
-            byte_op = "BC_ADD_F";
+
+    if kind == "field" {
+        if array_len(children) != 1 {
+            return nbc_emit(result, "BC_TRAP", "invalid field expression AST");
         }
-        return nbc_emit(result, byte_op, "");
-    }
-    let multiplicative = nbc_top_operator(text, [" * ", " / ", " % "]);
-    if int_from_str(multiplicative[0]) >= 0 {
-        let at: int = int_from_str(multiplicative[0]);
-        let op: str = multiplicative[1];
-        let left: str = str_trim(substr(text, 0, at));
-        let right: str = str_trim(substr(text, at + str_len(op), str_len(text)));
-        result = nbc_emit_expression(result, left);
-        result = nbc_emit_expression(result, right);
-        mut byte_op: str = "BC_MUL_I";
-        let real_case: bool = nbc_is_real(result, left) or nbc_is_real(result, right);
-        if op == " / " { byte_op = real_case ? "BC_DIV_F" : "BC_DIV_I"; }
-        else if op == " % " { byte_op = "BC_MOD_I"; }
-        else if real_case { byte_op = "BC_MUL_F"; }
-        return nbc_emit(result, byte_op, "");
-    }
-    if nbc_has_prefix(text, "-") {
-        let operand: str = substr(text, 1, str_len(text));
-        result = nbc_emit_expression(result, operand);
-        if nbc_is_float(operand) { return nbc_emit(result, "BC_NEG_F", ""); }
-        return nbc_emit(result, "BC_NEG_I", "");
-    }
-    if nbc_has_prefix(text, "not ") {
-        result = nbc_emit_expression(result, substr(text, 4, str_len(text)));
-        return nbc_emit(result, "BC_NOT", "");
-    }
-    if nbc_has_prefix(text, "~") {
-        result = nbc_emit_expression(result, substr(text, 1, str_len(text)));
-        return nbc_emit(result, "BC_BIT_NOT", "");
-    }
-    if str_contains(text, ".") {
-        let dot: int = nbc_find(text, ".");
-        if dot > 0 {
-            let base: str = str_trim(substr(text, 0, dot));
-            let field: str = str_trim(substr(text, dot + 1, str_len(text)));
-            let base_type: str = nbc_find_type(result, base);
-            if base_type != "" {
-                let recidx: int = nbc_record_index(result, base_type);
-                if recidx >= 0 {
-                    let fidx: int = nbc_field_index(result, base_type, field);
-                    if fidx >= 0 {
-                        result = nbc_emit_expression(result, base);
-                        return nbc_emit(result, "BC_FIELD_LD",
-                                        to_str(recidx) + "|" + to_str(fidx));
-                    }
-                }
-            }
+        let base: int = children[0];
+        let base_name: str = nbc_ast_value(nodes, base);
+        let base_type: str = nbc_find_type(instructions, base_name);
+        let record: int = nbc_record_index(instructions, base_type);
+        let field: int = nbc_field_index(instructions, base_type, value);
+        if record < 0 or field < 0 {
+            return nbc_emit(result, "BC_TRAP", "unknown record field: " + value);
         }
+        result = nbc_emit_ast_node(result, nodes, base);
+        return nbc_emit(result, "BC_FIELD_LD", to_str(record) + "|" + to_str(field));
     }
-    if str_len(text) >= 2 and text[0] == "[" and text[str_len(text) - 1] == "]" {
-        let inner: str = substr(text, 1, str_len(text) - 2);
-        if inner == "" { return nbc_emit(result, "BC_NEW_ARRAY", "0"); }
-        let elems: [str] = str_split(inner, ",");
-        let count: int = array_len(elems);
-        mut ei: int = 0;
-        while ei < count {
-            result = nbc_emit_expression(result, str_trim(elems[ei]));
-            ei += 1;
+
+    if kind == "index" {
+        if array_len(children) != 2 {
+            return nbc_emit(result, "BC_TRAP", "invalid index expression AST");
         }
-        return nbc_emit(result, "BC_NEW_ARRAY", to_str(count));
+        result = nbc_emit_ast_node(result, nodes, children[0]);
+        result = nbc_emit_ast_node(result, nodes, children[1]);
+        return nbc_emit(result, "BC_IDX_LD", "");
     }
-    if str_contains(text, "[") {
-        let bracket = nbc_find_postfix(text, "[", "]");
-        if int_from_str(bracket[0]) >= 0 and bracket[1] != "" {
-            result = nbc_emit_expression(result, bracket[1]);
-            result = nbc_emit_expression(result, bracket[2]);
-            return nbc_emit(result, "BC_IDX_LD", "");
+
+    if kind == "call" {
+        if array_len(children) == 0 {
+            return nbc_emit(result, "BC_TRAP", "call expression has no callee");
         }
-    }
-    let open: int = nbc_find(text, "(");
-    if open > 0 and text[str_len(text) - 1] == ")" {
-        let callee: str = str_trim(substr(text, 0, open));
-        let argument_text: str = str_trim(substr(text, open + 1,
-                                                  str_len(text) - open - 2));
+        let callee_node: int = children[0];
+        if nbc_ast_kind(nodes, callee_node) != "atom" {
+            return nbc_emit(result, "BC_TRAP", "unsupported call target");
+        }
+        let callee: str = nbc_ast_value(nodes, callee_node);
         if nbc_is_variant(result, callee) {
-            let vchoice: str = nbc_variant_choice(result, callee);
-            let vtag: int = nbc_variant_tag(result, vchoice, callee);
-            let vnargs: int = nbc_variant_nargs(result, vchoice, callee);
-            result = nbc_const(result, "int", "BC_CONST_INT", to_str(vtag));
-            if argument_text != "" {
-                result = nbc_emit_arguments(result, argument_text);
-            }
-            return nbc_emit(result, "BC_NEW_ARRAY", to_str(vnargs + 1));
+            let choice: str = nbc_variant_choice(result, callee);
+            let tag: int = nbc_variant_tag(result, choice, callee);
+            let nargs: int = nbc_variant_nargs(result, choice, callee);
+            result = nbc_const(result, "int", "BC_CONST_INT", to_str(tag));
+            result = nbc_ast_emit_arguments(result, nodes, children, 1);
+            return nbc_emit(result, "BC_NEW_ARRAY", to_str(nargs + 1));
         }
-        if argument_text != "" {
-            result = nbc_emit_arguments(result, argument_text);
-        }
+        result = nbc_ast_emit_arguments(result, nodes, children, 1);
         let builtin: int = nbc_builtin_index(callee);
         if builtin >= 0 { return nbc_emit(result, "BC_BUILTIN", to_str(builtin)); }
         let function: int = nbc_func_index(result, callee);
         if function >= 0 { return nbc_emit(result, "BC_CALL", to_str(function)); }
         return nbc_emit(result, "BC_TRAP", "unknown call: " + callee);
     }
-    if nbc_is_integer(text) {
-        return nbc_const(result, "int", "BC_CONST_INT", text);
+
+    if kind == "routine" {
+        return nbc_emit(result, "BC_TRAP", "routine expression lowering is not implemented");
     }
-    if nbc_is_float(text) {
-        return nbc_const(result, "float", "BC_CONST_FLOAT", text);
+    return nbc_emit(result, "BC_TRAP", "unknown typed expression node: " + kind);
+}
+
+func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
+    let empty_nodes: [str] = [];
+    let parsed = nea_parse_expression(expression, 0, 0, empty_nodes);
+    if nea_is_ok(parsed) == false {
+        return nbc_emit(instructions, "BC_TRAP",
+                        "typed expression parse failed: " + nea_message(parsed));
     }
-    if text == "true" or text == "false" {
-        return nbc_const(result, "int", "BC_CONST_INT", text == "true" ? "1" : "0");
+    let end = natural_next(expression, ne_skip_lines(expression, nea_next(parsed)));
+    if end.kind != NT_EOF {
+        return nbc_emit(instructions, "BC_TRAP",
+                        "typed expression has trailing token: " + end.text);
     }
-    if text == "none" {
-        return nbc_emit(result, "BC_CONST_NONE", "");
-    }
-    if str_len(text) >= 2 and text[0] == "\"" and text[str_len(text) - 1] == "\"" {
-        return nbc_const(result, "str", "BC_CONST_STR", text);
-    }
-    if nbc_is_variant(instructions, text) {
-        let tag: int = nbc_variant_tag(instructions,
-            nbc_variant_choice(instructions, text), text);
-        return nbc_const(result, "int", "BC_CONST_INT", to_str(tag));
-    }
-    let slot: int = nbc_slot(instructions, text);
-    if slot >= 0 { return nbc_emit(result, "BC_LD_LOCAL", to_str(slot)); }
-    return nbc_emit(result, "BC_TRAP", "unknown expression: " + text);
+    return nbc_emit_ast_node(instructions, nea_nodes(parsed), nea_root(parsed));
 }
 
 func nbc_expression_statement(instructions: [str], line: str) -> [str] {

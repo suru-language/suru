@@ -1,0 +1,12 @@
+func main() {
+    mut i = 0;
+    while i < 2 {
+        sum3(1, 2, 3);
+        i += 1;
+    }
+    println("forward-call-ok");
+}
+
+func sum3(a: int, b: int, c: int) -> int {
+    return a + b + c;
+}

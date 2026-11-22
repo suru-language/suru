@@ -1,0 +1,18 @@
+record Point
+    change x: Whole
+end record
+
+routine main() -> Unit
+    value arithmetic: Whole = 2 + 3 * 4
+    show(arithmetic)
+    value flag: Bool = true
+    value chosen: Whole = flag ? 10 : 20
+    show(chosen)
+    value xs: [Whole] = [4, 5, 6]
+    show(xs[1])
+    value p: Point = none
+    set p.x to 7
+    show(p.x)
+    value text: Text = "a" + "bc"
+    show(str_len(text))
+end routine

@@ -30,7 +30,8 @@ make asan       # AddressSanitizer build
 make ubsan      # UndefinedBehaviorSanitizer build
 make test       # run the full test suite
 make selfhost-check  # check the transitional SURU lexer module
-make selfhost-test   # differential lexer test against the C lexer
+make selfhost-test   # differential tests for the SURU-written compiler/VM
+suru --syntax=natural --compiler=selfhost compile hello.suru out.sbc
 ```
 
 A CMake build is also provided (gcc/clang on Linux/macOS, and the MSVC
@@ -86,10 +87,13 @@ constant folding.
 
 ## Status
 
-The legacy bootstrap has a working lexer/parser, semantic analysis (including
-generics), bytecode compiler with optimizer passes, bytecode verifier,
-stack-based VM, managed heap, standard library, CLI, and automated unit and
-integration tests. Natural Syntax 2.0 is specified and its transitional lexer
-gate passes; its parser and the SURU-native compiler/runtime are next-phase
-work. See `docs/document-a-2.0.md`, `docs/bootstrap.md`, and
-`docs/self-hosting.md` for the contracts and acceptance gates.
+The C17 Stage-0 reference compiler and VM remain the complete default
+toolchain. Natural Syntax 2.0 now has a SURU-written lexer, parser, semantic
+passes, typed expression AST, and a partial bytecode compiler. The CLI exposes
+`--syntax=natural --compiler=selfhost` to run that SURU-written compiler under
+the Stage-0 VM; the self-hosted path is differentially tested on its supported
+corpus but does not yet cover the full language. The SURU VM/runtime/GC port,
+complete compiler parity, native backend completeness, and C-independent
+self-rebuild remain in progress. See `docs/document-a-2.0.md`,
+`docs/bootstrap.md`, and `docs/self-hosting.md` for status and acceptance
+gates.
