@@ -30,7 +30,8 @@ make asan       # AddressSanitizer build
 make ubsan      # UndefinedBehaviorSanitizer build
 make test       # run the full test suite
 make selfhost-check  # check the transitional SURU lexer module
-make selfhost-test   # differential lexer test against the C lexer
+make selfhost-test   # differential tests for the SURU-written compiler/VM
+suru --syntax=natural --compiler=selfhost compile hello.suru out.sbc
 ```
 
 A CMake build is also provided (gcc/clang on Linux/macOS, and the MSVC
