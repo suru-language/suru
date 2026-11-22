@@ -14,6 +14,7 @@ trap 'rm -rf "$tmp"' EXIT
 fail=0
 tests=0
 accepted=0
+unsupported=0
 for input in "$ROOT"/tests/natural/*.suru; do
     if ! "$SURU" --syntax=natural compile "$input" "$tmp/c.sbc" 2>/dev/null; then
         continue
@@ -26,6 +27,9 @@ for input in "$ROOT"/tests/natural/*.suru; do
             echo "FAIL: build output differs from C on $(basename "$input")" >&2
             fail=$((fail + 1))
         fi
+    else
+        unsupported=$((unsupported + 1))
+        echo "UNSUPPORTED: self-hosted compiler does not yet accept $(basename "$input")" >&2
     fi
 done
 
@@ -76,5 +80,5 @@ else
     tests=$((tests + 1))
 fi
 
-echo "natural build driver: accepted=$accepted, $tests tests, $fail failures"
+echo "natural build driver: accepted=$accepted unsupported=$unsupported, $tests tests, $fail failures"
 [ "$fail" -eq 0 ]
