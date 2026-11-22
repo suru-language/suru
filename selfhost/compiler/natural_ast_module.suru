@@ -159,6 +159,43 @@ func nam_parse(source: str) -> [str] {
             continue;
         }
 
+        if first.text == "record" or first.text == "choice" {
+            if array_len(stack) != 0 {
+                return array_concat(["error", "ast-error", to_str(first.line),
+                        "record and choice declarations must be at module scope"],
+                        slice(nodes, 1, array_len(nodes)));
+            }
+            let declaration_kind: str = first.text;
+            let declaration_name = natural_next(source, first.next);
+            if declaration_name.kind == NT_EOF {
+                return array_concat(["error", "ast-error", to_str(first.line),
+                        "declaration requires a name"], slice(nodes, 1, array_len(nodes)));
+            }
+            mut scan: int = declaration_name.next;
+            mut closed: bool = false;
+            while scan < str_len(source) {
+                let token = natural_next(source, scan);
+                if token.kind == NT_EOF { break; }
+                if token.text == "end" {
+                    let terminator = natural_next(source, token.next);
+                    if terminator.text == declaration_kind {
+                        position = terminator.next;
+                        closed = true;
+                        break;
+                    }
+                    scan = terminator.next;
+                } else {
+                    scan = token.next;
+                }
+            }
+            if not closed {
+                return array_concat(["error", "ast-error", to_str(first.line),
+                        "unterminated " + declaration_kind + " declaration"],
+                        slice(nodes, 1, array_len(nodes)));
+            }
+            continue;
+        }
+
         mut control: [str] = nac_fail(first.start, "unsupported control statement");
         let is_control: bool = first.text == "routine" or
             first.text == "when" or first.text == "repeat" or

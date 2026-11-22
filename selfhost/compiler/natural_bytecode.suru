@@ -476,6 +476,18 @@ func nbc_field_index(instructions: [str], record: str, field: str) -> int {
     return -1;
 }
 
+func nbc_field_type(instructions: [str], record: str, field: str) -> str {
+    let wanted: str = "#fieldtype|" + record + "|" + field + "|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], wanted) {
+            return substr(instructions[i], str_len(wanted), str_len(instructions[i]));
+        }
+        i += 1;
+    }
+    return "";
+}
+
 func nbc_collect_records(instructions: [str], lines: [str]) -> [str] {
     mut result: [str] = instructions;
     mut i: int = 0;
@@ -503,8 +515,11 @@ func nbc_collect_records(instructions: [str], lines: [str]) -> [str] {
             let fcolon: int = nbc_find(fbody, ":");
             if fcolon > 0 {
                 let fname: str = str_trim(substr(fbody, 0, fcolon));
+                let ftype: str = str_trim(substr(fbody, fcolon + 1, str_len(fbody)));
                 result = array_concat(result,
                     ["#field|" + rname + "|" + fname + "|" + to_str(field_idx)]);
+                result = array_concat(result,
+                    ["#fieldtype|" + rname + "|" + fname + "|" + ftype]);
                 field_idx += 1;
             }
             i += 1;
@@ -658,6 +673,11 @@ func nbc_ast_type(instructions: [str], nodes: [str], node: int) -> str {
         return "Whole";
     }
     if kind == "array" { return "Array"; }
+    if kind == "field" {
+        if array_len(children) != 1 { return ""; }
+        let record_type: str = nbc_ast_type(instructions, nodes, children[0]);
+        return nbc_field_type(instructions, record_type, value);
+    }
     if kind == "call" {
         if array_len(children) == 0 { return ""; }
         let callee: str = nbc_ast_value(nodes, children[0]);

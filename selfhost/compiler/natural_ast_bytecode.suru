@@ -39,8 +39,22 @@ func nab_collect_ast(source: str) -> [str] {
     mut expressions: [str] = [];
     mut names: [str] = [];
     mut types: [str] = [];
-    let field_names: [str] = [];
-    let field_types: [str] = [];
+    mut field_names: [str] = [""];
+    mut field_types: [str] = [""];
+    mut metadata_index: int = 0;
+    while metadata_index < array_len(instructions) {
+        if nbc_has_prefix(instructions[metadata_index], "#fieldtype|") {
+            let field_parts: [str] = str_split(
+                substr(instructions[metadata_index], str_len("#fieldtype|"),
+                       str_len(instructions[metadata_index])), "|");
+            if array_len(field_parts) == 3 {
+                field_names = array_concat(field_names,
+                    [field_parts[0] + "." + field_parts[1]]);
+                field_types = array_concat(field_types, [field_parts[2]]);
+            }
+        }
+        metadata_index += 1;
+    }
     mut current_function: str = "";
     mut return_type: str = "";
     mut returned: bool = false;
@@ -130,8 +144,10 @@ func nab_collect_ast(source: str) -> [str] {
                                             field_names, field_types);
             if inferred[0] == "error" { return nab_fail(inferred[1]); }
             if parts[1] != "" and parts[1] != inferred[1] {
-                return nab_fail("binding '" + parts[0] + "' expected " +
-                                parts[1] + ", got " + inferred[1]);
+                if inferred[1] != "None" or nbc_record_index(instructions, parts[1]) < 0 {
+                    return nab_fail("binding '" + parts[0] + "' expected " +
+                                    parts[1] + ", got " + inferred[1]);
+                }
             }
             if nbc_slot(instructions, parts[0]) >= 0 {
                 return nab_fail("duplicate local '" + parts[0] + "'");
@@ -178,6 +194,24 @@ func nab_collect_ast(source: str) -> [str] {
                 instructions = nbc_emit_ast_node(instructions, nodes, target_children[1]);
                 instructions = nbc_emit_ast_node(instructions, nodes, roots[1]);
                 instructions = nbc_emit(instructions, "BC_IDX_ST", "");
+            } else if target_kind == "field" {
+                let target_children: [int] = nbc_ast_children(nodes, roots[0]);
+                if array_len(target_children) != 1 {
+                    return nab_fail("invalid field assignment target");
+                }
+                let base_type: [str] = net_infer(nodes, target_children[0], names, types,
+                                                 field_names, field_types);
+                if base_type[0] == "error" { return nab_fail(base_type[1]); }
+                let record_index: int = nbc_record_index(instructions, base_type[1]);
+                let field_name: str = nbc_ast_value(nodes, roots[0]);
+                let field_index: int = nbc_field_index(instructions, base_type[1], field_name);
+                if record_index < 0 or field_index < 0 {
+                    return nab_fail("unknown record field '" + base_type[1] + "." + field_name + "'");
+                }
+                instructions = nbc_emit_ast_node(instructions, nodes, target_children[0]);
+                instructions = nbc_emit_ast_node(instructions, nodes, roots[1]);
+                instructions = nbc_emit(instructions, "BC_FIELD_ST",
+                    to_str(record_index) + "|" + to_str(field_index));
             } else {
                 return nab_fail("AST bytecode slice does not yet lower this assignment target");
             }
