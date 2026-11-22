@@ -1,0 +1,13 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_ast_bytecode.suru";
+use "../../selfhost/compiler/natural_module_writer.suru";
+use "../../selfhost/compiler/natural_verifier.suru";
+
+func main() {
+    let source: str = source_load(args(0));
+    let instructions: [str] = nab_collect_ast(source);
+    if array_len(instructions) == 1 and instructions[0] == "#emit-failed" { exit(3); }
+    if natural_verify(instructions) != 0 { exit(4); }
+    write_file(args(1), nw_serialize(instructions));
+    exit(0);
+}

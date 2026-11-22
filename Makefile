@@ -67,7 +67,8 @@ SELFHOST_DRIVERS = tests/selfhost/lexer_driver.suru \
 	tests/selfhost/natural_module_driver.suru \
 	tests/selfhost/natural_effect_driver.suru \
 	tests/selfhost/effect_runtime_driver.suru \
-	tests/selfhost/natural_bytecode_driver.suru
+	tests/selfhost/natural_bytecode_driver.suru \
+	tests/selfhost/natural_ast_bytecode_driver.suru
 SELFHOST_REF = $(UNITDIR)/selfhost_reference_lexer
 
 all: $(BINDIR)/suru
@@ -152,6 +153,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_effect_run.sh $(BINDIR)/suru
 	@tests/selfhost/effect_runtime_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_bytecode_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_ast_bytecode_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_compile_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_verify_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_build_run.sh $(BINDIR)/suru

@@ -416,3 +416,9 @@ This initial module pass deliberately covers straight-line/module-level bindings
 ## Stage 1 routine declarations in the module AST
 
 The SURU-written module AST parser now recognizes top-level routine declarations and records their name, typed parameter list, return type (defaulting to `Unit`), and declared `throws` names. Routine bodies are collected as the same ordered statement/control nodes used by the expression attachment pass, and `end routine` is checked against the open-block stack. This establishes routine boundaries and signatures in the SURU AST before the next step adds routine-local scopes and connects those AST nodes to bytecode lowering.
+
+## Stage 1 AST-driven bytecode lowering
+
+A first AST-driven bytecode collector is now available as `natural_ast_bytecode.suru`. It consumes routine/module AST nodes and attached expression-node IDs directly for a deliberately small executable subset: typed routine parameters and returns, local bindings, local assignments, `show`, and `give`. It emits the same intermediate instruction records consumed by the existing SURU verifier and module writer. A differential gate compiles the same two-routine program with the reference frontend and the AST-driven collector, requires byte-identical `.sbc` output, and executes the AST-produced module.
+
+The existing source-scanning collector remains the reference for control flow, records, choices, exceptions, and the wider language. The next lowering increments should move those constructs onto module AST nodes, then remove source-line collection from the normal Stage 1 compiler path.

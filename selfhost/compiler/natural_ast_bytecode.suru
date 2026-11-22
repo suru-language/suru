@@ -1,0 +1,193 @@
+// First module-AST-driven bytecode collector.
+// The supported slice is typed routines, local bindings/assignments, show and give.
+// The legacy source collector remains the reference for other constructs.
+use "natural_ast_module.suru";
+use "natural_bytecode.suru";
+use "natural_expression_types.suru";
+
+func nab_fail(message: str) -> [str] {
+    println("ast-bytecode-error|" + message);
+    return ["#emit-failed"];
+}
+
+func nab_binding_parts(text: str) -> [str] {
+    let equals: int = nam_find(text, " = ", 0);
+    let first_space: int = nam_find(text, " ", 0);
+    if equals < 0 or first_space < 0 { return ["", "", ""]; }
+    let colon: int = nam_find(text, ":", first_space + 1);
+    let name_end: int = colon >= 0 ? colon : equals;
+    let name: str = str_trim(substr(text, first_space + 1,
+                                    name_end - first_space - 1));
+    let declared: str = colon < 0 ? "" :
+        str_trim(substr(text, colon + 1, equals - colon - 1));
+    return [name, declared, substr(text, equals + 3, str_len(text))];
+}
+
+func nab_collect_ast(source: str) -> [str] {
+    let module: [str] = nam_parse(source);
+    if module[0] == "error" {
+        println("ast-bytecode-error|" + module[1] + "|" + module[2] + "|" + module[3]);
+        return ["#emit-failed"];
+    }
+    let lines: [str] = str_split(source, "\n");
+    mut instructions: [str] = [];
+    instructions = nbc_collect_functions(instructions, lines);
+    instructions = nbc_collect_records(instructions, lines);
+    instructions = nbc_collect_choices(instructions, lines);
+
+    mut expressions: [str] = [];
+    mut names: [str] = [];
+    mut types: [str] = [];
+    let field_names: [str] = [];
+    let field_types: [str] = [];
+    mut current_function: str = "";
+    mut return_type: str = "";
+    mut returned: bool = false;
+    mut i: int = 1;
+    while i < array_len(module) {
+        let raw: str = module[i];
+        let kind: str = nam_node_kind(raw);
+        let line: int = nam_node_line(raw);
+        let text: str = nam_node_text(raw);
+
+        if kind == "routine" {
+            if current_function != "" {
+                return nab_fail("nested routine boundary at line " + to_str(line));
+            }
+            let signature: [str] = str_split(text, "|");
+            if array_len(signature) < 3 { return nab_fail("malformed routine AST"); }
+            current_function = signature[0];
+            return_type = signature[2];
+            returned = false;
+            names = slice(names, array_len(names), 0);
+            types = slice(types, array_len(types), 0);
+            expressions = slice(expressions, array_len(expressions), 0);
+            let params: [str] = signature[1] == "" ?
+                slice(signature, array_len(signature), 0) : str_split(signature[1], ",");
+            instructions = array_concat(instructions,
+                ["#funcbody|" + current_function + "|" + to_str(array_len(params))]);
+            mut p: int = 0;
+            while p < array_len(params) {
+                let colon: int = nbc_find(params[p], ":");
+                if colon < 1 { return nab_fail("invalid parameter in " + current_function); }
+                let pname: str = str_trim(substr(params[p], 0, colon));
+                let ptype: str = str_trim(substr(params[p], colon + 1, str_len(params[p])));
+                if pname == "" or ptype == "" { return nab_fail("invalid parameter in " + current_function); }
+                if nbc_slot(instructions, pname) >= 0 {
+                    return nab_fail("duplicate parameter '" + pname + "'");
+                }
+                instructions = nbc_bind(instructions, pname);
+                instructions = nbc_note_type(instructions, pname, ptype);
+                names = array_concat(names, [pname]);
+                types = array_concat(types, [ptype]);
+                p += 1;
+            }
+            i += 1;
+            continue;
+        }
+
+        if kind == "end-routine" {
+            if current_function == "" { return nab_fail("end routine without routine"); }
+            if return_type != "Unit" and not returned {
+                return nab_fail("non-Unit routine '" + current_function + "' has no give");
+            }
+            // Match the reference collector's explicit end-routine terminator;
+            // after a non-Unit give this is unreachable but bytecode-stable.
+            instructions = nbc_emit(instructions, "BC_RET_UNIT", "");
+            current_function = "";
+            return_type = "";
+            returned = false;
+            names = slice(names, array_len(names), 0);
+            types = slice(types, array_len(types), 0);
+            expressions = slice(expressions, array_len(expressions), 0);
+            i += 1;
+            continue;
+        }
+
+        if current_function == "" {
+            return nab_fail("statement outside routine at line " + to_str(line));
+        }
+
+        let state: [str] = array_concat(["ok", ""], expressions);
+        let attached: [str] = nam_attach_expressions(kind, text, state);
+        if attached[0] == "error" { return nab_fail(attached[1]); }
+        let roots: [int] = net_children(attached[1]);
+        let nodes: [str] = slice(attached, 2, array_len(attached));
+
+        if kind == "binding" {
+            if array_len(roots) != 1 { return nab_fail("binding requires one initializer"); }
+            let parts: [str] = nab_binding_parts(text);
+            if parts[0] == "" { return nab_fail("malformed binding at line " + to_str(line)); }
+            let inferred: [str] = net_infer(nodes, roots[0], names, types,
+                                            field_names, field_types);
+            if inferred[0] == "error" { return nab_fail(inferred[1]); }
+            if parts[1] != "" and parts[1] != inferred[1] {
+                return nab_fail("binding '" + parts[0] + "' expected " +
+                                parts[1] + ", got " + inferred[1]);
+            }
+            if nbc_slot(instructions, parts[0]) >= 0 {
+                return nab_fail("duplicate local '" + parts[0] + "'");
+            }
+            instructions = nbc_emit_ast_node(instructions, nodes, roots[0]);
+            instructions = nbc_bind(instructions, parts[0]);
+            instructions = nbc_note_type(instructions, parts[0],
+                                          parts[1] == "" ? inferred[1] : parts[1]);
+            instructions = nbc_emit(instructions, "BC_ST_LOCAL",
+                                    to_str(nbc_slot(instructions, parts[0])));
+            names = array_concat(names, [parts[0]]);
+            types = array_concat(types, [parts[1] == "" ? inferred[1] : parts[1]]);
+        } else if kind == "assignment" {
+            if array_len(roots) != 2 { return nab_fail("assignment requires target and value"); }
+            if nbc_ast_kind(nodes, roots[0]) != "atom" {
+                return nab_fail("AST bytecode slice only supports local assignment targets");
+            }
+            let target: str = nbc_ast_value(nodes, roots[0]);
+            let slot: int = nbc_slot(instructions, target);
+            if slot < 0 { return nab_fail("unknown local assignment target '" + target + "'"); }
+            let left: [str] = net_infer(nodes, roots[0], names, types, field_names, field_types);
+            let right: [str] = net_infer(nodes, roots[1], names, types, field_names, field_types);
+            if left[0] == "error" { return nab_fail(left[1]); }
+            if right[0] == "error" { return nab_fail(right[1]); }
+            if net_common_type(left[1], right[1]) == "" {
+                return nab_fail("assignment type mismatch for '" + target + "'");
+            }
+            instructions = nbc_emit_ast_node(instructions, nodes, roots[1]);
+            instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(slot));
+        } else if kind == "show" {
+            if array_len(roots) != 1 { return nab_fail("show requires one expression"); }
+            instructions = nbc_emit_ast_node(instructions, nodes, roots[0]);
+            instructions = nbc_emit(instructions, "BC_BUILTIN", "1");
+            instructions = nbc_emit(instructions, "BC_POP", "");
+        } else if kind == "give" {
+            if return_type == "Unit" and array_len(roots) > 0 {
+                return nab_fail("Unit routine cannot give a value");
+            }
+            if return_type != "Unit" and array_len(roots) != 1 {
+                return nab_fail("non-Unit routine must give a value");
+            }
+            if array_len(roots) == 1 {
+                let checked: [str] = net_infer(nodes, roots[0], names, types,
+                                               field_names, field_types);
+                if checked[0] == "error" { return nab_fail(checked[1]); }
+                if checked[1] != return_type {
+                    return nab_fail("routine '" + current_function + "' returns " +
+                                    return_type + ", got " + checked[1]);
+                }
+                instructions = nbc_emit_ast_node(instructions, nodes, roots[0]);
+                instructions = nbc_emit(instructions, "BC_RET", "");
+            } else {
+                instructions = nbc_emit(instructions, "BC_RET_UNIT", "");
+            }
+            returned = true;
+        } else {
+            return nab_fail("AST bytecode slice does not yet lower '" + kind +
+                            "' at line " + to_str(line));
+        }
+
+        expressions = nodes;
+        i += 1;
+    }
+
+    if current_function != "" { return nab_fail("unterminated routine '" + current_function + "'"); }
+    return instructions;
+}
