@@ -19,7 +19,7 @@ if ! cmp -s "$tmp/reference.sbc" "$tmp/ast.sbc"; then
     exit 1
 fi
 actual="$("$SURU" exec "$tmp/ast.sbc")"
-expected="$(printf '5\n5')"
+expected="$(printf '5\n5\n6\n1\n2\n3')"
 if [ "$actual" != "$expected" ]; then
     echo "AST bytecode execution mismatch: '$actual'" >&2
     exit 1
