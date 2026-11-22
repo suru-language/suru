@@ -240,11 +240,26 @@ void s_heap_remove_root(s_heap *h, s_value *slot) {
 /* Tri-color marking                                                    */
 /* ------------------------------------------------------------------ */
 
+/* Debug-only pointer membership check: pointer comparison is safe even
+ * when a stale reference no longer points into a live object chunk. */
+static bool heap_contains_object(const s_heap *h, const s_gcobj *target) {
+    for (const s_gcobj *live = h->all_live; live; live = live->next_all) {
+        if (live == target) return true;
+    }
+    return false;
+}
+
 /* Queue a white object onto the grey worklist, turning it grey. */
-static void mark_push(s_heap *h, s_gcobj *o) {
+static void mark_push(s_heap *h, s_gcobj *o, const char *origin) {
+    if (getenv("SURU_GC_DEBUG") && !heap_contains_object(h, o)) {
+        fprintf(stderr, "SURU GC: stale object pointer %p from %s "
+                        "(live=%u)\n", (void *)o, origin, h->live_objects);
+        abort();
+    }
     if (o->magic != S_OBJ_MAGIC) {
         /* Corrupted object pointer; abort to surface the bug. */
-        fprintf(stderr, "SURU GC: corrupt object pointer\n");
+        fprintf(stderr, "SURU GC: corrupt object pointer %p from %s\n",
+                (void *)o, origin);
         abort();
     }
     if (o->colour != S_GC_WHITE) return;
@@ -264,9 +279,9 @@ static void mark_push(s_heap *h, s_gcobj *o) {
     h->mark_stack[h->mark_len++] = o;
 }
 
-static void mark_from_value(s_heap *h, s_value v) {
+static void mark_from_value(s_heap *h, s_value v, const char *origin) {
     if (v.tag == S_VAL_OBJ && v.u.o) {
-        mark_push(h, v.u.o);
+        mark_push(h, v.u.o, origin);
     }
 }
 
@@ -279,7 +294,7 @@ static bool mark_process_one(s_heap *h) {
         o->kind == S_OBJ_CLOSURE || o->kind == S_OBJ_EXCEPTION) {
         s_value *vals = s_obj_array_data(o);
         for (s_u32 i = 0; i < o->count; ++i) {
-            mark_from_value(h, vals[i]);
+            mark_from_value(h, vals[i], "managed object child");
         }
     }
     o->colour = S_GC_BLACK;
@@ -289,11 +304,11 @@ static bool mark_process_one(s_heap *h) {
 static void seed_roots(s_heap *h) {
     if (h->stack_base) {
         for (s_size i = 0; i < h->stack_len; ++i) {
-            mark_from_value(h, h->stack_base[i]);
+            mark_from_value(h, h->stack_base[i], "operand stack");
         }
     }
     for (s_root_slot *r = h->roots; r; r = r->next) {
-        if (r->slot) mark_from_value(h, *r->slot);
+        if (r->slot) mark_from_value(h, *r->slot, "registered root slot");
     }
 }
 
@@ -334,7 +349,7 @@ void s_heap_write_barrier(s_heap *h, s_gcobj *dst, s_value v) {
     if (!h || !h->mark_active) return;
     if (dst->colour == S_GC_BLACK &&
         v.tag == S_VAL_OBJ && v.u.o && v.u.o->colour == S_GC_WHITE) {
-        mark_push(h, v.u.o);
+        mark_push(h, v.u.o, "write barrier");
     }
 }
 
