@@ -13,14 +13,14 @@ func main() {
     let fn_frames: [int] = [1];
     let fn_maxdepths: [int] = [128];
 
-    // 0 push_handler(target=9, type=strpool[0])
-    // 1..4 build inner exception
-    // 5..8 build outer exception with the inner exception as its cause
-    // 9 handler: pop exception, print "caught", return
-    let ops0: [int] = [69, 4, 3, 3, 53, 3, 3, 53, 71, 7, 3, 63, 65];
-    let as0: [int] = [9, 0, 1, 0, 0, 2, 0, 0, 0, 0, 3, 1, 0];
-    let bs0: [int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    let cs0: [int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    // 0 push_handler(target=11, type=strpool[0])
+    // 1..4 build inner exception and store it in local 0
+    // 5..9 build outer exception with local 0 as its cause
+    // 10 throw; 11 handler pops the exception and prints "caught"
+    let ops0: [int] = [69, 4, 3, 3, 53, 6, 3, 3, 5, 53, 71, 7, 3, 63, 65];
+    let as0: [int] = [11, 0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 1, 0];
+    let bs0: [int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let cs0: [int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     let fn_ops: [[int]] = [ops0];
     let fn_as: [[int]] = [as0];
     let fn_bs: [[int]] = [bs0];
