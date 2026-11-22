@@ -28,6 +28,23 @@ typedef struct s_heap {
     bool incremental;
 } s_heap;
 
+typedef struct s_freed_debug {
+    const void *pointer;
+    s_u32 kind;
+    s_u32 count;
+    s_u64 collection;
+} s_freed_debug;
+
+static s_freed_debug s_freed_ring[8192];
+static s_size s_freed_ring_next;
+
+static const s_freed_debug *debug_find_freed(const void *pointer) {
+    for (s_size i = 0; i < sizeof(s_freed_ring) / sizeof(s_freed_ring[0]); ++i) {
+        if (s_freed_ring[i].pointer == pointer) return &s_freed_ring[i];
+    }
+    return NULL;
+}
+
 static s_size bucket_index(s_size rounded) {
     return (rounded - 1) / SU_HEAP_BUCKET;
 }
@@ -164,6 +181,10 @@ s_gcobj *s_heap_alloc(s_heap *h, s_obj_kind kind, s_u32 count, s_size payload_by
     h->live_objects++;
     h->live_bytes += rounded;
     h->total_bytes += rounded;
+    if (getenv("SURU_GC_DEBUG") && kind == S_OBJ_ARRAY && count >= 200) {
+        fprintf(stderr, "SURU GC: alloc large array %p count=%u live=%u\n",
+                (void *)o, (unsigned)count, (unsigned)h->live_objects);
+    }
 
     /* zero payload */
     char *payloadp = (char *)(o + 1);
@@ -297,11 +318,20 @@ static bool mark_process_one(s_heap *h) {
             if (getenv("SURU_GC_DEBUG") &&
                 vals[i].tag == S_VAL_OBJ && vals[i].u.o &&
                 !heap_contains_object(h, vals[i].u.o)) {
+                const s_freed_debug *freed =
+                    debug_find_freed(vals[i].u.o);
                 fprintf(stderr,
                         "SURU GC: stale child edge parent=%p kind=%u "
-                        "count=%u slot=%u child=%p\n",
+                        "count=%u slot=%u child=%p",
                         (void *)o, (unsigned)o->kind, (unsigned)o->count,
                         (unsigned)i, (void *)vals[i].u.o);
+                if (freed) {
+                    fprintf(stderr, " freed-kind=%u freed-count=%u "
+                                    "freed-collection=%llu",
+                            (unsigned)freed->kind, (unsigned)freed->count,
+                            (unsigned long long)freed->collection);
+                }
+                fputc('\n', stderr);
                 abort();
             }
             mark_from_value(h, vals[i], "managed object child");
@@ -390,6 +420,13 @@ bool s_heap_collect_incremental(s_heap *h, s_size budget) {
 }
 
 static void free_object(s_heap *h, s_gcobj *o) {
+    if (getenv("SURU_GC_DEBUG")) {
+        s_freed_ring[s_freed_ring_next] = (s_freed_debug){
+            o, (s_u32)o->kind, (s_u32)o->count, h->collections
+        };
+        s_freed_ring_next = (s_freed_ring_next + 1) %
+            (sizeof(s_freed_ring) / sizeof(s_freed_ring[0]));
+    }
     h->live_objects--;
     h->live_bytes -= o->chunk_size;
     if (is_small(o->chunk_size)) {
