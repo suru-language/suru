@@ -403,8 +403,9 @@ suspended-caller regression exercises the integrated trigger and checks that a
 caller-local value survives collection. Logical byte accounting is an estimate
 based on SURU's object-table representation, not host allocator byte parity.
 The direct `natural_vm_gc_schedule_driver.suru` gate also calls the allocation
-wrapper at the 511th/512th allocation boundary and checks the independent
-logical-live-byte trigger.
+wrapper at the 511th/512th allocation boundary, checks the independent
+logical-live-byte trigger, and verifies that the next threshold adapts to four
+times the surviving rooted heap after collection.
 
 The regression driver exercises shared references, unreachable cycles,
 exception causes, dropping roots, full reclamation, class-aware slot reuse,
