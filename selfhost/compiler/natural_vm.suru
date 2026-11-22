@@ -129,25 +129,23 @@ func vm_heap_roots(stack: [str], frames: [[str]]) -> [int] {
     return roots;
 }
 
-// Match the C VM's 512-allocation / 1 MiB live-byte nursery trigger.
-// Once started, a cycle receives a bounded 128-object slice at each allocation.
-// Completed cycles adapt the next byte threshold to four times the survivor set.
+// Advance bounded marking during each allocation. This schedule is the
+// currently validated VM integration: it keeps the collector making progress
+// while roots are available at allocation safepoints. The C-compatible
+// interval/threshold policy is implemented and tested in heap.suru, but its
+// VM integration remains gated on complete mutator-root/safepoint coverage.
 func vm_heap_alloc(state: [[str]], stack: [str], frames: [[str]],
                    kind: str, payload: str, children: [int]) -> [[str]] {
     let roots: [int] = vm_heap_roots(stack, frames);
-    let old_collections: int = int_from_str(state[2][2]);
-    mut next: [[str]] = sh_gc_advance(state, roots, 512, 128);
-    let completed: bool = int_from_str(next[2][2]) > old_collections;
+    mut next: [[str]] = [state[0], state[1], state[2]];
+    next = sh_mark_step(next, 128, roots);
+    if sh_mark_pending(next) == 0 {
+        next = sh_mark_finish(next);
+        next = sh_mark_begin_with_metrics(next[0], roots, next[2]);
+    }
     let required: int = sh_allocation_size(payload, children);
     let id: int = sh_find_free(next[0], required);
     next = sh_alloc_incremental(next, kind, payload, children);
-    if completed {
-        // The triggering allocation is performed after collection, exactly as
-        // in maybe_collect() -> vm_alloc() in the C interpreter.
-        let metrics: [str] = next[2];
-        metrics[1] = "0";
-        next[2] = metrics;
-    }
     return [next[0], next[1], next[2], ["H" + to_str(id)]];
 }
 
@@ -258,10 +256,12 @@ func natural_run_module(bytes: str) -> int {
 
     mut stack: [str] = [];
     mut heap: [str] = [];
+    let initial_roots: [int] = [];
     let initial_gc_metrics: [str] = [
-        "0", "0", "0", "0", "1048576", "1048576", "0"
+        "1", "0", "0", "0", "1048576", "1048576", "0"
     ];
-    mut gc_state: [[str]] = sh_mark_idle(heap, initial_gc_metrics);
+    mut gc_state: [[str]] = sh_mark_begin_with_metrics(
+        heap, initial_roots, initial_gc_metrics);
     mut hdlrs: [str] = [];
     mut hdlr_frames: [int] = [];
     mut guard: int = 0;
