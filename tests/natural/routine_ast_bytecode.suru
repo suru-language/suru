@@ -1,7 +1,3 @@
-routine add(a: Whole, b: Whole) -> Whole
-    value total: Whole = a + b
-    give total
-end routine
 routine main() -> Unit
     value result: Whole = 0
     when true
@@ -21,4 +17,8 @@ routine main() -> Unit
     end repeat
     show(result)
     show(add(2, 3))
+end routine
+routine add(a: Whole, b: Whole) -> Whole
+    value total: Whole = a + b
+    give total
 end routine
