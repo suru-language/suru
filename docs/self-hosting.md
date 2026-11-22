@@ -387,8 +387,9 @@ white child. Allocation slots now retain a logical reservation size: small
 objects use ascending 16-byte classes through 4096 bytes, and larger slots use
 first-fit reuse when their capacity is sufficient. Sweeping retains the
 capacity class, while payload/reference growth raises the reservation without
-changing the stable handle. Live and reserved byte estimates are exposed for
-tests; these are logical SURU table estimates, not measurements of host memory.
+changing the stable handle. Live/reserved object and byte snapshots, including free-slot counts, are
+exposed for tests and future threshold tuning; byte values are logical SURU
+table estimates, not measurements of host memory.
 The regression driver exercises shared references, unreachable cycles,
 exception causes, dropping roots, full reclamation, class-aware slot reuse,
 large first-fit reuse, capacity growth, incremental root discovery, allocation
