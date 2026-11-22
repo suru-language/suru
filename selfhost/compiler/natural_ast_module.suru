@@ -8,7 +8,8 @@ use "natural_expression_ast.suru";
 use "natural_ast.suru";
 
 func nam_empty_attachment(expressions: [NAstExpr]) -> NAstExprAttachment {
-    return NAstExprAttachment(true, [], expressions, "");
+    let roots: [int] = [];
+    return NAstExprAttachment(true, roots, expressions, "");
 }
 
 func nam_add_expression(text: str, roots: [int],
