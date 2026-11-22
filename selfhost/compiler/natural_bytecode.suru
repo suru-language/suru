@@ -892,12 +892,12 @@ func nbc_typed_statement(line: str) -> [str] {
         return ["error", array_len(attached) > 1 ? attached[1] : "expression attachment failed"];
     }
     return array_concat([kind, text, attached[1]],
-                        slice(attached, 2, array_len(attached)));
+                        slice(attached, 2, array_len(attached) - 2));
 }
 
 func nbc_typed_statement_nodes(statement: [str]) -> [str] {
     if array_len(statement) <= 3 { return slice(statement, 3, 3); }
-    return slice(statement, 3, array_len(statement));
+    return slice(statement, 3, array_len(statement) - 3);
 }
 
 func nbc_typed_statement_root(statement: [str], index: int) -> int {
