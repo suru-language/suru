@@ -478,7 +478,11 @@ func natural_run_module(bytes: str) -> int {
                 stack = vm_push(stack, "I" + to_str(vm_arr_count(ar)));
             }
         } else if op == 60 {
-            stack = vm_push(stack, "C" + to_str(a));
+            heap = sh_collect(heap, vm_heap_roots(stack, fr_locals));
+            let closure_id: int = sh_find_free(heap);
+            let no_children: [int] = [];
+            heap = sh_alloc(heap, "closure", to_str(a), no_children);
+            stack = vm_push(stack, "H" + to_str(closure_id));
         } else if op == 61 {
             let n: int = array_len(stack);
             let cnt: int = b;
@@ -488,10 +492,14 @@ func natural_run_module(bytes: str) -> int {
                 elems = array_concat(elems, [stack[n - cnt + k]]);
                 k += 1;
             }
+            heap = sh_collect(heap, vm_heap_roots(stack, fr_locals));
+            let closure_id: int = sh_find_free(heap);
             let env: str = vm_arr_build(cnt, elems);
+            heap = sh_alloc(heap, "closure", to_str(a) + "|" + env,
+                            vm_heap_refs(elems));
             k = 0;
             while k < cnt { stack = vm_pop(stack); k += 1; }
-            stack = vm_push(stack, "C" + to_str(a) + "|" + env);
+            stack = vm_push(stack, "H" + to_str(closure_id));
         } else if op == 62 {
             let nargs: int = a;
             let nn: int = array_len(stack);
@@ -505,18 +513,35 @@ func natural_run_module(bytes: str) -> int {
             while k < nargs { stack = vm_pop(stack); k += 1; }
             let cl: str = stack[array_len(stack) - 1];
             stack = vm_pop(stack);
-            let bar: int = nbc_find(cl, "|");
-            let fid2: int = bar < 0 ?
-                int_from_str(substr(cl, 1, str_len(cl) - 1)) :
-                int_from_str(substr(cl, 1, bar - 1));
-            let has_env: bool = bar >= 0;
+            let closure_id: int = vm_handle_id(cl);
+            mut fid2: int = -1;
             mut callee: [str] = [];
-            if has_env {
-                let env2: str = substr(cl, bar + 1, str_len(cl));
-                callee = array_concat([env2], args);
+            if closure_id >= 0 and sh_kind(heap, closure_id) == "closure" {
+                let payload: str = sh_payload(heap, closure_id);
+                let bar: int = nbc_find(payload, "|");
+                fid2 = bar < 0 ? int_from_str(payload) :
+                    int_from_str(substr(payload, 0, bar));
+                if bar >= 0 {
+                    let env: str = substr(payload, bar + 1, str_len(payload));
+                    callee = array_concat([env], args);
+                } else {
+                    callee = args;
+                }
             } else {
-                callee = args;
+                // Transitional compatibility for inline closures from older
+                // bytecode fixtures while all closure objects move to handles.
+                let bar: int = nbc_find(cl, "|");
+                fid2 = bar < 0 ?
+                    int_from_str(substr(cl, 1, str_len(cl) - 1)) :
+                    int_from_str(substr(cl, 1, bar - 1));
+                if bar >= 0 {
+                    let env: str = substr(cl, bar + 1, str_len(cl));
+                    callee = array_concat([env], args);
+                } else {
+                    callee = args;
+                }
             }
+            if fid2 < 0 or fid2 >= array_len(fn_frames) { return 8; }
             let cf: int = fn_frames[fid2];
             while array_len(callee) < cf { callee = array_concat(callee, ["N"]); }
             fr_fid = array_concat(fr_fid, [fid2]);
