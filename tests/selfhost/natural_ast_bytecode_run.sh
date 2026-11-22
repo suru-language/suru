@@ -24,4 +24,14 @@ if [ "$actual" != "$expected" ]; then
     echo "AST bytecode execution mismatch: '$actual'" >&2
     exit 1
 fi
+range_source="$ROOT/tests/natural/routine_ast_each_range.suru"
+"$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+    "$range_source" "$tmp/ast-each-range.sbc"
+range_actual="$("$SURU" exec "$tmp/ast-each-range.sbc")"
+range_expected="$(printf '6\n1\n2\n3\n9223372036854775807')"
+if [ "$range_actual" != "$range_expected" ]; then
+    echo "AST each-range execution mismatch: '$range_actual'" >&2
+    exit 1
+fi
+echo "natural AST bytecode: exclusive until and inclusive through range loops executed correctly"
 echo "natural AST bytecode: AST-predeclared forward routine calls, bindings, nested when/otherwise, repeat, show and give matched reference"

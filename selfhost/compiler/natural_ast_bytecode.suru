@@ -275,6 +275,90 @@ func nab_collect_ast(source: str) -> [str] {
             if current[2] != "" { instructions = nbc_label(instructions, current[2]); }
             instructions = nbc_label(instructions, current[1]);
             controls = slice(controls, 0, array_len(controls) - 1);
+        } else if kind == "each" {
+            if array_len(roots) != 2 {
+                return nab_fail("each range requires start and end expressions");
+            }
+            let from_at: int = nam_find(text, " from ", 0);
+            let until_at: int = nam_find(text, " until ", 0);
+            let through_at: int = nam_find(text, " through ", 0);
+            let bound_at: int = until_at >= 0 ? until_at : through_at;
+            let bound_word: str = until_at >= 0 ? "until" : "through";
+            if from_at < 1 or bound_at <= from_at {
+                return nab_fail("malformed each range at line " + to_str(line));
+            }
+            let item_name: str = str_trim(substr(text, 0, from_at));
+            if item_name == "" or nbc_slot(instructions, item_name) >= 0 {
+                return nab_fail("invalid or duplicate each binding '" + item_name + "'");
+            }
+            let start_type: [str] = net_infer(nodes, roots[0], names, types,
+                                              field_names, field_types);
+            if start_type[0] == "error" { return nab_fail(start_type[1]); }
+            let finish_type: [str] = net_infer(nodes, roots[1], names, types,
+                                               field_names, field_types);
+            if finish_type[0] == "error" { return nab_fail(finish_type[1]); }
+            if start_type[1] != "Whole" or finish_type[1] != "Whole" {
+                return nab_fail("each range bounds must be Whole");
+            }
+
+            let loop_start: str = "ast-each-start-" + to_str(labels);
+            let loop_end: str = "ast-each-end-" + to_str(labels);
+            let limit_name: str = "$ast-each-limit-" + to_str(labels);
+            labels += 1;
+
+            instructions = nbc_bind(instructions, item_name);
+            instructions = nbc_note_type(instructions, item_name, "Whole");
+            names = array_concat(names, [item_name]);
+            types = array_concat(types, ["Whole"]);
+            instructions = nbc_emit_ast_node(instructions, nodes, roots[0]);
+            instructions = nbc_emit(instructions, "BC_ST_LOCAL",
+                                    to_str(nbc_slot(instructions, item_name)));
+
+            instructions = nbc_bind(instructions, limit_name);
+            instructions = nbc_note_type(instructions, limit_name, "Whole");
+            instructions = nbc_emit_ast_node(instructions, nodes, roots[1]);
+            instructions = nbc_emit(instructions, "BC_ST_LOCAL",
+                                    to_str(nbc_slot(instructions, limit_name)));
+
+            instructions = nbc_label(instructions, loop_start);
+            instructions = nbc_emit(instructions, "BC_LD_LOCAL",
+                                    to_str(nbc_slot(instructions, item_name)));
+            instructions = nbc_emit(instructions, "BC_LD_LOCAL",
+                                    to_str(nbc_slot(instructions, limit_name)));
+            instructions = nbc_emit(instructions,
+                                    bound_word == "until" ? "BC_LT_I" : "BC_LE_I", "");
+            instructions = nbc_emit(instructions, "BC_JZ", "@" + loop_end);
+            controls = array_concat(controls,
+                ["each|" + item_name + "|" + limit_name + "|" +
+                 loop_start + "|" + loop_end + "|" + bound_word]);
+        } else if kind == "end-each" {
+            if array_len(controls) == 0 {
+                return nab_fail("end each without an open each");
+            }
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if array_len(current) < 6 or current[0] != "each" {
+                return nab_fail("mismatched each terminator");
+            }
+            let item_slot: int = nbc_slot(instructions, current[1]);
+            let limit_slot: int = nbc_slot(instructions, current[2]);
+            if item_slot < 0 or limit_slot < 0 {
+                return nab_fail("missing each iterator or limit slot");
+            }
+            // A through loop must stop before incrementing its maximum bound;
+            // otherwise the final increment could overflow Whole.
+            if current[5] == "through" {
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(item_slot));
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(limit_slot));
+                instructions = nbc_emit(instructions, "BC_EQ_I", "");
+                instructions = nbc_emit(instructions, "BC_JNZ", "@" + current[4]);
+            }
+            instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(item_slot));
+            instructions = nbc_const(instructions, "int", "BC_CONST_INT", "1");
+            instructions = nbc_emit(instructions, "BC_ADD_I", "");
+            instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(item_slot));
+            instructions = nbc_emit(instructions, "BC_JMP", "@" + current[3]);
+            instructions = nbc_label(instructions, current[4]);
+            controls = slice(controls, 0, array_len(controls) - 1);
         } else if kind == "repeat" {
             if array_len(roots) != 1 {
                 return nab_fail("repeat while requires one condition expression");
