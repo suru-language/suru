@@ -61,6 +61,14 @@ func sh_set_children(heap: [str], id: int, children: [int]) -> [str] {
     return next;
 }
 
+func sh_set_payload(heap: [str], id: int, payload: str) -> [str] {
+    if id < 0 or id >= sh_object_count(heap) { return heap; }
+    if heap[id * 4] == "" { return heap; }
+    let next: [str] = heap;
+    next[id * 4 + 2] = payload;
+    return next;
+}
+
 func sh_alive(heap: [str], id: int) -> bool {
     return id >= 0 and id < sh_object_count(heap) and heap[id * 4] != "";
 }
