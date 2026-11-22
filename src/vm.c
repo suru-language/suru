@@ -989,14 +989,29 @@ static bool builtin_str_split(s_vm *vm) {
     s_heap_add_root(vm->heap, &s);
     s_heap_add_root(vm->heap, &sep);
     s_gcobj *arr = vm_alloc(vm, S_OBJ_ARRAY, (s_u32)n, 0);
-    if (!arr) return false;
-    s_value *dst = s_obj_array_data(arr);
+    if (!arr) {
+        s_heap_remove_root(vm->heap, &sep);
+        s_heap_remove_root(vm->heap, &s);
+        return false;
+    }
+
+    /* The result array is only in this C local until it is pushed. Each part
+     * allocation may trigger GC, so keep the partially populated array rooted
+     * while its child strings are allocated and stored. */
+    s_value arr_root = s_val_obj(arr);
+    s_heap_add_root(vm->heap, &arr_root);
+    s_value *dst = s_obj_array_data(arr_root.u.o);
     s_size start = 0, k = 0;
     for (s_size i = 0; i + pl <= sl; ) {
         if (memcmp(data + i, sp, pl) == 0) {
             s_size ln = i - start;
             s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)ln, ln);
-            if (!o) return false;
+            if (!o) {
+                s_heap_remove_root(vm->heap, &arr_root);
+                s_heap_remove_root(vm->heap, &sep);
+                s_heap_remove_root(vm->heap, &s);
+                return false;
+            }
             if (ln) memcpy(s_obj_str_data(o), data + start, ln);
             dst[k++] = s_val_obj(o);
             i += pl;
@@ -1008,13 +1023,20 @@ static bool builtin_str_split(s_vm *vm) {
     {
         s_size ln = sl - start;
         s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)ln, ln);
-        if (!o) return false;
+        if (!o) {
+            s_heap_remove_root(vm->heap, &arr_root);
+            s_heap_remove_root(vm->heap, &sep);
+            s_heap_remove_root(vm->heap, &s);
+            return false;
+        }
         if (ln) memcpy(s_obj_str_data(o), data + start, ln);
         dst[k++] = s_val_obj(o);
     }
+    bool pushed = push(vm, arr_root);
+    s_heap_remove_root(vm->heap, &arr_root);
     s_heap_remove_root(vm->heap, &sep);
     s_heap_remove_root(vm->heap, &s);
-    return push(vm, s_val_obj(arr));
+    return pushed;
 }
 
 static bool builtin_str_join(s_vm *vm) {
