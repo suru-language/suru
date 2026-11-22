@@ -327,3 +327,9 @@ assignments, show/give, routine-expression initializers, `when`/`otherwise`,
 Expression payloads are still source-shaped text at this point. The next
 compiler step is to replace those payloads with typed expression children and
 make bytecode lowering consume the AST instead of rescanning source lines.
+A typed expression AST increment adds `NAstExpr` nodes in a flat indexed table.
+The new Pratt parser records atom, unary, binary, array, call, field, index,
+routine-expression, and conditional nodes with child indices. The initial
+conformance gate checks operator precedence and logical/comparison tree shape
+against the existing expression parser. The expression tree is not yet attached
+to statement nodes or consumed by bytecode lowering; that is the next step.
