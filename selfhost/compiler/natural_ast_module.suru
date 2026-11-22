@@ -264,7 +264,7 @@ func nam_check_typed(source: str) -> int {
     while i < array_len(module.expressions) {
         let expr: NAstExpr = module.expressions[i];
         println("typed-expr|" + to_str(i) + "|" + expr.kind + "|" +
-                expr.value + "|" + nam_join_roots(expr.children));
+                expr.value + "|" + expr.children);
         i += 1;
     }
     return 0;
