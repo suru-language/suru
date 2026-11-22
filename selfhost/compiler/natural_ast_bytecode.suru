@@ -88,11 +88,12 @@ func nab_collect_ast(source: str) -> [str] {
 
         if kind == "end-routine" {
             if current_function == "" { return nab_fail("end routine without routine"); }
-            if return_type == "Unit" and not returned {
-                instructions = nbc_emit(instructions, "BC_RET_UNIT", "");
-            } else if return_type != "Unit" and not returned {
+            if return_type != "Unit" and not returned {
                 return nab_fail("non-Unit routine '" + current_function + "' has no give");
             }
+            // Match the reference collector's explicit end-routine terminator;
+            // after a non-Unit give this is unreachable but bytecode-stable.
+            instructions = nbc_emit(instructions, "BC_RET_UNIT", "");
             current_function = "";
             return_type = "";
             returned = false;
