@@ -67,6 +67,7 @@ SELFHOST_DRIVERS = tests/selfhost/lexer_driver.suru \
 	tests/selfhost/natural_module_driver.suru \
 	tests/selfhost/natural_effect_driver.suru \
 	tests/selfhost/effect_runtime_driver.suru \
+	tests/selfhost/heap_driver.suru \
 	tests/selfhost/natural_bytecode_driver.suru \
 	tests/selfhost/natural_ast_bytecode_driver.suru
 SELFHOST_REF = $(UNITDIR)/selfhost_reference_lexer
@@ -152,6 +153,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_module_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_effect_run.sh $(BINDIR)/suru
 	@tests/selfhost/effect_runtime_run.sh $(BINDIR)/suru
+	@tests/selfhost/heap_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_bytecode_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_ast_bytecode_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_compile_run.sh $(BINDIR)/suru
@@ -162,6 +164,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_corpus_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_closure_run.sh $(BINDIR)/suru
+	@tests/selfhost/heap_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_exec_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_compile_run.sh $(BINDIR)/suru
