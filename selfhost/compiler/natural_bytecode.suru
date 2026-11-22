@@ -3,6 +3,7 @@
 // and resolves every branch/handler target to a native instruction index.
 
 use "natural_expression_ast.suru";
+use "natural_ast_module.suru";
 
 func nbc_word(line: str) -> str {
     mut i: int = 0;
@@ -878,11 +879,109 @@ func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
     return nbc_emit_ast_node(instructions, nea_nodes(parsed), nea_root(parsed));
 }
 
+func nbc_typed_statement(line: str) -> [str] {
+    let parsed: [str] = nam_parse(line + "\n");
+    if parsed[0] != "ok" or array_len(parsed) < 2 {
+        return ["error", "statement AST parse failed"];
+    }
+    let raw: str = parsed[1];
+    let kind: str = nam_node_kind(raw);
+    let text: str = nam_node_text(raw);
+    let attached: [str] = nam_attach_expressions(kind, text, ["ok", ""]);
+    if attached[0] != "ok" {
+        return ["error", array_len(attached) > 1 ? attached[1] : "expression attachment failed"];
+    }
+    return array_concat([kind, text, attached[1]],
+                        slice(attached, 2, array_len(attached)));
+}
+
+func nbc_typed_statement_nodes(statement: [str]) -> [str] {
+    if array_len(statement) <= 3 { return []; }
+    return slice(statement, 3, array_len(statement));
+}
+
+func nbc_typed_statement_root(statement: [str], index: int) -> int {
+    if array_len(statement) < 3 or statement[2] == "" { return -1; }
+    let roots: [str] = str_split(statement[2], ",");
+    if index < 0 or index >= array_len(roots) { return -1; }
+    return int_from_str(roots[index]);
+}
+
+func nbc_emit_typed_statement_root(instructions: [str], statement: [str],
+                                   expected_kind: str, root_index: int) -> [str] {
+    if array_len(statement) == 0 or statement[0] != expected_kind {
+        return nbc_emit(instructions, "BC_TRAP", "typed statement kind mismatch");
+    }
+    let root: int = nbc_typed_statement_root(statement, root_index);
+    if root < 0 {
+        return nbc_emit(instructions, "BC_TRAP", "typed statement expression missing");
+    }
+    return nbc_emit_ast_node(instructions, nbc_typed_statement_nodes(statement), root);
+}
+
+func nbc_emit_typed_assignment(instructions: [str], line: str) -> [str] {
+    let statement: [str] = nbc_typed_statement(line);
+    if array_len(statement) == 0 or statement[0] != "assignment" {
+        return nbc_emit(instructions, "BC_TRAP", "assignment AST parse failed");
+    }
+    let target: int = nbc_typed_statement_root(statement, 0);
+    let value: int = nbc_typed_statement_root(statement, 1);
+    let nodes: [str] = nbc_typed_statement_nodes(statement);
+    if target < 0 or value < 0 {
+        return nbc_emit(instructions, "BC_TRAP", "assignment AST is missing a target or value");
+    }
+    let kind: str = nbc_ast_kind(nodes, target);
+    if kind == "atom" {
+        let name: str = nbc_ast_value(nodes, target);
+        let slot: int = nbc_slot(instructions, name);
+        if slot < 0 {
+            return nbc_emit(instructions, "BC_TRAP", "unknown assignment target: " + name);
+        }
+        let result: [str] = nbc_emit_ast_node(instructions, nodes, value);
+        return nbc_emit(result, "BC_ST_LOCAL", to_str(slot));
+    }
+    if kind == "field" {
+        let children: [int] = nbc_ast_children(nodes, target);
+        if array_len(children) != 1 {
+            return nbc_emit(instructions, "BC_TRAP", "invalid field assignment AST");
+        }
+        let base: int = children[0];
+        let base_name: str = nbc_ast_value(nodes, base);
+        let record_type: str = nbc_find_type(instructions, base_name);
+        let record: int = nbc_record_index(instructions, record_type);
+        let field: int = nbc_field_index(instructions, record_type,
+                                         nbc_ast_value(nodes, target));
+        if record < 0 or field < 0 {
+            return nbc_emit(instructions, "BC_TRAP", "unknown field assignment target");
+        }
+        let with_base: [str] = nbc_emit_ast_node(instructions, nodes, base);
+        let with_value: [str] = nbc_emit_ast_node(with_base, nodes, value);
+        return nbc_emit(with_value, "BC_FIELD_ST",
+                        to_str(record) + "|" + to_str(field));
+    }
+    if kind == "index" {
+        let children: [int] = nbc_ast_children(nodes, target);
+        if array_len(children) != 2 {
+            return nbc_emit(instructions, "BC_TRAP", "invalid index assignment AST");
+        }
+        let with_base: [str] = nbc_emit_ast_node(instructions, nodes, children[0]);
+        let with_index: [str] = nbc_emit_ast_node(with_base, nodes, children[1]);
+        let with_value: [str] = nbc_emit_ast_node(with_index, nodes, value);
+        return nbc_emit(with_value, "BC_IDX_ST", "");
+    }
+    return nbc_emit(instructions, "BC_TRAP", "unsupported assignment target AST: " + kind);
+}
+
 func nbc_expression_statement(instructions: [str], line: str) -> [str] {
     mut result: [str] = instructions;
     if nbc_has_prefix(line, "show(") and line[str_len(line) - 1] == ")" {
         let value: str = substr(line, 5, str_len(line) - 6);
-        result = nbc_emit_expression(result, value);
+        let statement: [str] = nbc_typed_statement(line);
+        if array_len(statement) > 0 and statement[0] == "show" {
+            result = nbc_emit_typed_statement_root(result, statement, "show", 0);
+        } else {
+            result = nbc_emit_expression(result, value);
+        }
         result = nbc_emit(result, "BC_BUILTIN", "1");
         return nbc_emit(result, "BC_POP", "");
     }
