@@ -58,8 +58,8 @@ func main() {
         byte_state, no_stack, no_frames, "str",
         "0123456789012345678901234567890123456789", no_children);
     byte_state = [large[0], large[1], large[2]];
-    if sh_live_bytes(byte_state[0]) <= 64 or
-       sh_gc_stats(byte_state)[1] != 0 {
+    let byte_before: [int] = sh_gc_stats(byte_state);
+    if sh_live_bytes(byte_state[0]) <= 64 or byte_before[1] != 0 {
         println("FAIL VM byte threshold setup");
         exit(1);
     }
