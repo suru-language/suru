@@ -304,9 +304,33 @@ The bytecode object-emitting half is now owned by SURU:
 
 The deferred self-rebuild identity gate (rebuilding the compiler twice yields
 byte-identical bytecode) still depends on the compiler itself being written in
-Natural syntax; the current build driver is a legacy host program that the
-Natural frontend does not accept, so self-compilation of the driver is not yet
-possible.
+Natural syntax; the current build driver is a legacy-syntax SURU program that
+the Natural frontend does not accept, so self-compilation of the driver is not
+yet possible.
+
+### Stage 1: public self-hosted compiler entry point
+
+The C17 CLI now exposes the SURU-written Stage 1 bytecode compiler explicitly:
+
+```text
+suru --syntax=natural --compiler=selfhost check source.suru
+suru --syntax=natural --compiler=selfhost compile source.suru output.sbc
+suru --syntax=natural --compiler=selfhost run source.suru
+```
+
+This route runs `tests/selfhost/natural_build_driver.suru` under the Stage 0
+C17 VM. That SURU driver performs the Natural frontend checks, emits bytecode,
+runs the SURU-written verifier, and serializes the module with the SURU module
+writer. The default Natural CLI route remains the C reference implementation
+until the self-hosted route reaches complete language and diagnostic parity.
+The native backend is not yet part of this flag; it remains a separate Stage 3
+path.
+
+The Stage 1 CLI gate checks byte-identical output against the reference
+compiler, check/run behavior, module execution, and paths containing spaces.
+The corpus-wide build parity gate now exercises the public
+`--compiler=selfhost` interface instead of invoking the driver directly.
+
 
 The first Stage 1 slot-isolation increment is implemented on the
 `stage1-per-function-slots` branch. Compiler slot and type markers are scoped
