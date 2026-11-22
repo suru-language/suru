@@ -3,7 +3,10 @@ record Point
 end record
 routine main() -> Unit
     value p: Point = none
-    value n: Whole = 7
+    value n: Whole = 0
+    repeat while n < 7
+        set n to n + 1
+    end repeat
     set p.x to n
     show(p.x)
 end routine
