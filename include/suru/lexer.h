@@ -11,8 +11,9 @@ extern "C" {
 #endif
 
 /* A lexer over an in-memory source buffer. The source buffer must outlive
- * the lexer and its tokens. String literal bytes are decoded into the
- * provided arena. */
+ * active scanning. Identifier spellings and decoded string-literal bytes
+ * are copied into the provided arena, so token text remains valid after the
+ * source buffer is released. The file-name pointer remains caller-owned. */
 typedef struct s_lexer {
     const char *file;       /* file name, not owned */
     const char *src;

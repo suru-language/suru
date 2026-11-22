@@ -140,11 +140,15 @@ static s_u32 new_label(s_labelmgr *m) {
 static bool patch_label(s_labelmgr *m, s_u32 ins_idx, s_u32 lab) {
     if (m->npatches >= m->capp) {
         s_u32 ncap = m->capp ? m->capp * 2 : 16;
-        s_u32 *ni = realloc(m->pins, (s_size)ncap * sizeof(s_u32));
-        s_u32 *nl = realloc(m->plab, (s_size)ncap * sizeof(s_u32));
-        if (!ni && !nl) return false;
-        if (!nl) { free(ni); return false; }
-        if (!ni) { free(nl); return false; }
+        s_u32 *ni = malloc((s_size)ncap * sizeof(s_u32));
+        s_u32 *nl = malloc((s_size)ncap * sizeof(s_u32));
+        if (!ni || !nl) { free(ni); free(nl); return false; }
+        if (m->npatches) {
+            memcpy(ni, m->pins, (s_size)m->npatches * sizeof(s_u32));
+            memcpy(nl, m->plab, (s_size)m->npatches * sizeof(s_u32));
+        }
+        free(m->pins);
+        free(m->plab);
         m->pins = ni;
         m->plab = nl;
         m->capp = ncap;
@@ -173,13 +177,15 @@ static void place_label(s_emit *e, s_labelmgr *m, s_u32 lab) {
 
 /* Resolve any patches whose label was placed after the patch was recorded
  * (backward jumps). Must be called after all emission for a function. */
-static void finalize_labels(s_emit *e, s_labelmgr *m) {
+static bool finalize_labels(s_emit *e, s_labelmgr *m) {
     for (s_u32 i = 0; i < m->npatches; ++i) {
         s_u32 lab = m->plab[i];
-        if (m->pos[lab] != LABEL_UNPLACED) {
-            e->ins[m->pins[i]].a = m->pos[lab];
-        }
+        s_u32 ins = m->pins[i];
+        if (lab >= m->nlabels || ins >= e->nins ||
+            m->pos[lab] == LABEL_UNPLACED) return false;
+        e->ins[ins].a = m->pos[lab];
     }
+    return true;
 }
 
 /* ------------------------------------------------------------------ */
@@ -886,41 +892,6 @@ static bool fold_func(s_bc_ins **pins, s_u32 *pnin, s_pool *pool) {
     return true;
 }
 
-static s_u32 max_user_slot(const s_stmt *s, s_u32 cur) {
-    switch (s->kind) {
-    case S_STMT_LET:
-        if ((s_u32)s->u.let.var_index + 1 > cur)
-            cur = (s_u32)s->u.let.var_index + 1;
-        break;
-    case S_STMT_FOR:
-        if ((s_u32)s->u.forstmt.var_index + 1 > cur)
-            cur = (s_u32)s->u.forstmt.var_index + 1;
-        if (s->u.forstmt.body)
-            cur = max_user_slot(s->u.forstmt.body, cur);
-        break;
-    case S_STMT_IF:
-        cur = max_user_slot(s->u.ifstmt.then_block, cur);
-        if (s->u.ifstmt.else_block)
-            cur = max_user_slot(s->u.ifstmt.else_block, cur);
-        break;
-    case S_STMT_WHILE:
-        if (s->u.whilestmt.body)
-            cur = max_user_slot(s->u.whilestmt.body, cur);
-        break;
-    case S_STMT_DO:
-        if (s->u.dostmt.body)
-            cur = max_user_slot(s->u.dostmt.body, cur);
-        break;
-    case S_STMT_BLOCK:
-        for (s_size i = 0; i < s->u.block.count; ++i)
-            cur = max_user_slot(s->u.block.items[i], cur);
-        break;
-    default:
-        break;
-    }
-    return cur;
-}
-
 bool s_bcc_run(const s_module *ast, s_arena *arena, s_diag_ctx *diag,
                s_bc_module *out) {
     s_gen g;
@@ -960,7 +931,12 @@ bool s_bcc_run(const s_module *ast, s_arena *arena, s_diag_ctx *diag,
         g.e.ins = NULL;
         g.labels.nlabels = 0;
         g.labels.npatches = 0;
-        g.frame_max = max_user_slot(fn->body, (s_u32)fn->nparams);
+        g.frame_max = fn->max_frame_slots;
+        if (fn->slot_type_count != fn->max_frame_slots) {
+            s_diag_error(diag, fn->loc, 500,
+                         "internal error: function slot type/frame metadata mismatch");
+            g.ok = false;
+        }
         if (!gen_stmt(&g, fn->body, NULL)) {
             if (getenv("SURU_BCC_DEBUG"))
                 fprintf(stderr, "[bcc] gen failed for '%s'\n", fn->name);
@@ -975,7 +951,11 @@ bool s_bcc_run(const s_module *ast, s_arena *arena, s_diag_ctx *diag,
                 if (!em_push(&g.e, BC_RET, 0, 0, 0)) g.ok = false;
             }
         }
-        finalize_labels(&g.e, &g.labels);
+        if (!finalize_labels(&g.e, &g.labels)) {
+            s_diag_error(diag, fn->loc, 500,
+                         "internal error: unresolved bytecode label in '%s'", fn->name);
+            g.ok = false;
+        }
         if (!dce_func(&g.e.ins, &g.e.nins)) {
             g.ok = false;
         }

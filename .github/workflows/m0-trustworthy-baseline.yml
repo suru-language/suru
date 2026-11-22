@@ -1,0 +1,48 @@
+name: M0 trustworthy baseline
+on:
+  push:
+    branches: [m0-trustworthy-baseline]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  m0-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify checkpoint in scratch clone
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          git clone --depth=1 --branch m0-trustworthy-baseline \
+            "https://github.com/${REPOSITORY}.git" "${RUNNER_TEMP}/suru-m0-scratch"
+          cd "${RUNNER_TEMP}/suru-m0-scratch"
+          test -s .kilo/plans/1794948281385-m0-trustworthy-baseline.md
+          test -s docs/m0-trustworthy-baseline.md
+          test -s tests/integration/manifest.json
+          git rev-parse HEAD
+      - name: Normal tests and determinism
+        working-directory: ${{ runner.temp }}/suru-m0-scratch
+        run: |
+          make clean
+          make test
+          make determinism-test
+      - name: Incremental and interval-one GC
+        working-directory: ${{ runner.temp }}/suru-m0-scratch
+        env:
+          SURU_GC_INCREMENTAL: "1"
+        run: make integration
+      - name: Static analysis
+        working-directory: ${{ runner.temp }}/suru-m0-scratch
+        run: make analyze
+      - name: Sanitizers
+        working-directory: ${{ runner.temp }}/suru-m0-scratch
+        run: make BUILD=build-asan asan-test
+      - name: Clang cross-compiler
+        working-directory: ${{ runner.temp }}/suru-m0-scratch
+        run: make CC=clang BUILD=build-clang test
+      - name: Final worktree
+        working-directory: ${{ runner.temp }}/suru-m0-scratch
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

@@ -205,7 +205,10 @@ typedef struct s_func_decl {
     bool is_lambda;              /* synthetic function created from a lambda */
     const char **type_params;    /* generic type parameter names */
     int ntype_params;
-    s_u32 max_frame_slots;       /* semi for stack size */
+    s_u32 max_frame_slots;       /* exact number of compiler local slots */
+    s_type **slot_types;         /* compiler-only type for each local slot */
+    s_u32 slot_type_count;
+    s_u32 slot_type_cap;
     s_u32 max_operand_depth;     /* sema */
     s_source_loc loc;
 } s_func_decl;

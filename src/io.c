@@ -38,16 +38,12 @@ int s_io_read_all(const char *path, s_u8 **out, s_size *outlen,
         return -1;
     }
 
-    s_size pos = 0;
-    while (pos < len) {
-        size_t want = (size_t)(len - pos);
-        size_t got = fread(buf + pos, 1, want, f);
-        if (got == 0) {
-            free(buf);
-            (void)fclose(f);
-            return -1;
-        }
-        pos += (s_size)got;
+    size_t want = (size_t)len;
+    size_t got = want ? fread(buf, 1, want, f) : 0;
+    if (got != want) {
+        free(buf);
+        (void)fclose(f);
+        return -1;
     }
 
     int read_error = ferror(f) ? 1 : 0;

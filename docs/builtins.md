@@ -65,6 +65,10 @@ array lengths are bounded by the heap/runtime limits.
 | `array_index_of` | `([int], int) -> int` | Returns the first index or -1. |
 | `array_sort` | `([int]) -> [int]` | Returns a sorted copy of an integer array. |
 
+| `f64_to_bytes` | `(float) -> str` | Returns the eight raw little-endian bytes of the binary64 bit pattern. |
+| `str_byte_at` | `(str, int) -> int` | Returns the unsigned byte at a zero-based index; negative and out-of-range indices trap. |
+| `bytes_to_f64` | `(str) -> float` | Decodes the first eight bytes as a little-endian binary64 value; strings shorter than eight bytes trap. |
+
 The table intentionally records current behavior, including byte-oriented
 string transforms and the bounded host-file builtins. The future Natural
 Syntax/Document A standard-library contract must either adopt or explicitly

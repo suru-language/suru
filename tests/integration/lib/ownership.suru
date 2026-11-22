@@ -1,0 +1,5 @@
+const OWNED_VALUE = "included source survives";
+func owned_value() -> str {
+    let local_identifier = OWNED_VALUE;
+    return local_identifier;
+}

@@ -9,36 +9,11 @@ ROOT="$(cd "$DIR/../.." && pwd)"
 fail=0
 tests=0
 
-for src in "$DIR"/*.suru; do
-    [ -e "$src" ] || continue
-    name="$(basename "$src" .suru)"
-    [ "$name" = "argtest" ] && continue   # handled specially with args
-    [ "$name" = "pkgmain" ] && continue   # handled specially with SURU_MOD_PATH
-    [[ "$name" == gcstress* ]] && continue  # handled specially with low GC threshold
-    tests=$((tests + 1))
-    outfile="$DIR/$name.out"
-    exitfile="$DIR/$name.exit"
-    want_code=0
-    [ -f "$exitfile" ] && want_code="$(cat "$exitfile")"
-
-    actual="$("$SURU" run "$src" 2>"$DIR/.stderr.$name")"
-    got_code=$?
-
-    if [ "$got_code" -ne "$want_code" ]; then
-        echo "FAIL: $name (exit $got_code, want $want_code)"
-        sed 's/^/    stderr: /' "$DIR/.stderr.$name"
-        fail=$((fail + 1))
-        continue
-    fi
-    if [ -f "$outfile" ] && [ "$actual" != "$(cat "$outfile")" ]; then
-        echo "FAIL: $name (stdout mismatch)"
-        echo "  got: $actual"
-        echo "  want: $(cat "$outfile")"
-        fail=$((fail + 1))
-        continue
-    fi
-    echo "ok: $name"
-done
+manifest_count="$(python3 "$DIR/run_manifest.py" --count-only)"
+tests=$((tests + manifest_count))
+if ! python3 "$DIR/run_manifest.py" "$SURU"; then
+    fail=$((fail + 1))
+fi
 
 # --syntax flag selection.
 tests=$((tests + 3))
@@ -359,51 +334,6 @@ else
     fail=$((fail + 1))
 fi
 rm -f "$natprog"
-
-# Program arguments: run argtest.suru with two args.
-tests=$((tests + 1))
-actual="$("$SURU" run "$DIR/argtest.suru" alpha beta 2>"$tmp/stderr")"
-code=$?
-if [ "$code" -eq 0 ] && [ "$actual" = "$(cat "$DIR/argtest.out")" ]; then
-    echo "ok: argtest"
-else
-    echo "FAIL: argtest (exit $code)"
-    echo "  got: $actual"
-    sed 's/^/    stderr: /' "$tmp/stderr"
-    fail=$((fail + 1))
-fi
-
-# Module search path: SURU_MOD_PATH is used to resolve `use`.
-tests=$((tests + 1))
-mkdir -p "$tmp/mod"
-printf 'func greet() -> str { return "gm"; }\n' > "$tmp/mod/gm.suru"
-actual="$(SURU_MOD_PATH="$tmp/mod" "$SURU" run "$DIR/pkgmain.suru" 2>"$tmp/stderr")"
-code=$?
-if [ "$code" -eq 0 ] && [ "$actual" = "gm" ]; then
-    echo "ok: pkgsearch"
-else
-    echo "FAIL: pkgsearch (exit $code)"
-    echo "  got: $actual"
-    sed 's/^/    stderr: /' "$tmp/stderr"
-    fail=$((fail + 1))
-fi
-
-# GC stress: force frequent collections with a tiny threshold.
-for src in "$DIR"/gcstress*.suru; do
-    [ -e "$src" ] || continue
-    name="$(basename "$src" .suru)"
-    tests=$((tests + 1))
-    actual="$(SURU_GC_THRESHOLD=512 "$SURU" run "$src" 2>"$tmp/stderr")"
-    code=$?
-    if [ "$code" -eq 0 ] && [ "$actual" = "$(cat "$DIR/$name.out")" ]; then
-        echo "ok: $name"
-    else
-        echo "FAIL: $name (exit $code)"
-        echo "  got: $actual"
-        sed 's/^/    stderr: /' "$tmp/stderr"
-        fail=$((fail + 1))
-    fi
-done
 
 rm -rf "$tmp"
 

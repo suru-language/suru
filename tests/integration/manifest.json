@@ -1,0 +1,607 @@
+{
+  "schema_version": 1,
+  "description": "Legacy integration corpus with exact byte stdout goldens and explicit unsupported stdout assertions.",
+  "tests": [
+    {
+      "name": "argsoob",
+      "source": "argsoob.suru",
+      "exit_code": 1,
+      "stdout": {
+        "unsupported": "No legacy stdout golden was present; this case asserts the recorded exit status only."
+      }
+    },
+    {
+      "name": "argtest",
+      "source": "argtest.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "argtest.out"
+      },
+      "args": [
+        "alpha",
+        "beta"
+      ]
+    },
+    {
+      "name": "arith",
+      "source": "arith.suru",
+      "exit_code": 2,
+      "stdout": {
+        "golden": "arith.out"
+      }
+    },
+    {
+      "name": "arraylit",
+      "source": "arraylit.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "arraylit.out"
+      }
+    },
+    {
+      "name": "arrfloat",
+      "source": "arrfloat.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "arrfloat.out"
+      }
+    },
+    {
+      "name": "arrreduce",
+      "source": "arrreduce.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "arrreduce.out"
+      }
+    },
+    {
+      "name": "assertfail",
+      "source": "assertfail.suru",
+      "exit_code": 1,
+      "stdout": {
+        "unsupported": "No legacy stdout golden was present; this case asserts the recorded exit status only."
+      }
+    },
+    {
+      "name": "badid",
+      "source": "badid.suru",
+      "exit_code": 1,
+      "stdout": {
+        "unsupported": "No legacy stdout golden was present; this case asserts the recorded exit status only."
+      }
+    },
+    {
+      "name": "badsur",
+      "source": "badsur.suru",
+      "exit_code": 1,
+      "stdout": {
+        "unsupported": "No legacy stdout golden was present; this case asserts the recorded exit status only."
+      }
+    },
+    {
+      "name": "bitwise",
+      "source": "bitwise.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "bitwise.out"
+      }
+    },
+    {
+      "name": "breakcont",
+      "source": "breakcont.suru",
+      "exit_code": 25,
+      "stdout": {
+        "golden": "breakcont.out"
+      }
+    },
+    {
+      "name": "closure",
+      "source": "closure.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "closure.out"
+      }
+    },
+    {
+      "name": "cmpassign",
+      "source": "cmpassign.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "cmpassign.out"
+      }
+    },
+    {
+      "name": "coll",
+      "source": "coll.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "coll.out"
+      }
+    },
+    {
+      "name": "compound",
+      "source": "compound.suru",
+      "exit_code": 6,
+      "stdout": {
+        "golden": "compound.out"
+      }
+    },
+    {
+      "name": "concat",
+      "source": "concat.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "concat.out"
+      }
+    },
+    {
+      "name": "const",
+      "source": "const.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "const.out"
+      }
+    },
+    {
+      "name": "constexpr",
+      "source": "constexpr.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "constexpr.out"
+      }
+    },
+    {
+      "name": "ctrl",
+      "source": "ctrl.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "ctrl.out"
+      }
+    },
+    {
+      "name": "divzero",
+      "source": "divzero.suru",
+      "exit_code": 1,
+      "stdout": {
+        "golden": "divzero.out"
+      }
+    },
+    {
+      "name": "dowhile",
+      "source": "dowhile.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "dowhile.out"
+      }
+    },
+    {
+      "name": "emptyreduce",
+      "source": "emptyreduce.suru",
+      "exit_code": 1,
+      "stdout": {
+        "unsupported": "No legacy stdout golden was present; this case asserts the recorded exit status only."
+      }
+    },
+    {
+      "name": "enum",
+      "source": "enum.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "enum.out"
+      }
+    },
+    {
+      "name": "escapes",
+      "source": "escapes.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "escapes.out"
+      }
+    },
+    {
+      "name": "exitcode",
+      "source": "exitcode.suru",
+      "exit_code": 7,
+      "stdout": {
+        "unsupported": "No legacy stdout golden was present; this case asserts the recorded exit status only."
+      }
+    },
+    {
+      "name": "ext",
+      "source": "ext.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "ext.out"
+      }
+    },
+    {
+      "name": "f64",
+      "source": "f64.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "f64.out"
+      }
+    },
+    {
+      "name": "fmt",
+      "source": "fmt.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "fmt.out"
+      }
+    },
+    {
+      "name": "fold",
+      "source": "fold.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "fold.out"
+      }
+    },
+    {
+      "name": "forcont",
+      "source": "forcont.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "forcont.out"
+      }
+    },
+    {
+      "name": "forloop",
+      "source": "forloop.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "forloop.out"
+      }
+    },
+    {
+      "name": "gc_interval1",
+      "source": "gc_interval1.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "gc_interval1.out"
+      }
+    },
+    {
+      "name": "gc_interval1-allocation-interval-one",
+      "source": "gc_interval1.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "gc_interval1.out"
+      },
+      "env": {
+        "SURU_GC_ALLOC_INTERVAL": "1"
+      }
+    },
+    {
+      "name": "gcstress",
+      "source": "gcstress.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "gcstress.out"
+      },
+      "env": {
+        "SURU_GC_THRESHOLD": "512"
+      }
+    },
+    {
+      "name": "gcstress2",
+      "source": "gcstress2.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "gcstress2.out"
+      },
+      "env": {
+        "SURU_GC_THRESHOLD": "512"
+      }
+    },
+    {
+      "name": "gcstress3",
+      "source": "gcstress3.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "gcstress3.out"
+      },
+      "env": {
+        "SURU_GC_THRESHOLD": "512"
+      }
+    },
+    {
+      "name": "gcstress4",
+      "source": "gcstress4.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "gcstress4.out"
+      },
+      "env": {
+        "SURU_GC_THRESHOLD": "512"
+      }
+    },
+    {
+      "name": "generic",
+      "source": "generic.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "generic.out"
+      }
+    },
+    {
+      "name": "hello",
+      "source": "hello.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "hello.out"
+      }
+    },
+    {
+      "name": "include_lifetime",
+      "source": "include_lifetime.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "include_lifetime.out"
+      }
+    },
+    {
+      "name": "intparse",
+      "source": "intparse.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "intparse.out"
+      }
+    },
+    {
+      "name": "io",
+      "source": "io.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "io.out"
+      }
+    },
+    {
+      "name": "iofail",
+      "source": "iofail.suru",
+      "exit_code": 1,
+      "stdout": {
+        "unsupported": "No legacy stdout golden was present; this case asserts the recorded exit status only."
+      }
+    },
+    {
+      "name": "len",
+      "source": "len.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "len.out"
+      }
+    },
+    {
+      "name": "logical",
+      "source": "logical.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "logical.out"
+      }
+    },
+    {
+      "name": "loop",
+      "source": "loop.suru",
+      "exit_code": 45,
+      "stdout": {
+        "golden": "loop.out"
+      }
+    },
+    {
+      "name": "methbad",
+      "source": "methbad.suru",
+      "exit_code": 1,
+      "stdout": {
+        "unsupported": "No legacy stdout golden was present; this case asserts the recorded exit status only."
+      }
+    },
+    {
+      "name": "methods",
+      "source": "methods.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "methods.out"
+      }
+    },
+    {
+      "name": "negidx",
+      "source": "negidx.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "negidx.out"
+      }
+    },
+    {
+      "name": "noret",
+      "source": "noret.suru",
+      "exit_code": 1,
+      "stdout": {
+        "unsupported": "No legacy stdout golden was present; this case asserts the recorded exit status only."
+      }
+    },
+    {
+      "name": "oob",
+      "source": "oob.suru",
+      "exit_code": 1,
+      "stdout": {
+        "unsupported": "No legacy stdout golden was present; this case asserts the recorded exit status only."
+      }
+    },
+    {
+      "name": "parseint",
+      "source": "parseint.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "parseint.out"
+      }
+    },
+    {
+      "name": "pkgmain",
+      "source": "pkgmain.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "pkgmain.out"
+      },
+      "fixtures": {
+        "gm.suru": "func greet() -> str { return \"gm\"; }\n"
+      },
+      "env": {
+        "SURU_MOD_PATH": "{fixture_dir}"
+      }
+    },
+    {
+      "name": "polyprint",
+      "source": "polyprint.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "polyprint.out"
+      }
+    },
+    {
+      "name": "pprint",
+      "source": "pprint.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "pprint.out"
+      }
+    },
+    {
+      "name": "promote",
+      "source": "promote.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "promote.out"
+      }
+    },
+    {
+      "name": "recinit",
+      "source": "recinit.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "recinit.out"
+      }
+    },
+    {
+      "name": "records",
+      "source": "records.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "records.out"
+      }
+    },
+    {
+      "name": "retfix",
+      "source": "retfix.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "retfix.out"
+      }
+    },
+    {
+      "name": "retpaths",
+      "source": "retpaths.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "retpaths.out"
+      }
+    },
+    {
+      "name": "slice",
+      "source": "slice.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "slice.out"
+      }
+    },
+    {
+      "name": "splitjoin",
+      "source": "splitjoin.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "splitjoin.out"
+      }
+    },
+    {
+      "name": "str_case",
+      "source": "str_case.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "str_case.out"
+      }
+    },
+    {
+      "name": "strcmp",
+      "source": "strcmp.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "strcmp.out"
+      }
+    },
+    {
+      "name": "stridx",
+      "source": "stridx.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "stridx.out"
+      }
+    },
+    {
+      "name": "strings",
+      "source": "strings.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "strings.out"
+      }
+    },
+    {
+      "name": "strmul",
+      "source": "strmul.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "strmul.out"
+      }
+    },
+    {
+      "name": "strutil",
+      "source": "strutil.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "strutil.out"
+      }
+    },
+    {
+      "name": "ternary",
+      "source": "ternary.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "ternary.out"
+      }
+    },
+    {
+      "name": "tshare",
+      "source": "tshare.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "tshare.out"
+      }
+    },
+    {
+      "name": "typeof",
+      "source": "typeof.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "typeof.out"
+      }
+    },
+    {
+      "name": "usemain",
+      "source": "usemain.suru",
+      "exit_code": 0,
+      "stdout": {
+        "unsupported": "No legacy stdout golden was present; this case asserts the recorded exit status only."
+      }
+    }
+  ]
+}
