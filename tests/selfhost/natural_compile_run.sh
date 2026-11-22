@@ -34,6 +34,13 @@ for input in "$ROOT"/tests/natural/*.suru; do
     tests=$((tests + 1))
     if ! cmp -s "$tmp/c.sbc" "$tmp/u.sbc"; then
         echo "FAIL: byte mismatch on $(basename "$input")" >&2
+        echo "  C bytes: $(wc -c < "$tmp/c.sbc"), SURU bytes: $(wc -c < "$tmp/u.sbc")" >&2
+        echo "  first differing offsets (1-based):" >&2
+        cmp -l "$tmp/c.sbc" "$tmp/u.sbc" | head -20 >&2 || true
+        echo "  C header:" >&2
+        od -An -tx1 -N64 "$tmp/c.sbc" >&2
+        echo "  SURU header:" >&2
+        od -An -tx1 -N64 "$tmp/u.sbc" >&2
         fail=$((fail + 1))
     fi
 done
