@@ -483,3 +483,21 @@ The SURU-written module AST parser now recognizes top-level routine declarations
 The AST-driven bytecode collector in `natural_ast_bytecode.suru` consumes routine/module AST nodes and attached expression-node IDs directly. Its executable subset now includes typed routine parameters and returns, local bindings and assignments, `show` and `give`, nested `when`/`otherwise`, `repeat while`, and integer range loops. The range-loop lowering evaluates the start and upper bound once, keeps the iterator and bound in function-local slots, uses an exclusive comparison for `until` and an inclusive comparison for `through`, and resolves loop branches through the SURU module writer. The emitted instruction records go through the existing SURU verifier and writer without changing bytecode v1.
 
 The differential test still compares the byte-identical two-routine subset supported by both collectors. A separate AST-only execution fixture checks `each ... from ... until` and `each ... from ... through`, because the older source-scanning reference collector does not yet lower these new range constructs. The source-scanning collector remains the reference for records, choices, exceptions, and wider language coverage; remaining AST lowering and removal of source-line collection from the normal Stage 1 compiler path are still open tasks.
+
+
+### Stage 2 root-coverage regression: suspended caller frames
+
+tests/selfhost/natural_vm_local_roots_mk_driver.suru builds a two-function
+bytecode module. main stores a managed string in local slot 0, calls a
+separate churn routine, and reads the string only after that routine
+returns. churn performs 520 managed string allocations, discarding each
+temporary value. This forces the SURU VM's incremental collector to make
+progress while the only live reference to the retained string is in a
+suspended caller frame.
+
+The regression runs the same module through the C reference VM and the
+SURU-written VM and requires identical output (caller-root). It specifically
+guards the VM root-set contract: every active call frame's locals, not merely
+the top frame's locals and the operand stack, must be scanned at allocation
+safepoints. The runner is included in both make selfhost-test and
+make selfhost-compare.
