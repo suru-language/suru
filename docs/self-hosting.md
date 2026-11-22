@@ -395,16 +395,23 @@ Array/field reads and writes dereference handles; nested object references are
 recorded in the object graph, and shared aliases observe mutations through the
 same handle. Exception objects retain managed type and message strings and a
 managed cause link; typed handler dispatch matches the exception type name.
-Before object allocation the interpreter seeds the collector from its operand
-stack and all active call-frame locals. Inline arrays remain temporarily for
-closure capture environments.
+Closure values are also managed objects. A closure with captures owns a
+managed environment array, and the closure records that array as a child.
+Calling the closure installs the environment handle in the new call frame, so
+captured handles remain visible to root scanning after the closure value leaves
+the operand stack. A C-vs-SURU VM regression captures a managed string and reads
+it inside the called routine; the existing closure parity fixture remains
+intact.
+
+Before each object allocation the interpreter currently runs a full SURU heap
+collection, seeding roots from its operand stack and all active call-frame
+locals. The incremental marking API is tested independently, but scheduling
+bounded incremental slices through every mutator is still open work.
 
 This remains a Stage 2 port, not a replacement for `src/mem.c` or the default
-C VM: the SURU interpreter itself still runs under the Stage 0 C17 VM. The
-current interpreter performs a full SURU heap collection before object
-allocation; integrating incremental slices with every mutator, moving closure
-environments onto managed objects, porting allocation accounting, and making
-the native/default runtime independent of C remain open work.
+C VM: the SURU interpreter itself still runs under the Stage 0 C17 VM. Porting
+allocation accounting/reuse policy parity and making the native/default runtime
+independent of C remain open work.
 The next Stage 1 AST increment adds `NAstModule`, a typed collection of
 `NAstNode` records with parse-error metadata. The statement parser's serialized
 nodes are rehydrated into the module array. The module driver is compared
