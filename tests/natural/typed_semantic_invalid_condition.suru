@@ -1,0 +1,4 @@
+value score: Whole = 1
+when score
+    show("wrong")
+end when

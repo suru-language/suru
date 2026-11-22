@@ -5,6 +5,7 @@
 use "natural_token_stream.suru";
 use "natural_control_parser.suru";
 use "natural_expression_ast.suru";
+use "natural_expression_types.suru";
 
 func nam_find(text: str, needle: str, start: int) -> int {
     mut i: int = start;
@@ -228,5 +229,134 @@ func nam_check_typed(source: str) -> int {
                 expressions[base + 1] + "|" + expressions[base + 2]);
         i += 1;
     }
+    return 0;
+}
+
+func nam_type_error(line: int, message: str) -> int {
+    println("semantic-error|" + to_str(line) + "|" + message);
+    return 1;
+}
+
+func nam_check_semantic(source: str) -> int {
+    let module: [str] = nam_parse(source);
+    if module[0] == "error" {
+        println("semantic-error|" + module[1] + "|" + module[2] + "|" + module[3]);
+        return 1;
+    }
+
+    mut names: [str] = [];
+    mut types: [str] = [];
+    mut expressions: [str] = [];
+    let field_names: [str] = [];
+    let field_types: [str] = [];
+    mut i: int = 1;
+    while i < array_len(module) {
+        let raw: str = module[i];
+        let kind: str = nam_node_kind(raw);
+        let line: int = nam_node_line(raw);
+        let text: str = nam_node_text(raw);
+        let state: [str] = array_concat(["ok", ""], expressions);
+        let attached: [str] = nam_attach_expressions(kind, text, state);
+        if attached[0] == "error" {
+            return nam_type_error(line, attached[1]);
+        }
+        let roots: [int] = net_children(attached[1]);
+        let next_nodes: [str] = slice(attached, 2, array_len(attached));
+
+        if kind == "binding" {
+            if array_len(roots) != 1 {
+                return nam_type_error(line, "binding requires one initializer expression");
+            }
+            let inferred: [str] = net_infer(next_nodes, roots[0], names, types,
+                                            field_names, field_types);
+            if inferred[0] == "error" { return nam_type_error(line, inferred[1]); }
+            let equals: int = nam_find(text, " = ", 0);
+            let first_space: int = nam_find(text, " ", 0);
+            if equals < 0 or first_space < 0 {
+                return nam_type_error(line, "malformed binding AST payload");
+            }
+            let colon: int = nam_find(text, ":", first_space + 1);
+            let name_end: int = colon >= 0 ? colon : equals;
+            let name: str = str_trim(substr(text, first_space + 1,
+                                            name_end - first_space - 1));
+            if name == "" { return nam_type_error(line, "binding name is empty"); }
+            if net_lookup(names, types, name) != "" {
+                return nam_type_error(line, "duplicate binding '" + name + "'");
+            }
+            mut declared: str = "";
+            if colon >= 0 {
+                declared = str_trim(substr(text, colon + 1, equals - colon - 1));
+            }
+            if declared != "" and declared != inferred[1] {
+                return nam_type_error(line, "initializer for '" + name +
+                                      "' has type " + inferred[1] +
+                                      ", expected " + declared);
+            }
+            let final_type: str = declared == "" ? inferred[1] : declared;
+            names = array_concat(names, [name]);
+            types = array_concat(types, [final_type]);
+            println("typed-binding|" + name + "|" + final_type);
+        } else if kind == "assignment" {
+            if array_len(roots) != 2 {
+                return nam_type_error(line, "assignment requires target and value");
+            }
+            let left: [str] = net_infer(next_nodes, roots[0], names, types,
+                                        field_names, field_types);
+            if left[0] == "error" { return nam_type_error(line, left[1]); }
+            let right: [str] = net_infer(next_nodes, roots[1], names, types,
+                                         field_names, field_types);
+            if right[0] == "error" { return nam_type_error(line, right[1]); }
+            let target_kind: str = next_nodes[roots[0] * 3];
+            if target_kind != "atom" and target_kind != "field" and target_kind != "index" {
+                return nam_type_error(line, "assignment target is not writable");
+            }
+            if net_common_type(left[1], right[1]) == "" {
+                return nam_type_error(line, "cannot assign " + right[1] +
+                                      " to " + left[1]);
+            }
+        } else if kind == "when" or kind == "repeat" or kind == "otherwise-when" {
+            if array_len(roots) != 1 {
+                return nam_type_error(line, "control condition requires one expression");
+            }
+            let condition: [str] = net_infer(next_nodes, roots[0], names, types,
+                                             field_names, field_types);
+            if condition[0] == "error" { return nam_type_error(line, condition[1]); }
+            if condition[1] != "Bool" {
+                return nam_type_error(line, "control condition requires Bool, got " + condition[1]);
+            }
+        } else if kind == "each" {
+            if array_len(roots) == 1 {
+                let iterable: [str] = net_infer(next_nodes, roots[0], names, types,
+                                                field_names, field_types);
+                if iterable[0] == "error" { return nam_type_error(line, iterable[1]); }
+                if not net_is_array(iterable[1]) and iterable[1] != "Text" {
+                    return nam_type_error(line, "each across requires an Array or Text");
+                }
+            } else if array_len(roots) == 2 {
+                let start: [str] = net_infer(next_nodes, roots[0], names, types,
+                                             field_names, field_types);
+                if start[0] == "error" { return nam_type_error(line, start[1]); }
+                let finish: [str] = net_infer(next_nodes, roots[1], names, types,
+                                              field_names, field_types);
+                if finish[0] == "error" { return nam_type_error(line, finish[1]); }
+                if start[1] != "Whole" or finish[1] != "Whole" {
+                    return nam_type_error(line, "each range bounds must be Whole");
+                }
+            }
+        } else if kind == "show" or kind == "give" or kind == "choose" or kind == "case" {
+            mut root_index: int = 0;
+            while root_index < array_len(roots) {
+                let inferred: [str] = net_infer(next_nodes, roots[root_index],
+                                                names, types, field_names, field_types);
+                if inferred[0] == "error" { return nam_type_error(line, inferred[1]); }
+                root_index += 1;
+            }
+        }
+
+        expressions = next_nodes;
+        i += 1;
+    }
+    println("typed-module-ok|" + to_str(array_len(names)) + "|" +
+            to_str(array_len(expressions) / 3));
     return 0;
 }

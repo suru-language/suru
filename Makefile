@@ -60,6 +60,7 @@ SELFHOST_DRIVERS = tests/selfhost/lexer_driver.suru \
 	tests/selfhost/natural_ast_driver.suru \
 	tests/selfhost/natural_ast_module_driver.suru \
 	tests/selfhost/natural_typed_ast_module_driver.suru \
+	tests/selfhost/natural_typed_module_semantic_driver.suru \
 	tests/selfhost/natural_control_driver.suru \
 	tests/selfhost/natural_semantic_driver.suru \
 	tests/selfhost/natural_declaration_driver.suru \
@@ -142,6 +143,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_expression_types_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_ast_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_typed_ast_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_typed_module_semantic_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_control_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_semantic_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_declaration_run.sh $(BINDIR)/suru

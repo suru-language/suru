@@ -1,0 +1,2 @@
+value items: [Whole] = [1, 2, 3]
+show(items[0])
