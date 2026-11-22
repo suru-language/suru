@@ -31,6 +31,10 @@ for input in "$ROOT"/tests/natural/*.suru; do
             "$SURU" run "$DIR/natural_bytecode_after_frontend_driver.suru" "$input" >"$tmp/b.ir" 2>/dev/null || true
             echo "  bytecode IR diff:" >&2
             diff -u "$tmp/c.ir" "$tmp/b.ir" | head -60 >&2 || true
+            "$SURU" run "$DIR/natural_bytecode_raw_driver.suru" "$input" >"$tmp/c.raw" 2>/dev/null || true
+            "$SURU" run "$DIR/natural_bytecode_raw_after_frontend_driver.suru" "$input" >"$tmp/b.raw" 2>/dev/null || true
+            echo "  raw instruction diff:" >&2
+            diff -u "$tmp/c.raw" "$tmp/b.raw" | head -80 >&2 || true
             fail=$((fail + 1))
         fi
     fi
