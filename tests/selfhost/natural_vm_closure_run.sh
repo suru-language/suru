@@ -10,7 +10,7 @@ trap 'rm -rf "$tmp"' EXIT
 
 "$SURU" run "$DIR/natural_closure_mk_driver.suru" "$tmp/clo.sbc" 2>/dev/null
 c=$("$SURU" exec "$tmp/clo.sbc" 2>&1)
-s=$(SURU_GC_ALLOC_INTERVAL=1000000 "$SURU" run "$DIR/natural_vm_driver.suru" "$tmp/clo.sbc" 2>&1)
+s=$(SURU_GC_ALLOC_INTERVAL=1000000 SURU_GC_THRESHOLD=1099511627776 "$SURU" run "$DIR/natural_vm_driver.suru" "$tmp/clo.sbc" 2>&1)
 
 if [ "$c" = "5" ] && [ "$s" = "5" ]; then
     echo "natural VM closures: 1 tests, 0 failures"
