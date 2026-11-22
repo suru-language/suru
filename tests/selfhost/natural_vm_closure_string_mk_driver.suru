@@ -1,0 +1,36 @@
+use "../../selfhost/compiler/natural_module_writer.suru";
+
+// A closure captures a heap-backed string and reads it after a call frame
+// is created. Its capture environment is a managed array child of the closure.
+func main() {
+    let intb: [str] = [nw_i64(0)];
+    let floats: [str] = [];
+    let strs: [str] = ["captured"];
+    let recf: [int] = [];
+    let fn_names: [str] = ["main", "use_env"];
+    let fn_nparams: [int] = [0, 1];
+    let fn_frames: [int] = [1, 1];
+    let fn_maxdepths: [int] = [1024, 1024];
+
+    // main: const_str 0; mkclosure_v(use_env, captures=1); call_v(0); ret_unit
+    let ops0: [int] = [3, 61, 62, 65];
+    let as0: [int] = [0, 1, 0, 0];
+    let bs0: [int] = [0, 1, 0, 0];
+    let cs0: [int] = [0, 0, 0, 0];
+
+    // use_env: load managed capture array; load index 0; print string; return.
+    let ops1: [int] = [5, 1, 54, 63, 65];
+    let as1: [int] = [0, 0, 0, 1, 0];
+    let bs1: [int] = [0, 0, 0, 0, 0];
+    let cs1: [int] = [0, 0, 0, 0, 0];
+
+    let fn_ops: [[int]] = [ops0, ops1];
+    let fn_as: [[int]] = [as0, as1];
+    let fn_bs: [[int]] = [bs0, bs1];
+    let fn_cs: [[int]] = [cs0, cs1];
+    let bytes: str = nw_emit_module(intb, floats, strs, recf,
+        fn_names, fn_nparams, fn_frames, fn_maxdepths,
+        fn_ops, fn_as, fn_bs, fn_cs);
+    write_file(args(0), bytes);
+    exit(0);
+}
