@@ -129,18 +129,28 @@ func vm_heap_roots(stack: [str], frames: [[str]]) -> [int] {
     return roots;
 }
 
-// Perform a bounded mark slice per managed allocation. The fixed budget
-// amortizes large root/work queues without allowing an unbounded collection
-// pause. When the grey queue drains, sweep and seed the next cycle from roots.
-// The new object is shaded grey by sh_alloc_incremental before it is returned.
+// Match the C VM's default allocation trigger: begin a GC cycle after
+// 512 managed allocations or when live logical capacity exceeds 1 MiB. Once
+// marking starts, advance a bounded slice on every allocation until sweep
+// completes. Newly allocated objects are shaded while marking is active.
 func vm_heap_alloc(state: [[str]], stack: [str], frames: [[str]],
                    kind: str, payload: str, children: [int]) -> [[str]] {
     let roots: [int] = vm_heap_roots(stack, frames);
     mut next: [[str]] = [state[0], state[1], state[2]];
-    next = sh_mark_step(next, 128, roots);
-    if sh_mark_pending(next) == 0 {
-        let swept: [str] = sh_sweep(next[0]);
-        next = sh_mark_begin(swept, roots);
+    let allocation_counter: int = int_from_str(next[2][1]);
+    let should_start: bool = allocation_counter >= 511 or
+        sh_live_bytes(next[0]) > 1048576;
+    if next[2][0] == "1" or should_start {
+        if next[2][0] != "1" {
+            next = sh_mark_begin_with_metrics(next[0], roots, next[2]);
+        }
+        next = sh_mark_step(next, 128, roots);
+        if sh_mark_pending(next) == 0 {
+            next = sh_mark_finish(next);
+        } else {
+            // Keep the allocation trigger saturated until this cycle drains.
+            next[2][1] = "512";
+        }
     }
     let required: int = sh_allocation_size(payload, children);
     let id: int = sh_find_free(next[0], required);
@@ -255,8 +265,8 @@ func natural_run_module(bytes: str) -> int {
 
     mut stack: [str] = [];
     mut heap: [str] = [];
-    let initial_roots: [int] = [];
-    mut gc_state: [[str]] = sh_mark_begin(heap, initial_roots);
+    let initial_gc_metrics: [str] = ["0", "0", "0", "0"];
+    mut gc_state: [[str]] = sh_mark_idle(heap, initial_gc_metrics);
     mut hdlrs: [str] = [];
     mut hdlr_frames: [int] = [];
     mut guard: int = 0;
