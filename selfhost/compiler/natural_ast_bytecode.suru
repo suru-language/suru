@@ -103,7 +103,7 @@ func nab_collect_ast(source: str) -> [str] {
             current_function = "";
             return_type = "";
             returned = false;
-            controls = [];
+            controls = [""];
             names = slice(names, array_len(names), 0);
             types = slice(types, array_len(types), 0);
             expressions = slice(expressions, array_len(expressions), 0);
@@ -208,7 +208,7 @@ func nab_collect_ast(source: str) -> [str] {
             controls[array_len(controls) - 1] =
                 "when|" + current[1] + "|" + next + "|1";
         } else if kind == "otherwise" {
-            if array_len(controls) == 0 {
+            if array_len(controls) <= 1 {
                 return nab_fail("otherwise without an open when");
             }
             let current: [str] = str_split(controls[array_len(controls) - 1], "|");
@@ -220,7 +220,7 @@ func nab_collect_ast(source: str) -> [str] {
             controls[array_len(controls) - 1] =
                 "when|" + current[1] + "||2";
         } else if kind == "end-when" {
-            if array_len(controls) == 0 {
+            if array_len(controls) <= 1 {
                 return nab_fail("end when without an open when");
             }
             let current: [str] = str_split(controls[array_len(controls) - 1], "|");
@@ -250,7 +250,7 @@ func nab_collect_ast(source: str) -> [str] {
             instructions = nbc_emit(instructions, "BC_JZ", "@" + finish);
             controls = array_concat(controls, ["repeat|" + start + "|" + finish]);
         } else if kind == "end-repeat" {
-            if array_len(controls) == 0 {
+            if array_len(controls) <= 1 {
                 return nab_fail("end repeat without an open repeat");
             }
             let current: [str] = str_split(controls[array_len(controls) - 1], "|");
