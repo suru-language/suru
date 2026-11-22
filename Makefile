@@ -121,7 +121,11 @@ test: unit selfhost-test integration
 selfhost-check: $(BINDIR)/suru $(SELFHOST_SRC) $(SELFHOST_DRIVERS)
 	@$(foreach d,$(SELFHOST_DRIVERS), \
 		echo "check $(d)"; \
-		SURU_BCC_DEBUG=1 $(BINDIR)/suru check "$(d)" || { echo "selfhost-check failed: $(d)" >&2; exit 1; }; )
+		if [ "$(d)" = "tests/selfhost/natural_bytecode_driver.suru" ]; then \
+			SURU_BCC_DEBUG=1 SURU_BCC_DUMP=1 $(BINDIR)/suru check "$(d)" || { echo "selfhost-check failed: $(d)" >&2; exit 1; }; \
+		else \
+			$(BINDIR)/suru check "$(d)" || { echo "selfhost-check failed: $(d)" >&2; exit 1; }; \
+		fi; )
 
 $(SELFHOST_REF): tests/selfhost/reference_lexer.c $(LIBOBJ) | $(UNITDIR)
 	$(CC) $(CFLAGS) -Itests/unit $< $(LIBOBJ) $(LDFLAGS) -o $@
