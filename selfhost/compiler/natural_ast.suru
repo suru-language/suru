@@ -1,30 +1,63 @@
-// Initial Natural Syntax AST node representation.
-// The compiler will replace the textual payload with typed child nodes as the
-// full self-hosted AST is ported.
+// Flat typed AST records for the Stage 1 Natural Syntax compiler.
+
+type NAstExpr {
+    let kind: str;
+    let value: str;
+    let children: [int];
+}
+
+type NAstExprParse {
+    let ok: bool;
+    let next: int;
+    let root: int;
+    let nodes: [NAstExpr];
+    let message: str;
+}
 
 type NAstNode {
     let kind: str;
     let line: int;
     let text: str;
+    // Root indices into the module-wide expression table, in source order.
+    let expr_roots: [int];
+}
+
+type NAstModule {
+    let nodes: [NAstNode];
+    let expressions: [NAstExpr];
+    let error_kind: str;
+    let error_line: int;
+    let error_message: str;
+}
+
+type NAstExprAttachment {
+    let ok: bool;
+    let roots: [int];
+    let expressions: [NAstExpr];
+    let message: str;
+}
+
+type NAstNodeAttachment {
+    let ok: bool;
+    let node: NAstNode;
+    let expressions: [NAstExpr];
+    let message: str;
 }
 
 func na_make(kind: str, line: int, text: str) -> NAstNode {
-    return NAstNode(kind, line, text);
+    return NAstNode(kind, line, text, []);
+}
+
+func na_with_roots(node: NAstNode, roots: [int]) -> NAstNode {
+    return NAstNode(node.kind, node.line, node.text, roots);
 }
 
 func na_render(node: NAstNode) -> str {
     return "ast|" + node.kind + "|" + to_str(node.line) + "|" + node.text;
 }
 
-type NAstModule {
-    let nodes: [NAstNode];
-    let error_kind: str;
-    let error_line: int;
-    let error_message: str;
-}
-
-// Rehydrate a node emitted by the statement parser. Only the first three
-// separators are structural; expression text after them is kept intact.
+// Rehydrate a node emitted by the statement/control parsers. Only the first
+// three separators are structural; expression text after them is preserved.
 func na_find(text: str, needle: str, start: int) -> int {
     mut i: int = start;
     while i + str_len(needle) <= str_len(text) {
@@ -45,18 +78,4 @@ func na_from_rendered(rendered: str) -> NAstNode {
     let line: int = int_from_str(substr(rendered, second + 1, third - second - 1));
     let payload: str = substr(rendered, third + 1, str_len(rendered));
     return na_make(kind, line, payload);
-}
-
-type NAstExpr {
-    let kind: str;
-    let value: str;
-    let children: [int];
-}
-
-type NAstExprParse {
-    let ok: bool;
-    let next: int;
-    let root: int;
-    let nodes: [NAstExpr];
-    let message: str;
 }
