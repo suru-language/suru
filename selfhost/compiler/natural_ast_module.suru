@@ -5,6 +5,7 @@
 use "natural_token_stream.suru";
 use "natural_control_parser.suru";
 use "natural_expression_ast.suru";
+use "natural_expression_types.suru";
 use "natural_ast.suru";
 
 type NAstTypedNode {
