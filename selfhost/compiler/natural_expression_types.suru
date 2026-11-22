@@ -1,0 +1,369 @@
+// Stage 1 expression type analysis over the flat typed-expression AST.
+// Each expression node is a triplet: kind, value, comma-separated child IDs.
+// This pass consumes those nodes directly; it does not reparse source text.
+use "natural_expression_ast.suru";
+
+func net_ok(typ: str) -> [str] { return ["ok", typ]; }
+func net_error(message: str) -> [str] { return ["error", message]; }
+
+func net_node_valid(nodes: [str], id: int) -> bool {
+    return id >= 0 and id * 3 + 2 < array_len(nodes);
+}
+
+func net_children(encoded: str) -> [int] {
+    mut out: [int] = [];
+    if encoded == "" { return out; }
+    let pieces: [str] = str_split(encoded, ",");
+    mut i: int = 0;
+    while i < array_len(pieces) {
+        out = array_concat(out, [int_from_str(pieces[i])]);
+        i += 1;
+    }
+    return out;
+}
+
+func net_is_integer(text: str) -> bool {
+    if text == "" { return false; }
+    mut i: int = 0;
+    while i < str_len(text) {
+        let c: str = text[i];
+        if not (c >= "0" and c <= "9") and c != "_" { return false; }
+        i += 1;
+    }
+    return true;
+}
+
+func net_is_real(text: str) -> bool {
+    if text == "" { return false; }
+    if not (str_contains(text, ".") or str_contains(text, "e") or
+            str_contains(text, "E")) { return false; }
+    mut has_digit: bool = false;
+    mut i: int = 0;
+    while i < str_len(text) {
+        let c: str = text[i];
+        if c >= "0" and c <= "9" { has_digit = true; }
+        i += 1;
+    }
+    return has_digit;
+}
+
+func net_is_array(typ: str) -> bool {
+    return str_len(typ) >= 2 and typ[0] == "[" and
+           typ[str_len(typ) - 1] == "]";
+}
+
+func net_array_element(typ: str) -> str {
+    if not net_is_array(typ) { return ""; }
+    return substr(typ, 1, str_len(typ) - 2);
+}
+
+func net_common_type(left: str, right: str) -> str {
+    if left == right { return left; }
+    if (left == "Whole" and right == "Real") or
+       (left == "Real" and right == "Whole") { return "Real"; }
+    return "";
+}
+
+func net_lookup(names: [str], types: [str], name: str) -> str {
+    mut i: int = array_len(names) - 1;
+    while i >= 0 {
+        if names[i] == name { return types[i]; }
+        i -= 1;
+    }
+    return "";
+}
+
+func net_infer(nodes: [str], id: int, names: [str], types: [str],
+               field_names: [str], field_types: [str]) -> [str] {
+    if not net_node_valid(nodes, id) {
+        return net_error("invalid expression node ID " + to_str(id));
+    }
+    let base: int = id * 3;
+    let kind: str = nodes[base];
+    let value: str = nodes[base + 1];
+    let children: [int] = net_children(nodes[base + 2]);
+
+    if kind == "atom" {
+        if str_len(value) >= 2 and value[0] == "\"" { return net_ok("Text"); }
+        if value == "true" or value == "false" { return net_ok("Bool"); }
+        if value == "none" { return net_ok("None"); }
+        if net_is_integer(value) { return net_ok("Whole"); }
+        if net_is_real(value) { return net_ok("Real"); }
+        let found: str = net_lookup(names, types, value);
+        if found != "" { return net_ok(found); }
+        return net_error("unknown name '" + value + "'");
+    }
+
+    if kind == "routine" { return net_ok("Routine"); }
+
+    if kind == "unary" {
+        if array_len(children) != 1 {
+            return net_error("unary expression must have one operand");
+        }
+        let operand: [str] = net_infer(nodes, children[0], names, types,
+                                       field_names, field_types);
+        if operand[0] == "error" { return operand; }
+        if value == "-" {
+            if operand[1] == "Whole" or operand[1] == "Real" { return operand; }
+            return net_error("unary '-' requires Whole or Real");
+        }
+        if value == "not" {
+            if operand[1] == "Bool" { return net_ok("Bool"); }
+            return net_error("'not' requires Bool");
+        }
+        if value == "~" {
+            if operand[1] == "Whole" { return net_ok("Whole"); }
+            return net_error("'~' requires Whole");
+        }
+        return net_error("unsupported unary operator '" + value + "'");
+    }
+
+    if kind == "binary" {
+        if array_len(children) != 2 {
+            return net_error("binary expression must have two operands");
+        }
+        let left: [str] = net_infer(nodes, children[0], names, types,
+                                    field_names, field_types);
+        if left[0] == "error" { return left; }
+        let right: [str] = net_infer(nodes, children[1], names, types,
+                                     field_names, field_types);
+        if right[0] == "error" { return right; }
+        let common: str = net_common_type(left[1], right[1]);
+        if value == "and" or value == "or" {
+            if left[1] == "Bool" and right[1] == "Bool" { return net_ok("Bool"); }
+            return net_error("logical operators require Bool operands");
+        }
+        if value == "==" or value == "!=" {
+            if common != "" or left[1] == right[1] { return net_ok("Bool"); }
+            return net_error("equality operands have incompatible types");
+        }
+        if value == "<" or value == "<=" or value == ">" or value == ">=" {
+            if common == "Whole" or common == "Real" { return net_ok("Bool"); }
+            if left[1] == "Text" and right[1] == "Text" { return net_ok("Bool"); }
+            return net_error("ordered comparison requires matching numeric or Text operands");
+        }
+        if value == "+" and left[1] == "Text" and right[1] == "Text" {
+            return net_ok("Text");
+        }
+        if value == "%" or value == "&" or value == "|" or value == "^" or
+           value == "<<" or value == ">>" {
+            if left[1] == "Whole" and right[1] == "Whole" { return net_ok("Whole"); }
+            return net_error("integer operator requires Whole operands");
+        }
+        if value == "+" or value == "-" or value == "*" or value == "/" {
+            if common == "Whole" or common == "Real" { return net_ok(common); }
+            return net_error("arithmetic requires numeric operands");
+        }
+        return net_error("unsupported binary operator '" + value + "'");
+    }
+
+    if kind == "conditional" {
+        if array_len(children) != 3 {
+            return net_error("conditional expression must have three children");
+        }
+        let condition: [str] = net_infer(nodes, children[0], names, types,
+                                         field_names, field_types);
+        if condition[0] == "error" { return condition; }
+        if condition[1] != "Bool" { return net_error("conditional condition requires Bool"); }
+        let when_true: [str] = net_infer(nodes, children[1], names, types,
+                                         field_names, field_types);
+        if when_true[0] == "error" { return when_true; }
+        let when_false: [str] = net_infer(nodes, children[2], names, types,
+                                          field_names, field_types);
+        if when_false[0] == "error" { return when_false; }
+        let common: str = net_common_type(when_true[1], when_false[1]);
+        if common != "" { return net_ok(common); }
+        return net_error("conditional branches have incompatible types");
+    }
+
+    if kind == "array" {
+        if array_len(children) == 0 { return net_ok("[]"); }
+        let first: [str] = net_infer(nodes, children[0], names, types,
+                                     field_names, field_types);
+        if first[0] == "error" { return first; }
+        mut element_type: str = first[1];
+        mut i: int = 1;
+        while i < array_len(children) {
+            let item: [str] = net_infer(nodes, children[i], names, types,
+                                        field_names, field_types);
+            if item[0] == "error" { return item; }
+            let common: str = net_common_type(element_type, item[1]);
+            if common == "" {
+                return net_error("array elements have incompatible types '" +
+                                 element_type + "' and '" + item[1] + "'");
+            }
+            element_type = common;
+            i += 1;
+        }
+        return net_ok("[" + element_type + "]");
+    }
+
+    if kind == "index" {
+        if array_len(children) != 2 {
+            return net_error("index expression must have two children");
+        }
+        let target: [str] = net_infer(nodes, children[0], names, types,
+                                      field_names, field_types);
+        if target[0] == "error" { return target; }
+        let index: [str] = net_infer(nodes, children[1], names, types,
+                                     field_names, field_types);
+        if index[0] == "error" { return index; }
+        if index[1] != "Whole" { return net_error("array index requires Whole"); }
+        if net_is_array(target[1]) {
+            let element: str = net_array_element(target[1]);
+            if element == "" { return net_error("cannot infer element type of an empty array"); }
+            return net_ok(element);
+        }
+        if target[1] == "Text" { return net_ok("Whole"); }
+        return net_error("indexing requires an array or Text");
+    }
+
+    if kind == "field" {
+        if array_len(children) != 1 {
+            return net_error("field expression must have one receiver");
+        }
+        let receiver: [str] = net_infer(nodes, children[0], names, types,
+                                        field_names, field_types);
+        if receiver[0] == "error" { return receiver; }
+        let key: str = receiver[1] + "." + value;
+        let field_type: str = net_lookup(field_names, field_types, key);
+        if field_type != "" { return net_ok(field_type); }
+        return net_error("unknown field '" + key + "'");
+    }
+
+    if kind == "call" {
+        if array_len(children) == 0 {
+            return net_error("call expression has no callee");
+        }
+        let callee_id: int = children[0];
+        if not net_node_valid(nodes, callee_id) or
+           nodes[callee_id * 3] != "atom" {
+            return net_error("call target must be a named routine or builtin");
+        }
+        let name: str = nodes[callee_id * 3 + 1];
+        mut args: [str] = [];
+        mut i: int = 1;
+        while i < array_len(children) {
+            let arg: [str] = net_infer(nodes, children[i], names, types,
+                                       field_names, field_types);
+            if arg[0] == "error" { return arg; }
+            args = array_concat(args, [arg[1]]);
+            i += 1;
+        }
+        return net_builtin_call(name, args);
+    }
+
+    return net_error("unsupported expression node kind '" + kind + "'");
+}
+
+func net_expect(args: [str], index: int, expected: str) -> bool {
+    return index < array_len(args) and args[index] == expected;
+}
+
+func net_builtin_call(name: str, args: [str]) -> [str] {
+    if name == "str_len" or name == "str_utf8_len" {
+        if array_len(args) == 1 and net_expect(args, 0, "Text") { return net_ok("Whole"); }
+        return net_error(name + " expects (Text)");
+    }
+    if name == "array_len" {
+        if array_len(args) == 1 and net_is_array(args[0]) { return net_ok("Whole"); }
+        return net_error("array_len expects (Array)");
+    }
+    if name == "len" {
+        if array_len(args) == 1 and (args[0] == "Text" or net_is_array(args[0])) {
+            return net_ok("Whole");
+        }
+        return net_error("len expects Text or Array");
+    }
+    if name == "to_str" {
+        if array_len(args) == 1 { return net_ok("Text"); }
+        return net_error("to_str expects one argument");
+    }
+    if name == "substr" {
+        if array_len(args) == 3 and net_expect(args, 0, "Text") and
+           net_expect(args, 1, "Whole") and net_expect(args, 2, "Whole") {
+            return net_ok("Text");
+        }
+        return net_error("substr expects (Text, Whole, Whole)");
+    }
+    if name == "str_contains" {
+        if array_len(args) == 2 and net_expect(args, 0, "Text") and
+           net_expect(args, 1, "Text") { return net_ok("Bool"); }
+        return net_error("str_contains expects (Text, Text)");
+    }
+    if name == "str_compare" {
+        if array_len(args) == 2 and net_expect(args, 0, "Text") and
+           net_expect(args, 1, "Text") { return net_ok("Whole"); }
+        return net_error("str_compare expects (Text, Text)");
+    }
+    if name == "int_from_str" {
+        if array_len(args) == 1 and net_expect(args, 0, "Text") { return net_ok("Whole"); }
+        return net_error("int_from_str expects (Text)");
+    }
+    if name == "abs" {
+        if array_len(args) == 1 and net_expect(args, 0, "Whole") { return net_ok("Whole"); }
+        return net_error("abs expects (Whole)");
+    }
+    if name == "str_lower" or name == "str_upper" or name == "str_trim" {
+        if array_len(args) == 1 and net_expect(args, 0, "Text") { return net_ok("Text"); }
+        return net_error(name + " expects (Text)");
+    }
+    if name == "str_repeat" {
+        if array_len(args) == 2 and net_expect(args, 0, "Text") and
+           net_expect(args, 1, "Whole") { return net_ok("Text"); }
+        return net_error("str_repeat expects (Text, Whole)");
+    }
+    if name == "range" {
+        if array_len(args) == 2 and net_expect(args, 0, "Whole") and
+           net_expect(args, 1, "Whole") { return net_ok("[Whole]"); }
+        return net_error("range expects (Whole, Whole)");
+    }
+    if name == "make_array" {
+        if array_len(args) == 1 and net_expect(args, 0, "Whole") { return net_ok("[Whole]"); }
+        return net_error("make_array expects (Whole)");
+    }
+    if name == "array_concat" {
+        if array_len(args) == 2 and net_is_array(args[0]) and args[0] == args[1] {
+            return net_ok(args[0]);
+        }
+        return net_error("array_concat expects arrays with matching element types");
+    }
+    if name == "slice" {
+        if array_len(args) == 3 and net_is_array(args[0]) and
+           net_expect(args, 1, "Whole") and net_expect(args, 2, "Whole") {
+            return net_ok(args[0]);
+        }
+        return net_error("slice expects (Array, Whole, Whole)");
+    }
+    if name == "i64_to_f64" {
+        if array_len(args) == 1 and net_expect(args, 0, "Whole") { return net_ok("Real"); }
+        return net_error("i64_to_f64 expects (Whole)");
+    }
+    if name == "f64_to_i64" {
+        if array_len(args) == 1 and net_expect(args, 0, "Real") { return net_ok("Whole"); }
+        return net_error("f64_to_i64 expects (Real)");
+    }
+    return net_error("unknown routine or builtin '" + name + "'");
+}
+
+func net_check_expression(source: str, names: [str], types: [str],
+                          field_names: [str], field_types: [str]) -> int {
+    let parsed = nea_parse_expression(source, 0, 0, []);
+    if nea_is_ok(parsed) == false {
+        println("type-error|" + nea_message(parsed));
+        return 1;
+    }
+    let end = natural_next(source, ne_skip_lines(source, nea_next(parsed)));
+    if end.kind != NT_EOF {
+        println("type-error|unexpected token '" + end.text + "'");
+        return 1;
+    }
+    let inferred: [str] = net_infer(nea_nodes(parsed), nea_root(parsed),
+                                   names, types, field_names, field_types);
+    if inferred[0] == "error" {
+        println("type-error|" + inferred[1]);
+        return 1;
+    }
+    println("type|" + inferred[1]);
+    return 0;
+}

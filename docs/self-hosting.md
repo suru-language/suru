@@ -400,3 +400,9 @@ operator precedence, child indices, and statement-to-expression root links.
 The original source-shaped node payload remains available for diagnostics and
 differential comparison. The next increment is to lower this AST directly to
 bytecode and compare it against the existing source-shaped emitter.
+
+## Stage 1 typed expression analysis
+
+The module AST currently attaches flat expression-node triplets. The next Stage 1 increment adds `natural_expression_types.suru`, a SURU-written recursive type checker over those AST node IDs. It handles primitive literals, local bindings, unary and binary operators, conditionals, homogeneous arrays, indexing, record-field lookups supplied by the enclosing module, and a core set of builtin signatures. It returns structured `ok/type` or `error/message` results without reparsing expression source text.
+
+The focused test driver supplies a small module environment (locals, an array, and a record field table) and exercises valid and invalid expressions. This is an incremental typed-AST contract; complete routine signature collection, lexical scope lifetimes, generic inference, closure types, and direct AST-to-bytecode lowering remain subsequent Stage 1 tasks.
