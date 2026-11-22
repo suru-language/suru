@@ -1,0 +1,3 @@
+routine broken() -> Unit
+    show("x")
+end when

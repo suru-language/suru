@@ -1,0 +1,3 @@
+routine broken(a Whole) -> Whole
+    give 1
+end routine
