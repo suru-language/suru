@@ -257,7 +257,10 @@ func net_infer(nodes: [str], id: int, names: [str], types: [str],
             if array_len(signature) != 2 {
                 return net_error("invalid routine signature metadata for '" + name + "'");
             }
-            let parameters: [str] = signature[1] == "" ? [] : str_split(signature[1], ",");
+            mut parameters: [str] = [];
+            if signature[1] != "" {
+                parameters = str_split(signature[1], ",");
+            }
             if array_len(parameters) != array_len(args) {
                 return net_error("routine '" + name + "' expects " +
                     to_str(array_len(parameters)) + " arguments, got " +
