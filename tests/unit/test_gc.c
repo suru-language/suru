@@ -89,6 +89,32 @@ static void test_alloc_fail_after(void) {
     s_heap_destroy(h);
 }
 
+static void test_large_free_list_preserves_capacity(void) {
+    s_heap *h = s_heap_create();
+    CHECK(h != NULL);
+    s_heap_set_stack_root(h, NULL, 0);
+
+    /* All three arrays are larger than the small-object allocator limit.
+     * The first block is too small for the second; after both are freed, a
+     * first-fit search must skip both when asked for the still-larger third. */
+    s_gcobj *seed = s_heap_new_array(h, 260);
+    CHECK(seed != NULL);
+    s_heap_collect(h);
+
+    s_gcobj *small = s_heap_new_array(h, 265);
+    CHECK(small != NULL);
+    CHECK(small != seed);
+    s_heap_collect(h);
+
+    s_gcobj *large = s_heap_new_array(h, 275);
+    CHECK(large != NULL);
+    CHECK(large != small);
+    CHECK(large != seed);
+    CHECK(large->chunk_size >= sizeof(s_gcobj) + 275 * sizeof(s_value));
+
+    s_heap_destroy(h);
+}
+
 static void test_incremental_step(void) {
     s_heap *h = s_heap_create();
     s_value st[1];
@@ -155,6 +181,7 @@ TEST_MAIN_BEGIN()
     test_stack_root();
     test_allocation_failure();
     test_alloc_fail_after();
+    test_large_free_list_preserves_capacity();
     test_incremental_step();
     test_incremental_graph();
     test_exception_object_graph();
