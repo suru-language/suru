@@ -1,0 +1,11 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_expression_types.suru";
+
+func main() {
+    let names: [str] = ["count", "ratio", "ready", "label", "items", "point"];
+    let types: [str] = ["Whole", "Real", "Bool", "Text", "[Whole]", "Point"];
+    let field_names: [str] = ["Point.x", "Point.name"];
+    let field_types: [str] = ["Whole", "Text"];
+    exit(net_check_expression(source_load(args(0)), names, types,
+                              field_names, field_types));
+}
