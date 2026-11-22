@@ -236,7 +236,7 @@ func main() {
     adaptive_heap = sh_alloc(adaptive_heap, "str", "g2", no_children);
     adaptive_heap = sh_alloc(adaptive_heap, "str", "g3", no_children);
     let adaptive_metrics: [str] = [
-        "0", "0", "0", "0", "1048576", "64", "0"
+        "0", "511", "0", "0", "1048576", "64", "0"
     ];
     mut adaptive_state: [[str]] = sh_mark_idle(adaptive_heap, adaptive_metrics);
     adaptive_state = sh_gc_advance(adaptive_state, [0], 512, 16);
