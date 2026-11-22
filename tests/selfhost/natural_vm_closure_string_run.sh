@@ -9,7 +9,7 @@ if ! c="$("$SURU" exec "$tmp/clo-string.sbc" 2>&1)"; then
     echo "FAIL managed closure capture: C VM failed: [$c]" >&2
     exit 1
 fi
-if ! s="$(SURU_GC_ALLOC_INTERVAL=1000000 SURU_GC_THRESHOLD=1099511627776 "$SURU" run "$DIR/natural_vm_driver.suru" "$tmp/clo-string.sbc" 2>&1)"; then
+if ! s="$("$SURU" run "$DIR/natural_vm_driver.suru" "$tmp/clo-string.sbc" 2>&1)"; then
     echo "FAIL managed closure capture: SURU VM failed: [$s]" >&2
     exit 1
 fi
