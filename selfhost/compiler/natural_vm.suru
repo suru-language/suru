@@ -594,22 +594,42 @@ func natural_run_module(bytes: str) -> int {
             let typ: str = stack[n - 1];
             let msg: str = stack[n - 2];
             let cause: str = stack[n - 3];
+            let type_text: str = vm_to_str(typ, heap);
+            let message_text: str = vm_to_str(msg, heap);
+            heap = sh_collect(heap, vm_heap_roots(stack, fr_locals));
+            let object_id: int = sh_find_free(heap);
+            heap = sh_alloc(heap, "exception", type_text + "|" + message_text,
+                            vm_heap_refs([typ, msg, cause]));
             stack = vm_pop(stack);
             stack = vm_pop(stack);
             stack = vm_pop(stack);
-            stack = vm_push(stack, "X" + typ + "|" + msg + "|" + cause);
+            stack = vm_push(stack, "H" + to_str(object_id));
         } else if op == 71 {
             let n: int = array_len(stack);
             let ex: str = stack[n - 1];
             stack = vm_pop(stack);
+            let exception_id: int = vm_handle_id(ex);
+            mut exception_type: str = "";
+            if exception_id >= 0 and sh_kind(heap, exception_id) == "exception" {
+                let payload: str = sh_payload(heap, exception_id);
+                let separator: int = nbc_find(payload, "|");
+                exception_type = separator < 0 ? payload :
+                    substr(payload, 0, separator);
+            } else {
+                let separator: int = nbc_find(ex, "|");
+                let encoded_type: str = separator < 0 ? "" :
+                    substr(ex, 1, separator - 1);
+                exception_type = vm_to_str(encoded_type, heap);
+            }
             mut found: bool = false;
             while array_len(hdlrs) > 0 and not found {
                 let h: str = hdlrs[array_len(hdlrs) - 1];
                 let bar: int = nbc_find(h, "|");
                 let tgt: int = int_from_str(substr(h, 1, bar - 1));
                 let ht: int = int_from_str(substr(h, bar + 1, str_len(h)));
-                let etype: int = int_from_str(substr(ex, 1, nbc_find(ex, "|")));
-                if ht == 4294967295 or ht == etype {
+                let matches: bool = ht == 4294967295 or
+                    (ht >= 0 and ht < array_len(strpool) and strpool[ht] == exception_type);
+                if matches {
                     hdlrs = slice(hdlrs, 0, array_len(hdlrs) - 1);
                     let hf: int = hdlr_frames[array_len(hdlr_frames) - 1];
                     hdlr_frames = slice(hdlr_frames, 0, array_len(hdlr_frames) - 1);
