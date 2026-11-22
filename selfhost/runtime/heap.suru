@@ -237,7 +237,7 @@ func sh_mark_begin_with_metrics(heap: [str], roots: [int],
 }
 
 func sh_mark_begin(heap: [str], roots: [int]) -> [[str]] {
-    let metrics: [str] = ["1", "0", "0", "0"];
+    let metrics: [str] = ["1", "0", "0", "0", "1048576", "1048576", "0"];
     return sh_mark_begin_with_metrics(heap, roots, metrics);
 }
 
@@ -261,16 +261,83 @@ func sh_mark_finish(state: [[str]]) -> [[str]] {
 }
 
 func sh_gc_stats(state: [[str]]) -> [int] {
-    if array_len(state) < 3 { return [0, 0, 0, 0, 0]; }
+    if array_len(state) < 3 { return [0, 0, 0, 0, 0, 1048576]; }
     let metrics: [str] = state[2];
     let active: int = metrics[0] == "1" ? 1 : 0;
+    let threshold: int = array_len(metrics) > 4 ?
+        int_from_str(metrics[4]) : 1048576;
     return [int_from_str(metrics[1]), int_from_str(metrics[2]),
-            int_from_str(metrics[3]), active, array_len(state[1])];
+            int_from_str(metrics[3]), active, array_len(state[1]), threshold];
 }
 
 func sh_mark_pending(state: [[str]]) -> int {
     if array_len(state) < 2 { return 0; }
     return array_len(state[1]);
+}
+
+// Match the production VM's nursery trigger: the current allocation counts
+// toward the interval, or the live logical reservation has crossed threshold.
+func sh_gc_should_collect(state: [[str]], allocation_interval: int) -> bool {
+    if array_len(state) < 3 { return false; }
+    let metrics: [str] = state[2];
+    if metrics[0] == "1" { return true; }
+    let allocated: int = int_from_str(metrics[1]);
+    let threshold: int = array_len(metrics) > 4 ?
+        int_from_str(metrics[4]) : 1048576;
+    return allocated + 1 >= allocation_interval or
+           sh_live_bytes(state[0]) > threshold;
+}
+
+// Mirror the C VM's four-object headroom heuristic with overflow-safe clamps.
+func sh_gc_next_threshold(before_live: int, after_live: int,
+                          current_threshold: int, minimum_threshold: int,
+                          maximum_threshold: int) -> int {
+    mut target: int = maximum_threshold;
+    if after_live <= maximum_threshold / 4 {
+        target = after_live * 4;
+    }
+    if target < minimum_threshold { target = minimum_threshold; }
+    if target > maximum_threshold { target = maximum_threshold; }
+    if target < current_threshold and
+       (after_live > maximum_threshold / 2 or before_live <= after_live * 2) {
+        target = current_threshold;
+    }
+    return target;
+}
+
+// Advance one incremental slice only when the allocation interval/byte
+// threshold is due, or when an existing cycle needs more work. On completion,
+// sweep, update the adaptive threshold, and reset the interval counter.
+func sh_gc_advance(state: [[str]], roots: [int],
+                  allocation_interval: int, budget: int) -> [[str]] {
+    if array_len(state) < 3 { return state; }
+    let active_before: bool = state[2][0] == "1";
+    if not sh_gc_should_collect(state, allocation_interval) { return state; }
+
+    mut next: [[str]] = [state[0], state[1], state[2]];
+    if not active_before {
+        mut metrics: [str] = next[2];
+        while array_len(metrics) < 7 {
+            metrics = array_concat(metrics, ["0"]);
+        }
+        metrics[0] = "1";
+        metrics[6] = to_str(sh_live_bytes(next[0]));
+        next = sh_mark_begin_with_metrics(next[0], roots, metrics);
+    }
+    next = sh_mark_step(next, budget, roots);
+    if sh_mark_pending(next) == 0 {
+        let before_live: int = int_from_str(next[2][6]);
+        let old_threshold: int = int_from_str(next[2][4]);
+        let minimum_threshold: int = int_from_str(next[2][5]);
+        next = sh_mark_finish(next);
+        let after_live: int = sh_live_bytes(next[0]);
+        mut metrics: [str] = next[2];
+        metrics[4] = to_str(sh_gc_next_threshold(before_live, after_live,
+            old_threshold, minimum_threshold, 1099511627776));
+        metrics[6] = "0";
+        next[2] = metrics;
+    }
+    return next;
 }
 
 func sh_mark_step(state: [[str]], budget: int, roots: [int]) -> [[str]] {
