@@ -116,29 +116,19 @@ static bool em_push(s_emit *e, s_u8 op, s_u32 a, s_u32 b, s_u32 c) {
 /* ------------------------------------------------------------------ */
 
 #define LABEL_UNPLACED 0xFFFFFFFFu
+#define LABEL_PENDING 0x80000000u
+#define LABEL_INDEX_MASK 0x7FFFFFFFu
 
 typedef struct s_labelmgr {
-    const char *owner;
     s_u32 *pos;
     s_u32 nlabels, caplabels;
-    s_u32 *pins;      /* instruction indices awaiting patch */
-    s_u32 *plab;
-    s_u32 npatches, capp;
 } s_labelmgr;
 
 static s_u32 new_label(s_labelmgr *m) {
-    if (m->owner && strcmp(m->owner, "nbc_render_section") == 0 &&
-        getenv("SURU_LABEL_DEBUG"))
-        fprintf(stderr, "[label] new id=%u cap=%u\n", m->nlabels, m->caplabels);
     if (m->nlabels >= m->caplabels) {
         s_u32 ncap = m->caplabels ? m->caplabels * 2 : 8;
         s_u32 *n = realloc(m->pos, (s_size)ncap * sizeof(s_u32));
-        if (!n) {
-            if (m->owner && strcmp(m->owner, "nbc_render_section") == 0)
-                fprintf(stderr, "[label] realloc failed id=%u cap=%u\n",
-                        m->nlabels, ncap);
-            return 0;
-        }
+        if (!n) return LABEL_UNPLACED;
         m->pos = n;
         m->caplabels = ncap;
     }
@@ -146,57 +136,29 @@ static s_u32 new_label(s_labelmgr *m) {
     return m->nlabels++;
 }
 
-static bool patch_label(s_labelmgr *m, s_u32 ins_idx, s_u32 lab) {
-    if (m->npatches >= m->capp) {
-        s_u32 ncap = m->capp ? m->capp * 2 : 16;
-        s_u32 *ni = malloc((s_size)ncap * sizeof(s_u32));
-        s_u32 *nl = malloc((s_size)ncap * sizeof(s_u32));
-        if (!ni || !nl) { free(ni); free(nl); return false; }
-        if (m->npatches) {
-            memcpy(ni, m->pins, (s_size)m->npatches * sizeof(s_u32));
-            memcpy(nl, m->plab, (s_size)m->npatches * sizeof(s_u32));
-        }
-        free(m->pins);
-        free(m->plab);
-        m->pins = ni;
-        m->plab = nl;
-        m->capp = ncap;
-    }
-    m->pins[m->npatches] = ins_idx;
-    m->plab[m->npatches] = lab;
-    m->npatches++;
-    return true;
-}
-
-/* Emit a jump and record a patch so that when `lab` is placed, the jump
- * target (operand a) is filled in, */
+/* Encode symbolic targets in the high bit until all labels are placed. This
+ * keeps branch fixups in the instruction stream and avoids a second dynamic
+ * patch table that can lose entries as it grows. */
 static bool em_jump(s_emit *e, s_labelmgr *m, s_u8 op, s_u32 lab) {
-    if (!em_push(e, op, 0, 0, 0)) return false;
-    return patch_label(m, e->nins - 1, lab);
+    if (lab >= m->nlabels || lab >= LABEL_INDEX_MASK) return false;
+    return em_push(e, op, LABEL_PENDING | lab, 0, 0);
 }
 
 static void place_label(s_emit *e, s_labelmgr *m, s_u32 lab) {
-    if (m->owner && strcmp(m->owner, "nbc_render_section") == 0 &&
-        getenv("SURU_LABEL_DEBUG"))
-        fprintf(stderr, "[label] place id=%u at=%u nlabels=%u\n",
-                lab, e->nins, m->nlabels);
+    if (lab >= m->nlabels) return;
     m->pos[lab] = e->nins;
-    for (s_u32 i = 0; i < m->npatches; ++i) {
-        if (m->plab[i] == lab) {
-            e->ins[m->pins[i]].a = e->nins;
-        }
-    }
 }
 
-/* Resolve any patches whose label was placed after the patch was recorded
- * (backward jumps). Must be called after all emission for a function. */
+/* Resolve symbolic branches after emission and before optimization. */
 static bool finalize_labels(s_emit *e, s_labelmgr *m) {
-    for (s_u32 i = 0; i < m->npatches; ++i) {
-        s_u32 lab = m->plab[i];
-        s_u32 ins = m->pins[i];
-        if (lab >= m->nlabels || ins >= e->nins ||
-            m->pos[lab] == LABEL_UNPLACED) return false;
-        e->ins[ins].a = m->pos[lab];
+    for (s_u32 i = 0; i < e->nins; ++i) {
+        if (!s_bc_op_table[e->ins[i].op].is_branch) continue;
+        s_u32 operand = e->ins[i].a;
+        if ((operand & LABEL_PENDING) == 0) continue;
+        s_u32 lab = operand & LABEL_INDEX_MASK;
+        if (lab >= m->nlabels || m->pos[lab] == LABEL_UNPLACED)
+            return false;
+        e->ins[i].a = m->pos[lab];
     }
     return true;
 }
@@ -933,18 +895,27 @@ bool s_bcc_run(const s_module *ast, s_arena *arena, s_diag_ctx *diag,
         if (!out->funcs) { s_bc_module_dispose(out); return false; }
     }
 
+    /* Publish every callee signature before verifying any function.
+     * BC_CALL stack effects depend on the target's nparams, including forward
+     * calls to functions that appear later in source order. */
+    for (s_size f = 0; f < ast->nfuncs; ++f) {
+        const s_func_decl *fn = &ast->funcs[f];
+        out->funcs[f].name = xstrdup(fn->name);
+        out->funcs[f].nparams = (s_u32)fn->nparams;
+        if (!out->funcs[f].name) {
+            s_bc_module_dispose(out);
+            return false;
+        }
+    }
+
     for (s_size f = 0; f < ast->nfuncs; ++f) {
         const s_func_decl *fn = &ast->funcs[f];
         s_bc_func *bf = &out->funcs[f];
-        bf->name = xstrdup(fn->name);
-        bf->nparams = (s_u32)fn->nparams;
         g.fn = fn;
         g.e.nins = 0;
         g.e.cap = 0;
         g.e.ins = NULL;
-        g.labels.owner = fn->name;
         g.labels.nlabels = 0;
-        g.labels.npatches = 0;
         g.frame_max = fn->max_frame_slots;
         if (fn->slot_type_count != fn->max_frame_slots) {
             s_diag_error(diag, fn->loc, 500,
@@ -977,8 +948,8 @@ bool s_bcc_run(const s_module *ast, s_arena *arena, s_diag_ctx *diag,
             g.ok = false;
         }
         if (getenv("SURU_BCC_DUMP")) {
-            fprintf(stderr, "func %zu '%s' n=%u params=%u frame=%u:\n",
-                    f, fn->name, g.e.nins, bf->nparams, g.frame_max);
+            fprintf(stderr, "func %zu '%s' n=%u frame=%u:\n",
+                    f, fn->name, g.e.nins, g.frame_max);
             for (s_u32 i = 0; i < g.e.nins; ++i)
                 fprintf(stderr, "  %u op=%-10s a=%u b=%u\n", i,
                         s_bc_op_table[g.e.ins[i].op].name,
@@ -1001,13 +972,8 @@ bool s_bcc_run(const s_module *ast, s_arena *arena, s_diag_ctx *diag,
         }
         bf->max_operand_depth = max_depth;
         free(g.labels.pos);
-        free(g.labels.pins);
-        free(g.labels.plab);
         g.labels.pos = NULL;
-        g.labels.pins = NULL;
-        g.labels.plab = NULL;
         g.labels.caplabels = 0;
-        g.labels.capp = 0;
     }
 
     out->ints = g.pool.ints;
