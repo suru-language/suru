@@ -46,12 +46,12 @@ func nam_parse(source: str) -> [str] {
         let first = natural_next(source, position);
         if first.error {
             return array_concat(["error", "ast-error", to_str(first.line),
-                    "lexical error " + to_str(first.error_code)], nodes);
+                    "lexical error " + to_str(first.error_code)], slice(nodes, 1, array_len(nodes)));
         }
         if first.kind == NT_EOF {
             if array_len(stack) > 0 {
                 return array_concat(["error", "control-error", to_str(first.line),
-                        "unterminated " + stack[array_len(stack) - 1]], nodes);
+                        "unterminated " + stack[array_len(stack) - 1]], slice(nodes, 1, array_len(nodes)));
             }
             return nodes;
         }
@@ -75,7 +75,7 @@ func nam_parse(source: str) -> [str] {
         } else if first.text == "otherwise" or first.text == "case" {
             if array_len(stack) == 0 {
                 return array_concat(["error", "control-error", to_str(first.line),
-                        "clause has no owning block"], nodes);
+                        "clause has no owning block"], slice(nodes, 1, array_len(nodes)));
             }
             control = nac_parse_clause(source, first, stack);
         } else if first.text == "end" {
@@ -85,7 +85,7 @@ func nam_parse(source: str) -> [str] {
         if is_control {
             if nac_is_ok(control) == false {
                 return array_concat(["error", "control-error", to_str(first.line),
-                        nac_message(control)], nodes);
+                        nac_message(control)], slice(nodes, 1, array_len(nodes)));
             }
             nodes = array_concat(nodes, [nac_node(control)]);
             if nac_action(control) == "push" {
@@ -100,7 +100,7 @@ func nam_parse(source: str) -> [str] {
         let statement = nas_statement(source, position);
         if nas_is_ok(statement) == false {
             return array_concat(["error", "ast-error", to_str(first.line),
-                                 nas_message(statement)], nodes);
+                                 nas_message(statement)], slice(nodes, 1, array_len(nodes)));
         }
         nodes = array_concat(nodes, [nas_node(statement)]);
         position = nas_next(statement);
