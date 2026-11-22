@@ -15,3 +15,33 @@ func na_make(kind: str, line: int, text: str) -> NAstNode {
 func na_render(node: NAstNode) -> str {
     return "ast|" + node.kind + "|" + to_str(node.line) + "|" + node.text;
 }
+
+type NAstModule {
+    let nodes: [NAstNode];
+    let error_line: int;
+    let error_message: str;
+}
+
+// Rehydrate a node emitted by the statement parser. Only the first three
+// separators are structural; expression text after them is kept intact.
+func na_find(text: str, needle: str, start: int) -> int {
+    mut i: int = start;
+    while i + str_len(needle) <= str_len(text) {
+        if substr(text, i, str_len(needle)) == needle { return i; }
+        i += 1;
+    }
+    return -1;
+}
+
+func na_from_rendered(rendered: str) -> NAstNode {
+    let first: int = na_find(rendered, "|", 0);
+    if first < 0 { return na_make("invalid", 0, rendered); }
+    let second: int = na_find(rendered, "|", first + 1);
+    if second < 0 { return na_make("invalid", 0, rendered); }
+    let third: int = na_find(rendered, "|", second + 1);
+    if third < 0 { return na_make("invalid", 0, rendered); }
+    let kind: str = substr(rendered, first + 1, second - first - 1);
+    let line: int = int_from_str(substr(rendered, second + 1, third - second - 1));
+    let payload: str = substr(rendered, third + 1, str_len(rendered));
+    return na_make(kind, line, payload);
+}
