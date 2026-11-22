@@ -1,0 +1,17 @@
+// Shared scalar records for the typed expression AST. Kept separate from
+// the parser module so every importer sees one stable record identity.
+
+type NAstExpr {
+    let kind: str;
+    let value: str;
+    // Comma-separated child indices keep expression records scalar and flat.
+    let children: str;
+}
+
+type NAstExprParse {
+    let ok: bool;
+    let next: int;
+    let root: int;
+    let nodes: [NAstExpr];
+    let message: str;
+}
