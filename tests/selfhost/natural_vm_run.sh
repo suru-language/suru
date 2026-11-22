@@ -27,7 +27,7 @@ run_case() {
         fail=$((fail + 1))
         return
     fi
-    if ! s=$("$SURU" run "$DIR/natural_vm_driver.suru" \
+    if ! s=$(SURU_GC_ALLOC_INTERVAL=1000000 "$SURU" run "$DIR/natural_vm_driver.suru" \
             "$tmp/$name.sbc" 2>&1); then
         echo "FAIL $name: SURU VM failed: [$s]" >&2
         fail=$((fail + 1))
