@@ -27,4 +27,20 @@ if "$SURU" run "$DIR/natural_ast_driver.suru" \
 fi
 grep -q '^ast-error|1|binding requires an initializer$' "$tmp/invalid.out"
 
-echo "natural AST parser: statement node corpus passed"
+"$SURU" run "$DIR/natural_ast_module_driver.suru" \
+    "$ROOT/tests/natural/ast_statements_valid.suru" >"$tmp/module.out"
+diff -u "$tmp/valid.out" "$tmp/module.out"
+
+"$SURU" run "$DIR/natural_ast_module_driver.suru" \
+    "$ROOT/tests/natural/ast_routine_expression_valid.suru" >"$tmp/module-routine.out"
+diff -u "$tmp/routine.out" "$tmp/module-routine.out"
+
+if "$SURU" run "$DIR/natural_ast_module_driver.suru" \
+       "$ROOT/tests/natural/ast_statement_invalid.suru" >"$tmp/module-invalid.out"; then
+    echo "natural AST module: invalid binding was accepted" >&2
+    exit 1
+fi
+diff -u "$tmp/invalid.out" "$tmp/module-invalid.out"
+
+echo "natural AST parser: statement nodes are collected into typed module AST"
+
