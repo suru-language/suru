@@ -59,10 +59,11 @@ func nab_collect_ast(source: str) -> [str] {
             current_function = signature[0];
             return_type = signature[2];
             returned = false;
-            names = [];
-            types = [];
-            expressions = [];
-            let params: [str] = signature[1] == "" ? [] : str_split(signature[1], ",");
+            names = slice(names, array_len(names), 0);
+            types = slice(types, array_len(types), 0);
+            expressions = slice(expressions, array_len(expressions), 0);
+            let params: [str] = signature[1] == "" ?
+                slice(signature, array_len(signature), 0) : str_split(signature[1], ",");
             instructions = array_concat(instructions,
                 ["#funcbody|" + current_function + "|" + to_str(array_len(params))]);
             mut p: int = 0;
@@ -95,9 +96,9 @@ func nab_collect_ast(source: str) -> [str] {
             current_function = "";
             return_type = "";
             returned = false;
-            names = [];
-            types = [];
-            expressions = [];
+            names = slice(names, array_len(names), 0);
+            types = slice(types, array_len(types), 0);
+            expressions = slice(expressions, array_len(expressions), 0);
             i += 1;
             continue;
         }
