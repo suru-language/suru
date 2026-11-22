@@ -963,8 +963,8 @@ bool s_bcc_run(const s_module *ast, s_arena *arena, s_diag_ctx *diag,
             g.ok = false;
         }
         if (getenv("SURU_BCC_DUMP")) {
-            fprintf(stderr, "func %zu '%s' n=%u frame=%u:\n",
-                    f, fn->name, g.e.nins, g.frame_max);
+            fprintf(stderr, "func %zu '%s' n=%u params=%u frame=%u:\n",
+                    f, fn->name, g.e.nins, bf->nparams, g.frame_max);
             for (s_u32 i = 0; i < g.e.nins; ++i)
                 fprintf(stderr, "  %u op=%-10s a=%u b=%u\n", i,
                         s_bc_op_table[g.e.ins[i].op].name,
