@@ -24,4 +24,4 @@ if [ "$actual" != "$expected" ]; then
     echo "AST bytecode execution mismatch: '$actual'" >&2
     exit 1
 fi
-echo "natural AST bytecode: routines, bindings, calls, nested when/otherwise, repeat, show and give matched reference"
+echo "natural AST bytecode: AST-predeclared forward routine calls, bindings, nested when/otherwise, repeat, show and give matched reference"
