@@ -3,7 +3,7 @@ record Point
 end record
 
 routine main() -> Unit
-    value arithmetic: Whole = 0 - (2 + 3 * 4)
+    value arithmetic: Whole = 2 + 3 * 4
     show(arithmetic)
     value flag: Bool = true
     value chosen: Whole = flag ? 10 : 20
