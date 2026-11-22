@@ -294,6 +294,16 @@ static bool mark_process_one(s_heap *h) {
         o->kind == S_OBJ_CLOSURE || o->kind == S_OBJ_EXCEPTION) {
         s_value *vals = s_obj_array_data(o);
         for (s_u32 i = 0; i < o->count; ++i) {
+            if (getenv("SURU_GC_DEBUG") &&
+                vals[i].tag == S_VAL_OBJ && vals[i].u.o &&
+                !heap_contains_object(h, vals[i].u.o)) {
+                fprintf(stderr,
+                        "SURU GC: stale child edge parent=%p kind=%u "
+                        "count=%u slot=%u child=%p\n",
+                        (void *)o, (unsigned)o->kind, (unsigned)o->count,
+                        (unsigned)i, (void *)vals[i].u.o);
+                abort();
+            }
             mark_from_value(h, vals[i], "managed object child");
         }
     }
