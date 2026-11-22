@@ -2,9 +2,9 @@ name: Stage 1 self-hosted compiler
 
 on:
   push:
-    branches: [stage1-selfhost-compiler]
+    branches: [stage1-selfhost-compiler, stage2-suru-managed-heap]
   pull_request:
-    branches: [main]
+    branches: [main, stage2-suru-managed-heap]
 
 permissions:
   contents: read
