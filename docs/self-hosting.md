@@ -209,7 +209,7 @@ The bytecode object-emitting half is now owned by SURU:
   frontend first imposes GC pressure that corrupts aliasing source views (a
   known SURU string-aliasing fragility); re-reading yields deterministic,
   C-identical output.   This is the first execution step of the Stage 2 VM port. The interpreter now
-  implements the full instruction set, including closures (`BC_MKCLOSURE`,
+  implements the currently supported instruction subset, including closures (`BC_MKCLOSURE`,
   `BC_MKCLOSURE_V`, `BC_CALLV`) matching the C VM's capture/call convention
   (env placed in callee local slot 0, args after it); a hand-built module gate
   (`natural_vm_closure_run.sh`) verifies identical output on both VMs.
@@ -394,11 +394,14 @@ allocations since the last completed cycle, completed cycle count, cumulative
 logical allocation bytes, the current threshold, and the cycle's before-live
 snapshot. The heap module implements and tests the C VM's 512-allocation /
 1 MiB live-byte trigger and four-times-survivor threshold adaptation, including
-minimum/maximum clamps and the high-survival anti-thrashing rule. The
-SURU-written VM currently advances a bounded 128-object mark slice at every
-managed allocation; wiring the C-compatible interval/threshold trigger into
-the VM remains gated on complete runtime safepoint and root coverage. This
-conservative schedule is the version validated against the full VM corpus.
+minimum/maximum clamps and the high-survival anti-thrashing rule. The SURU-written VM now invokes the C-compatible allocation trigger before
+managed allocations: collection starts at the 512-allocation interval or
+when logical live reservations exceed the 1 MiB starting threshold. It advances
+marking in 128-object slices at allocation safepoints and republishes roots
+from the operand stack and every active frame on each slice. The 520-allocation
+suspended-caller regression exercises the integrated trigger and checks that a
+caller-local value survives collection. Logical byte accounting is an estimate
+based on SURU's object-table representation, not host allocator byte parity.
 The regression driver exercises shared references, unreachable cycles,
 exception causes, dropping roots, full reclamation, class-aware slot reuse,
 large first-fit reuse, capacity growth, incremental root discovery, allocation
