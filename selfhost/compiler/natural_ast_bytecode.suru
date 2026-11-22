@@ -191,8 +191,8 @@ func nab_collect_ast(source: str) -> [str] {
             let condition: [str] = net_infer(nodes, roots[0], names, types,
                                              field_names, field_types);
             if condition[0] == "error" { return nab_fail(condition[1]); }
-            if condition[1] != "Truth" {
-                return nab_fail("when condition must be Truth, got " + condition[1]);
+            if condition[1] != "Bool" {
+                return nab_fail("when condition must be Bool, got " + condition[1]);
             }
             let finish: str = "ast-when-end-" + to_str(labels);
             let next: str = "ast-when-next-" + to_str(labels);
@@ -220,8 +220,8 @@ func nab_collect_ast(source: str) -> [str] {
                 let condition: [str] = net_infer(nodes, roots[0], names, types,
                                                  field_names, field_types);
                 if condition[0] == "error" { return nab_fail(condition[1]); }
-                if condition[1] != "Truth" {
-                    return nab_fail("otherwise when condition must be Truth, got " + condition[1]);
+                if condition[1] != "Bool" {
+                    return nab_fail("otherwise when condition must be Bool, got " + condition[1]);
                 }
                 let next: str = "ast-when-next-" + to_str(labels);
                 labels += 1;
@@ -253,8 +253,8 @@ func nab_collect_ast(source: str) -> [str] {
             let condition: [str] = net_infer(nodes, roots[0], names, types,
                                              field_names, field_types);
             if condition[0] == "error" { return nab_fail(condition[1]); }
-            if condition[1] != "Truth" {
-                return nab_fail("repeat condition must be Truth, got " + condition[1]);
+            if condition[1] != "Bool" {
+                return nab_fail("repeat condition must be Bool, got " + condition[1]);
             }
             let start: str = "ast-repeat-start-" + to_str(labels);
             let finish: str = "ast-repeat-end-" + to_str(labels);
