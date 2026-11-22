@@ -81,8 +81,10 @@ func nab_collect_ast(source: str) -> [str] {
                 return nab_fail("malformed routine signature during type prepass");
             }
             let parameter_text: str = signature[1];
-            let parameters: [str] = parameter_text == "" ? [] :
-                str_split(parameter_text, ",");
+            mut parameters: [str] = [];
+            if parameter_text != "" {
+                parameters = str_split(parameter_text, ",");
+            }
             mut parameter_types: [str] = [];
             mut p: int = 0;
             while p < array_len(parameters) {
