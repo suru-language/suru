@@ -4,10 +4,11 @@
 // emitting output through SURU's own print/println. Differential parity with
 // the C VM is the acceptance gate.
 //
-// Values on the interpreter stack are encoded as single-character-tagged
-// strings: "I"<int>, "S"<str>, "B1"/"B0", "N" (none/unit). Surfacing only the
-// subset used by the corpus test programs (constants, locals, int arithmetic,
-// int/string comparison, control flow, print/println/to_str, returns).
+// Interpreter values use tagged strings for immediates and text. Arrays and
+// records use "H"<stable heap handle>; closure capture environments and
+// exception records retain transitional inline encodings. The SURU heap traces
+// handles from the operand stack, all call-frame locals, closure environments,
+// and exception causes before aggregate allocation.
 
 use "natural_module_reader.suru";
 use "../runtime/heap.suru";
