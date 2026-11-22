@@ -1,0 +1,9 @@
+func main() {
+    let retained = read_file("tests/integration/hello.suru");
+    let original_len = str_len(retained);
+    for i in range(0, 128) {
+        let garbage = "temporary-allocation-" + to_str(i);
+    }
+    println(str_len(retained) == original_len);
+    println(str_contains(retained, "func main"));
+}

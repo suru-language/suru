@@ -48,6 +48,7 @@ struct s_vm {
     s_handler *handlers;
     s_size nhandlers, caphandlers;
     s_u32 alloc_counter;
+    s_u32 gc_alloc_interval;
     s_u64 gc_threshold;
     s_u64 gc_min_threshold;
     bool gc_incremental;
@@ -64,6 +65,14 @@ s_vm *s_vm_create(const s_bc_module *m) {
     if (!vm->st) { free(vm); return NULL; }
     vm->st_cap = VM_INIT_STACK;
     vm->gc_threshold = VM_GC_INIT_THRESHOLD;
+    vm->gc_alloc_interval = VM_GC_ALLOC_INTERVAL;
+    const char *ais = getenv("SURU_GC_ALLOC_INTERVAL");
+    if (ais && *ais) {
+        char *end;
+        unsigned long v = strtoul(ais, &end, 10);
+        if (end != ais && *end == '\0' && v > 0 && v <= UINT32_MAX)
+            vm->gc_alloc_interval = (s_u32)v;
+    }
     const char *gs = getenv("SURU_GC_THRESHOLD");
     if (gs && *gs) {
         char *end;
@@ -197,7 +206,7 @@ static bool vm_throw(s_vm *vm, s_value exception, const s_bc_module *m,
 
 static void maybe_collect(s_vm *vm) {
     vm->alloc_counter++;
-    bool should = vm->alloc_counter >= VM_GC_ALLOC_INTERVAL ||
+    bool should = vm->alloc_counter >= vm->gc_alloc_interval ||
                   s_heap_live_bytes(vm->heap) > vm->gc_threshold;
     if (!should) return;
     s_heap_set_stack_root(vm->heap, vm->st, vm->sp);

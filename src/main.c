@@ -21,14 +21,12 @@ static char *read_file(const char *path, s_size *len) {
         free(bytes);
         return NULL;
     }
-    char *text = (char *)malloc(n + 1u);
+    char *text = (char *)realloc(bytes, n + 1u);
     if (!text) {
         free(bytes);
         return NULL;
     }
-    if (n != 0) memcpy(text, bytes, n);
     text[n] = '\0';
-    free(bytes);
     *len = n;
     return text;
 }
@@ -100,6 +98,7 @@ static int natural_frontend_path(char *out, size_t n, const char *argv0) {
 
 static int resolve_driver(char *out, size_t n, const char *argv0,
                           const char *leaf) {
+    if (!out || n == 0 || !argv0 || !leaf) return -1;
     const char *slash = strrchr(argv0, '/');
     char dir[1024];
     if (slash && slash != argv0) {
@@ -157,6 +156,7 @@ static int cmd_compile_natural(const char *path, const char *outpath,
     static s_u32 rnfields[65536];
     s_u32 nints = 0, nfl = 0, nstr = 0, nrecords = 0;
     int nfuncs = 0, cur_func = -1;
+    int malformed_function_name = 0;
     s_u32 cur_nins = 0;
     char line[4096];
     while (fgets(line, sizeof line, p)) {
@@ -197,12 +197,17 @@ static int cmd_compile_natural(const char *path, const char *outpath,
             if (cur_func < MAX_FUNCS) {
                 char *save = NULL;
                 char *ntok = strtok_r(line + 10, "|", &save);
+                const char *fname = ntok ? ntok : line + 10;
+                size_t fname_len = strlen(fname);
+                if (fname_len >= sizeof fnames[cur_func]) {
+                    malformed_function_name = 1;
+                    break;
+                }
+                memcpy(fnames[cur_func], fname, fname_len + 1u);
                 if (ntok) {
-                    snprintf(fnames[cur_func], sizeof fnames[cur_func], "%s", ntok);
                     char *ptok = strtok_r(NULL, "|", &save);
                     fnparams[cur_func] = (s_u32)(ptok ? strtoul(ptok, NULL, 10) : 0);
                 } else {
-                    snprintf(fnames[cur_func], sizeof fnames[cur_func], "%s", line + 10);
                     fnparams[cur_func] = 0;
                 }
                 cur_nins = 0;
@@ -238,6 +243,10 @@ static int cmd_compile_natural(const char *path, const char *outpath,
     int pstatus = pclose(p);
     if (pstatus != 0) {
         fprintf(stderr, "suru: natural bytecode driver failed\n");
+        return 1;
+    }
+    if (malformed_function_name) {
+        fprintf(stderr, "suru: natural function name exceeds the 255-byte limit\n");
         return 1;
     }
     if (getenv("SURU_NAT_DEBUG")) {

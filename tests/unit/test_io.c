@@ -15,6 +15,18 @@ static void test_binary_round_trip(void) {
     (void)remove(path);
 }
 
+static void test_empty_file(void) {
+    const char *path = "suru-io-empty.bin";
+    s_u8 *output = NULL;
+    s_size output_len = 99;
+    CHECK_EQ_INT(s_io_write_all(path, NULL, 0), 0);
+    CHECK_EQ_INT(s_io_read_all(path, &output, &output_len, 1024), 0);
+    CHECK(output != NULL);
+    CHECK_EQ_INT(output_len, 0);
+    free(output);
+    (void)remove(path);
+}
+
 static void test_limits_and_errors(void) {
     const char *path = "suru-io-limit.bin";
     const s_u8 input[] = { 1, 2, 3, 4 };
@@ -31,5 +43,6 @@ static void test_limits_and_errors(void) {
 
 TEST_MAIN_BEGIN()
     test_binary_round_trip();
+    test_empty_file();
     test_limits_and_errors();
 TEST_MAIN_END()

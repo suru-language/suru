@@ -168,6 +168,30 @@ static s_type *type_unit(s_sema *S) {
     return t;
 }
 
+static bool record_slot_type(s_sema *S, s_u32 slot, s_type *type) {
+    if (!S->fn) return true;
+    s_func_decl *fn = S->fn;
+    if (slot >= fn->slot_type_cap) {
+        s_size ncap = fn->slot_type_cap ? (s_size)fn->slot_type_cap * 2u : 8u;
+        while (ncap <= slot) {
+            if (ncap > SIZE_MAX / 2u) return false;
+            ncap *= 2u;
+        }
+        if (ncap > UINT32_MAX) return false;
+        s_type **types = s_arena_calloc(S->arena, ncap, sizeof(*types),
+                                        _Alignof(s_type *));
+        if (!types) return false;
+        if (fn->slot_types && fn->slot_type_count)
+            memcpy(types, fn->slot_types, (s_size)fn->slot_type_count * sizeof(*types));
+        fn->slot_types = types;
+        fn->slot_type_cap = (s_u32)ncap;
+    }
+    fn->slot_types[slot] = type;
+    if (fn->slot_type_count <= slot) fn->slot_type_count = slot + 1u;
+    return true;
+}
+
+
 /* ------------------------------------------------------------------ */
 /* Record / function resolution                                        */
 /* ------------------------------------------------------------------ */
@@ -833,8 +857,24 @@ static s_type *check_lambda(s_sema *S, s_expr *e) {
     S->fn = f;
     S->lambda_owner = e;
     S->next_slot = (int)f->nparams;
+    f->slot_types = NULL;
+    f->slot_type_count = 0;
+    f->slot_type_cap = 0;
+    f->max_frame_slots = 0;
+    for (s_size i = 0; i < f->nparams; ++i) {
+        if (!record_slot_type(S, (s_u32)i, f->params[i].type)) {
+            s_diag_error(S->diag, e->loc, 440, "out of memory");
+            S->scope = saved_scope;
+            S->fn = saved_fn;
+            S->lambda_owner = saved_lam;
+            S->next_slot = saved_slot;
+            scope_pop(&sc);
+            return type_unit(S);
+        }
+    }
 
     check_block(S, f->body);
+    f->max_frame_slots = (s_u32)S->next_slot;
 
     if (f->ret_type && f->ret_type->kind != S_TYPE_UNIT &&
         !stmt_returns(f->body)) {
@@ -1046,6 +1086,10 @@ static bool push_let(s_sema *S, s_stmt *s, s_type *t, bool is_mut,
     sym.type = t;
     sym.index = S->next_slot++;
     sym.is_mut = is_mut;
+    if (!record_slot_type(S, (s_u32)sym.index, t)) {
+        s_diag_error(S->diag, s->loc, 440, "out of memory");
+        return false;
+    }
     if (!scope_push_sym(S->scope, sym)) {
         s_diag_error(S->diag, s->loc, 440, "out of memory");
         return false;
@@ -1176,6 +1220,10 @@ static bool check_stmt(s_sema *S, s_stmt *s) {
         sym.type = elem;
         sym.index = S->next_slot++;
         sym.is_mut = true;
+        if (!record_slot_type(S, (s_u32)sym.index, elem)) {
+            s_diag_error(S->diag, s->loc, 440, "out of memory");
+            return false;
+        }
         if (!scope_push_sym(S->scope, sym)) return false;
         s->u.forstmt.var_index = sym.index;
         bool ok = check_block(S, s->u.forstmt.body);
@@ -1437,6 +1485,10 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
         if (fn->is_lambda) continue; /* analyzed within its enclosing function */
         S.fn = fn;
         S.next_slot = 0;
+        fn->slot_types = NULL;
+        fn->slot_type_count = 0;
+        fn->slot_type_cap = 0;
+        fn->max_frame_slots = 0;
 
         /* parameter scope */
         s_scope sc;
@@ -1461,12 +1513,18 @@ bool s_sema_run(s_module *mod, s_arena *arena, s_diag_ctx *diag) {
             if (!scope_push_sym(&sc, sym)) { scope_pop(&sc); return false; }
             fn->params[i].index = (int)i;
             S.next_slot++;
+            if (!record_slot_type(&S, (s_u32)i, pt)) {
+                s_diag_error(diag, fn->loc, 440, "out of memory");
+                scope_pop(&sc);
+                return false;
+            }
         }
         if (fn->ret_type && fn->ret_type->kind == S_TYPE_RECORD) {
             int idx = resolve_record(&S, fn->ret_type, fn->loc);
             if (idx >= 0) fn->ret_type->record_index = idx;
         }
         if (!check_block(&S, fn->body)) ok = false;
+        fn->max_frame_slots = (s_u32)S.next_slot;
         if (fn->ret_type && fn->ret_type->kind != S_TYPE_UNIT &&
             !stmt_returns(fn->body)) {
             s_diag_error(diag, fn->loc, 462,

@@ -102,6 +102,15 @@ integration: $(BINDIR)/suru
 integration-incremental: $(BINDIR)/suru
 	@SURU_GC_INCREMENTAL=1 tests/integration/run.sh $(BINDIR)/suru
 
+.PHONY: determinism-test
+determinism-test: $(BINDIR)/suru
+	@mkdir -p $(BINDIR)/determinism && \
+		$(BINDIR)/suru compile tests/integration/hello.suru "$(BINDIR)/determinism/first.sbc" && \
+		$(BINDIR)/suru compile tests/integration/hello.suru "$(BINDIR)/determinism/second.sbc" && \
+		cmp "$(BINDIR)/determinism/first.sbc" "$(BINDIR)/determinism/second.sbc" && \
+		rm -rf $(BINDIR)/determinism && \
+		echo "determinism: bytecode outputs match"
+
 .PHONY: test
 test: unit integration selfhost-test
 
@@ -224,7 +233,7 @@ analyze:
 
 .PHONY: ci
 ci:
-	$(MAKE) clean && $(MAKE) test
+	$(MAKE) clean && $(MAKE) test && $(MAKE) determinism-test
 	$(MAKE) clean && $(MAKE) release
 	$(MAKE) clean && $(MAKE) asan-test
 	$(MAKE) analyze

@@ -1,0 +1,4 @@
+use "lib/ownership.suru";
+func main() {
+    println(owned_value());
+}

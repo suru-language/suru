@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 #define SU_PARSE_MAX_DEPTH 512
 #define SU_PARSE_MAX_ITEMS 1u << 20
@@ -103,7 +104,8 @@ static bool enter_depth(s_parser *p, int code) {
 static void leave_depth(s_parser *p) { p->depth--; }
 
 static const char *ident_text(s_parser *p) {
-    return s_arena_strndup(p->arena, p->cur.v.s.text, p->cur.v.s.len);
+    /* Identifier token text is already owned by the compilation arena. */
+    return p->cur.v.s.text;
 }
 
 /* ------------------------------------------------------------------ */
@@ -602,7 +604,8 @@ static s_expr *parse_primary(s_parser *p) {
     if (at(p, S_TOK_STR)) {
         s_expr *e = expr_alloc(p, S_EXPR_STR_LIT, loc);
         if (!e) return NULL;
-        e->u.str.text = s_arena_strdup(p->arena, p->cur.v.s.text);
+        e->u.str.text = s_arena_strndup(p->arena, p->cur.v.s.text,
+                                        p->cur.v.s.len);
         e->u.str.len = p->cur.v.s.len;
         advance(p);
         return e;
@@ -1059,14 +1062,12 @@ static bool read_file(const char *path, char **out, s_size *outlen) {
         free(bytes);
         return false;
     }
-    char *text = (char *)malloc(len + 1u);
+    char *text = (char *)realloc(bytes, len + 1u);
     if (!text) {
         free(bytes);
         return false;
     }
-    if (len != 0) memcpy(text, bytes, len);
     text[len] = '\0';
-    free(bytes);
     *out = text;
     *outlen = len;
     return true;
@@ -1075,8 +1076,8 @@ static bool read_file(const char *path, char **out, s_size *outlen) {
 static bool parse_items(s_parser *p);
 
 /* Resolve an include path: absolute, relative to the containing file, then
- * each colon-separated directory in SURU_MOD_PATH. On success fills `full`
- * with an openable path and returns true. */
+ * each colon-separated directory in SURU_MOD_PATH. stat() only probes the
+ * candidate; parse_use() reads its contents once after de-duplication. */
 static bool resolve_include(const char *basefile, const char *inc,
                             char *full, size_t fullsz) {
     char cand[1024];
@@ -1088,12 +1089,18 @@ static bool resolve_include(const char *basefile, const char *inc,
         if (d + il + 1 <= sizeof cand) {
             memcpy(cand, basefile, d);
             memcpy(cand + d, inc, il + 1);
-            FILE *f = fopen(cand, "rb");
-            if (f) { fclose(f); snprintf(full, fullsz, "%s", cand); return true; }
+            struct stat st;
+            if (stat(cand, &st) == 0) {
+                snprintf(full, fullsz, "%s", cand);
+                return true;
+            }
         }
     } else {
-        FILE *f = fopen(inc, "rb");
-        if (f) { fclose(f); snprintf(full, fullsz, "%s", inc); return true; }
+        struct stat st;
+        if (stat(inc, &st) == 0) {
+            snprintf(full, fullsz, "%s", inc);
+            return true;
+        }
     }
     const char *path = getenv("SURU_MOD_PATH");
     if (!path || !*path) return false;
@@ -1109,8 +1116,11 @@ static bool resolve_include(const char *basefile, const char *inc,
             size_t cl = tlen;
             cand[cl] = '/';
             memcpy(cand + cl + 1, inc, strlen(inc) + 1);
-            FILE *f = fopen(cand, "rb");
-            if (f) { fclose(f); snprintf(full, fullsz, "%s", cand); return true; }
+            struct stat st;
+            if (stat(cand, &st) == 0) {
+                snprintf(full, fullsz, "%s", cand);
+                return true;
+            }
         }
         if (!sep) break;
         q = sep + 1;

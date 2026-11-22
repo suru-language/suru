@@ -445,7 +445,10 @@ bool s_lexer_next(s_lexer *lx, s_token *out) {
         }
         out->kind = keyword_kind(text, len);
         if (out->kind == S_TOK_IDENT) {
-            out->v.s.text = text;
+            char *owned = s_arena_strndup(lx->arena, text, len);
+            if (!owned)
+                return lex_error(lx, out->loc, 110, "out of memory");
+            out->v.s.text = owned;
             out->v.s.len = len;
         }
         return true;
