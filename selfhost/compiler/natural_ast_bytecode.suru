@@ -43,7 +43,7 @@ func nab_collect_ast(source: str) -> [str] {
     mut current_function: str = "";
     mut return_type: str = "";
     mut returned: bool = false;
-    mut controls: [str] = [];
+    mut controls: [str] = [""];
     mut next_label: int = 0;
     mut i: int = 1;
     while i < array_len(module) {
@@ -61,7 +61,7 @@ func nab_collect_ast(source: str) -> [str] {
             current_function = signature[0];
             return_type = signature[2];
             returned = false;
-            controls = [];
+            controls = [""];
             names = slice(names, array_len(names), 0);
             types = slice(types, array_len(types), 0);
             expressions = slice(expressions, array_len(expressions), 0);
@@ -91,7 +91,7 @@ func nab_collect_ast(source: str) -> [str] {
 
         if kind == "end-routine" {
             if current_function == "" { return nab_fail("end routine without routine"); }
-            if array_len(controls) != 0 {
+            if array_len(controls) != 1 {
                 return nab_fail("unterminated control block in '" + current_function + "'");
             }
             if return_type != "Unit" and not returned {
@@ -183,7 +183,7 @@ func nab_collect_ast(source: str) -> [str] {
             controls = array_concat(controls,
                 ["when|" + finish + "|" + next + "|0"]);
         } else if kind == "otherwise-when" {
-            if array_len(controls) == 0 {
+            if array_len(controls) <= 1 {
                 return nab_fail("otherwise when without an open when");
             }
             let current: [str] = str_split(controls[array_len(controls) - 1], "|");
