@@ -4,7 +4,20 @@
 
 use "natural_token_stream.suru";
 use "natural_expression.suru";
-use "natural_ast.suru";
+
+type NAstExpr {
+    let kind: str;
+    let value: str;
+    let children: [int];
+}
+
+type NAstExprParse {
+    let ok: bool;
+    let next: int;
+    let root: int;
+    let nodes: [NAstExpr];
+    let message: str;
+}
 
 func nea_ok(next: int, root: int, nodes: [NAstExpr]) -> NAstExprParse {
     return NAstExprParse(true, next, root, nodes, "");
