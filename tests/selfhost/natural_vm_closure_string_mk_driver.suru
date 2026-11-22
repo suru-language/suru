@@ -5,19 +5,33 @@ use "../../selfhost/compiler/natural_module_writer.suru";
 func main() {
     let intb: [str] = [nw_i64(0)];
     let floats: [str] = [];
-    let strs: [str] = ["captured"];
+    let strs: [str] = ["captured", "garbage"];
     let recf: [int] = [];
     let fn_names: [str] = ["main", "use_env"];
     let fn_nparams: [int] = [0, 1];
     let fn_frames: [int] = [1, 1];
     let fn_maxdepths: [int] = [1024, 1024];
 
-    // main: make a closure over the managed string, allocate an unrelated
-    // empty array (forcing a collection), then call the still-rooted closure.
-    let ops0: [int] = [3, 61, 51, 7, 62, 65];
-    let as0: [int] = [0, 1, 0, 0, 0, 0];
-    let bs0: [int] = [0, 1, 0, 0, 0, 0];
-    let cs0: [int] = [0, 0, 0, 0, 0, 0];
+    // Keep the closure on the operand stack while more than one default
+    // allocation interval of garbage strings is created. The next allocation
+    // must trigger marking/sweep and retain the captured string through the
+    // closure -> managed environment -> string graph.
+    mut ops0: [int] = [3, 61];
+    mut as0: [int] = [0, 1];
+    mut bs0: [int] = [0, 1];
+    mut cs0: [int] = [0, 0];
+    mut i: int = 0;
+    while i < 520 {
+        ops0 = array_concat(ops0, [3, 7]);
+        as0 = array_concat(as0, [1, 0]);
+        bs0 = array_concat(bs0, [0, 0]);
+        cs0 = array_concat(cs0, [0, 0]);
+        i += 1;
+    }
+    ops0 = array_concat(ops0, [62, 65]);
+    as0 = array_concat(as0, [0, 0]);
+    bs0 = array_concat(bs0, [0, 0]);
+    cs0 = array_concat(cs0, [0, 0]);
 
     // use_env: load managed capture array; load index 0; print string; return.
     let ops1: [int] = [5, 1, 54, 63, 65];
