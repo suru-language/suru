@@ -37,4 +37,13 @@ if [ "$actual" != "done" ]; then
     echo "AST control bytecode execution mismatch: '$actual'" >&2
     exit 1
 fi
+source="$ROOT/tests/natural/each_ast_bytecode.suru"
+"$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+    "$source" "$tmp/each-ast.sbc"
+actual="$("$SURU" exec "$tmp/each-ast.sbc")"
+expected="$(printf '%s\n' 12 1 2 3 1 2)"
+if [ "$actual" != "$expected" ]; then
+    echo "AST each bytecode execution mismatch: '$actual'" >&2
+    exit 1
+fi
 echo "natural AST bytecode: routine/binding/call/show/give output matched reference"

@@ -1,0 +1,14 @@
+routine main() -> Unit
+    value items: [Whole] = [2, 4, 6]
+    value total: Whole = 0
+    each item across items
+        set total to total + item
+    end each
+    show(total)
+    each n from 1 through 3
+        show(n)
+    end each
+    each m from 1 until 3
+        show(m)
+    end each
+end routine

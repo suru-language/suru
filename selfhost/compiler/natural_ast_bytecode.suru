@@ -260,6 +260,137 @@ func nab_collect_ast(source: str) -> [str] {
             instructions = nbc_emit(instructions, "BC_JMP", "@" + current[1]);
             instructions = nbc_label(instructions, current[2]);
             controls = slice(controls, 0, array_len(controls) - 1);
+        } else if kind == "each" {
+            let across_at: int = nam_find(text, " across ", 0);
+            let from_at: int = nam_find(text, " from ", 0);
+            if across_at < 0 and from_at < 0 {
+                return nab_fail("each requires across or from range");
+            }
+            let item_end: int = across_at >= 0 ? across_at : from_at;
+            let item_name: str = str_trim(substr(text, 0, item_end));
+            if item_name == "" { return nab_fail("each binding name is empty"); }
+            if net_lookup(names, types, item_name) != "" or
+               nbc_slot(instructions, item_name) >= 0 {
+                return nab_fail("each binding '" + item_name + "' conflicts with an existing local");
+            }
+            let saved_names: int = array_len(names);
+            let saved_types: int = array_len(types);
+            let start_label: str = "ast-each-start-" + to_str(next_label);
+            let finish_label: str = "ast-each-end-" + to_str(next_label);
+            let index_name: str = "__nab_each_index_" + to_str(next_label);
+            next_label += 1;
+            if across_at >= 0 {
+                if array_len(roots) != 1 {
+                    return nab_fail("each across requires one iterable expression");
+                }
+                let iterable: [str] = net_infer(nodes, roots[0], names, types,
+                                                field_names, field_types);
+                if iterable[0] == "error" { return nab_fail(iterable[1]); }
+                if not net_is_array(iterable[1]) {
+                    return nab_fail("AST each across currently requires an Array");
+                }
+                let element_type: str = net_array_element(iterable[1]);
+                if element_type == "" {
+                    return nab_fail("cannot infer each element type from an empty array");
+                }
+                let array_name: str = "__nab_each_array_" + to_str(next_label - 1);
+                instructions = nbc_bind(instructions, array_name);
+                instructions = nbc_note_type(instructions, array_name, iterable[1]);
+                instructions = nbc_bind(instructions, index_name);
+                instructions = nbc_note_type(instructions, index_name, "Whole");
+                instructions = nbc_bind(instructions, item_name);
+                instructions = nbc_note_type(instructions, item_name, element_type);
+                let array_slot: int = nbc_slot(instructions, array_name);
+                let index_slot: int = nbc_slot(instructions, index_name);
+                let item_slot: int = nbc_slot(instructions, item_name);
+                instructions = nbc_emit_ast_node(instructions, nodes, roots[0]);
+                instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(array_slot));
+                instructions = nbc_const(instructions, "int", "BC_CONST_INT", "0");
+                instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(index_slot));
+                instructions = nbc_label(instructions, start_label);
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(index_slot));
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(array_slot));
+                instructions = nbc_emit(instructions, "BC_ARR_LEN", "");
+                instructions = nbc_emit(instructions, "BC_LT_I", "");
+                instructions = nbc_emit(instructions, "BC_JZ", "@" + finish_label);
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(array_slot));
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(index_slot));
+                instructions = nbc_emit(instructions, "BC_IDX_LD", "");
+                instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(item_slot));
+                names = array_concat(names, [item_name]);
+                types = array_concat(types, [element_type]);
+                controls = array_concat(controls,
+                    ["each|across|" + start_label + "|" + finish_label + "|" +
+                     index_name + "|" + array_name + "|" + item_name + "|" +
+                     to_str(saved_names) + "|" + to_str(saved_types)]);
+            } else {
+                if array_len(roots) != 2 {
+                    return nab_fail("each range requires start and finish expressions");
+                }
+                let start_type: [str] = net_infer(nodes, roots[0], names, types,
+                                                  field_names, field_types);
+                if start_type[0] == "error" { return nab_fail(start_type[1]); }
+                let finish_type: [str] = net_infer(nodes, roots[1], names, types,
+                                                   field_names, field_types);
+                if finish_type[0] == "error" { return nab_fail(finish_type[1]); }
+                if start_type[1] != "Whole" or finish_type[1] != "Whole" {
+                    return nab_fail("each range bounds must be Whole");
+                }
+                let range_text: str = substr(text, from_at + 6, str_len(text));
+                let until_at: int = nam_find(range_text, " until ", 0);
+                let through_at: int = nam_find(range_text, " through ", 0);
+                let inclusive: str = through_at >= 0 ? "through" : "until";
+                if until_at < 0 and through_at < 0 {
+                    return nab_fail("each range requires until or through");
+                }
+                let limit_name: str = "__nab_each_limit_" + to_str(next_label - 1);
+                instructions = nbc_bind(instructions, index_name);
+                instructions = nbc_note_type(instructions, index_name, "Whole");
+                instructions = nbc_bind(instructions, limit_name);
+                instructions = nbc_note_type(instructions, limit_name, "Whole");
+                instructions = nbc_bind(instructions, item_name);
+                instructions = nbc_note_type(instructions, item_name, "Whole");
+                let index_slot: int = nbc_slot(instructions, index_name);
+                let limit_slot: int = nbc_slot(instructions, limit_name);
+                let item_slot: int = nbc_slot(instructions, item_name);
+                instructions = nbc_emit_ast_node(instructions, nodes, roots[0]);
+                instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(index_slot));
+                instructions = nbc_emit_ast_node(instructions, nodes, roots[1]);
+                instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(limit_slot));
+                instructions = nbc_label(instructions, start_label);
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(index_slot));
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(limit_slot));
+                instructions = nbc_emit(instructions,
+                    inclusive == "through" ? "BC_LE_I" : "BC_LT_I", "");
+                instructions = nbc_emit(instructions, "BC_JZ", "@" + finish_label);
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(index_slot));
+                instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(item_slot));
+                names = array_concat(names, [item_name]);
+                types = array_concat(types, ["Whole"]);
+                controls = array_concat(controls,
+                    ["each|range|" + start_label + "|" + finish_label + "|" +
+                     index_name + "|" + limit_name + "|" + item_name + "|" +
+                     inclusive + "|" + to_str(saved_names) + "|" + to_str(saved_types)]);
+            }
+        } else if kind == "end-each" {
+            if array_len(controls) <= 1 {
+                return nab_fail("end each without an open each");
+            }
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if current[0] != "each" {
+                return nab_fail("mismatched each terminator");
+            }
+            let index_slot: int = nbc_slot(instructions, current[4]);
+            if index_slot < 0 { return nab_fail("missing each index slot"); }
+            instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(index_slot));
+            instructions = nbc_const(instructions, "int", "BC_CONST_INT", "1");
+            instructions = nbc_emit(instructions, "BC_ADD_I", "");
+            instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(index_slot));
+            instructions = nbc_emit(instructions, "BC_JMP", "@" + current[2]);
+            instructions = nbc_label(instructions, current[3]);
+            names = slice(names, 0, int_from_str(current[current[1] == "across" ? 7 : 8]));
+            types = slice(types, 0, int_from_str(current[current[1] == "across" ? 8 : 9]));
+            controls = slice(controls, 0, array_len(controls) - 1);
         } else if kind == "give" {
             if return_type == "Unit" and array_len(roots) > 0 {
                 return nab_fail("Unit routine cannot give a value");
