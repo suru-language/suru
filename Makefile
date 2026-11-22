@@ -143,6 +143,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_expression_types_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_ast_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_typed_ast_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_routine_ast_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_typed_module_semantic_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_control_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_semantic_run.sh $(BINDIR)/suru

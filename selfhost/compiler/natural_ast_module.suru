@@ -39,6 +39,104 @@ func nam_node_text(rendered: str) -> str {
     return substr(rendered, third + 1, str_len(rendered));
 }
 
+func nam_join(items: [str], separator: str) -> str {
+    mut out: str = "";
+    mut i: int = 0;
+    while i < array_len(items) {
+        if i > 0 { out = out + separator; }
+        out = out + items[i];
+        i += 1;
+    }
+    return out;
+}
+
+func nam_parse_routine(source: str, first: NToken) -> [str] {
+    let name = natural_next(source, first.next);
+    if name.kind != NT_IDENT {
+        return nac_fail(name.start, "expected routine name");
+    }
+    let open = natural_next(source, name.next);
+    if open.text != "(" {
+        return nac_fail(open.start, "routine requires '(' after its name");
+    }
+
+    mut params: [str] = [];
+    mut position: int = open.next;
+    let initial = natural_next(source, position);
+    if initial.text == ")" {
+        position = initial.next;
+    } else {
+        while true {
+            let param = natural_next(source, position);
+            if param.kind != NT_IDENT {
+                return nac_fail(param.start, "expected parameter name");
+            }
+            let colon = natural_next(source, param.next);
+            if colon.text != ":" {
+                return nac_fail(colon.start, "routine parameter requires a type annotation");
+            }
+            let typ = nas_parse_type(source, colon.next);
+            if typ[0] != "ok" {
+                return nac_fail(colon.next, typ[2]);
+            }
+            params = array_concat(params, [param.text + ":" + typ[2]]);
+            let separator = natural_next(source, int_from_str(typ[1]));
+            if separator.text == "," {
+                position = separator.next;
+                continue;
+            }
+            if separator.text == ")" {
+                position = separator.next;
+                break;
+            }
+            return nac_fail(separator.start, "expected ',' or ')' after routine parameter");
+        }
+    }
+
+    mut return_type: str = "Unit";
+    mut effects: [str] = [];
+    let after_params = natural_next(source, position);
+    if after_params.text == "->" {
+        let typ = nas_parse_type(source, after_params.next);
+        if typ[0] != "ok" {
+            return nac_fail(after_params.next, typ[2]);
+        }
+        return_type = typ[2];
+        position = int_from_str(typ[1]);
+    } else {
+        position = after_params.start;
+    }
+
+    let after_return = natural_next(source, position);
+    if after_return.text == "throws" {
+        position = after_return.next;
+        while true {
+            let effect = natural_next(source, position);
+            if effect.kind == NT_NEWLINE or effect.kind == NT_EOF {
+                position = effect.start;
+                break;
+            }
+            if effect.kind == NT_IDENT or effect.kind == NT_WORD {
+                effects = array_concat(effects, [effect.text]);
+                position = effect.next;
+                continue;
+            }
+            if effect.text == "," {
+                position = effect.next;
+                continue;
+            }
+            return nac_fail(effect.start, "invalid throws list in routine signature");
+        }
+    } else {
+        position = after_return.start;
+    }
+
+    let payload: str = name.text + "|" + nam_join(params, ",") + "|" +
+                       return_type + "|" + nam_join(effects, ",");
+    let node = na_make("routine", first.line, payload);
+    return nac_finish(source, position, na_render(node), "push", "routine");
+}
+
 func nam_parse(source: str) -> [str] {
     mut nodes: [str] = ["ok"];
     mut stack: [str] = [];
@@ -62,10 +160,17 @@ func nam_parse(source: str) -> [str] {
         }
 
         mut control: [str] = nac_fail(first.start, "unsupported control statement");
-        let is_control: bool = first.text == "when" or first.text == "repeat" or
+        let is_control: bool = first.text == "routine" or
+            first.text == "when" or first.text == "repeat" or
             first.text == "each" or first.text == "choose" or
             first.text == "otherwise" or first.text == "case" or first.text == "end";
-        if first.text == "when" {
+        if first.text == "routine" {
+            if array_len(stack) != 0 {
+                return array_concat(["error", "ast-error", to_str(first.line),
+                        "routine declarations must be at module scope"], slice(nodes, 1, array_len(nodes)));
+            }
+            control = nam_parse_routine(source, first);
+        } else if first.text == "when" {
             control = nac_parse_when(source, first);
         } else if first.text == "repeat" {
             control = nac_parse_repeat(source, first);

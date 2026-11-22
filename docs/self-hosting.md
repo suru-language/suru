@@ -412,3 +412,7 @@ The focused test driver supplies a small module environment (locals, an array, a
 The expression type checker is now being integrated with the module AST for a first statement-level semantic slice. The module pass tracks bindings in source order, checks declared initializer types, checks assignment target/value compatibility, requires Boolean control conditions, and validates array/text iteration sources and integer range bounds. It uses the attached expression-node IDs and type checker; it does not parse expression text a second time.
 
 This initial module pass deliberately covers straight-line/module-level bindings and the supported control nodes. Lexical block scopes, mutability enforcement, routine parameter/return signatures, record declarations/methods, generic substitution, and effect typing remain separate follow-up work.
+
+## Stage 1 routine declarations in the module AST
+
+The SURU-written module AST parser now recognizes top-level routine declarations and records their name, typed parameter list, return type (defaulting to `Unit`), and declared `throws` names. Routine bodies are collected as the same ordered statement/control nodes used by the expression attachment pass, and `end routine` is checked against the open-block stack. This establishes routine boundaries and signatures in the SURU AST before the next step adds routine-local scopes and connects those AST nodes to bytecode lowering.

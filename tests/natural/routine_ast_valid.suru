@@ -1,0 +1,7 @@
+routine add(a: Whole, b: Whole) -> Whole
+    value total: Whole = a + b
+    give total
+end routine
+routine main() -> Unit
+    show(add(2, 3))
+end routine
