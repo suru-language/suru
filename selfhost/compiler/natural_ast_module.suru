@@ -1,99 +1,59 @@
 // Module-level statement/control AST collection and Stage 1 typed-expression
-// attachment. The original NAstNode/NAstModule API stays stable for the
-// Natural frontend; expression nodes are kept in a flat triplet table.
+// attachment. This module uses the existing serialized node boundary so the
+// legacy frontend's record types remain isolated from the new expression table.
 
 use "natural_token_stream.suru";
 use "natural_control_parser.suru";
 use "natural_expression_ast.suru";
-use "natural_ast.suru";
 
-func nam_add_expression(text: str, state: [str]) -> [str] {
-    if state[0] != "ok" { return state; }
-    let source: str = str_trim(text);
-    if source == "" or source == "Unit" { return state; }
-    let initial_nodes: [str] = slice(state, 2, array_len(state));
-    let parsed = nea_parse_expression(source, 0, 0, initial_nodes);
-    if nea_is_ok(parsed) == false { return ["error", nea_message(parsed)]; }
-    let end = natural_next(source, nea_next(parsed));
-    if end.kind != NT_EOF {
-        return ["error", "unexpected token after expression: " + end.text];
+func nam_find(text: str, needle: str, start: int) -> int {
+    mut i: int = start;
+    while i + str_len(needle) <= str_len(text) {
+        if substr(text, i, str_len(needle)) == needle { return i; }
+        i += 1;
     }
-    let old_roots: str = state[1];
-    let root_text: str = to_str(nea_root(parsed));
-    let roots: str = old_roots == "" ? root_text : old_roots + "," + root_text;
-    return array_concat(["ok", roots], nea_nodes(parsed));
+    return -1;
 }
 
-func nam_attach_expressions(node: NAstNode, state: [str]) -> [str] {
-    mut attached: [str] = state;
-    if node.kind == "binding" {
-        let equals: int = na_find(node.text, " = ", 0);
-        if equals >= 0 {
-            attached = nam_add_expression(
-                substr(node.text, equals + 3, str_len(node.text)), attached);
-        }
-    } else if node.kind == "assignment" {
-        let to_at: int = na_find(node.text, " to ", 0);
-        if to_at >= 0 {
-            attached = nam_add_expression(substr(node.text, 0, to_at), attached);
-            if attached[0] == "ok" {
-                attached = nam_add_expression(
-                    substr(node.text, to_at + 4, str_len(node.text)), attached);
-            }
-        }
-    } else if node.kind == "show" or node.kind == "when" or
-              node.kind == "choose" or node.kind == "case" or
-              node.kind == "otherwise-when" or node.kind == "give" {
-        attached = nam_add_expression(node.text, attached);
-    } else if node.kind == "repeat" {
-        if str_len(node.text) >= 6 and substr(node.text, 0, 6) == "while " {
-            attached = nam_add_expression(
-                substr(node.text, 6, str_len(node.text)), attached);
-        }
-    } else if node.kind == "each" {
-        let across: int = na_find(node.text, " across ", 0);
-        if across >= 0 {
-            attached = nam_add_expression(
-                substr(node.text, across + 8, str_len(node.text)), attached);
-        } else {
-            let from: int = na_find(node.text, " from ", 0);
-            if from >= 0 {
-                let range: str = substr(node.text, from + 6, str_len(node.text));
-                let until: int = na_find(range, " until ", 0);
-                let through: int = na_find(range, " through ", 0);
-                let split: int = until >= 0 ? until : through;
-                let width: int = until >= 0 ? 7 : 9;
-                if split < 0 {
-                    attached = ["error", "range iteration requires until/through"];
-                } else {
-                    attached = nam_add_expression(substr(range, 0, split), attached);
-                    if attached[0] == "ok" {
-                        attached = nam_add_expression(
-                            substr(range, split + width, str_len(range)), attached);
-                    }
-                }
-            }
-        }
-    }
-    return attached;
+func nam_node_kind(rendered: str) -> str {
+    let first: int = nam_find(rendered, "|", 0);
+    let second: int = nam_find(rendered, "|", first + 1);
+    if first < 0 or second < 0 { return "invalid"; }
+    return substr(rendered, first + 1, second - first - 1);
 }
 
-func nam_parse(source: str) -> NAstModule {
-    mut nodes: [NAstNode] = [];
+func nam_node_line(rendered: str) -> int {
+    let first: int = nam_find(rendered, "|", 0);
+    let second: int = nam_find(rendered, "|", first + 1);
+    let third: int = nam_find(rendered, "|", second + 1);
+    if first < 0 or second < 0 or third < 0 { return 0; }
+    return int_from_str(substr(rendered, second + 1, third - second - 1));
+}
+
+func nam_node_text(rendered: str) -> str {
+    let first: int = nam_find(rendered, "|", 0);
+    let second: int = nam_find(rendered, "|", first + 1);
+    let third: int = nam_find(rendered, "|", second + 1);
+    if first < 0 or second < 0 or third < 0 { return rendered; }
+    return substr(rendered, third + 1, str_len(rendered));
+}
+
+func nam_parse(source: str) -> [str] {
+    mut nodes: [str] = ["ok"];
     mut stack: [str] = [];
     mut position: int = 0;
     while true {
         let first = natural_next(source, position);
         if first.error {
-            return NAstModule(nodes, "ast-error", first.line,
-                              "lexical error " + to_str(first.error_code));
+            return ["error", "ast-error", to_str(first.line),
+                    "lexical error " + to_str(first.error_code)];
         }
         if first.kind == NT_EOF {
             if array_len(stack) > 0 {
-                return NAstModule(nodes, "control-error", first.line,
-                                  "unterminated " + stack[array_len(stack) - 1]);
+                return ["error", "control-error", to_str(first.line),
+                        "unterminated " + stack[array_len(stack) - 1]];
             }
-            return NAstModule(nodes, "", 0, "");
+            return nodes;
         }
         if first.kind == NT_NEWLINE {
             position = first.next;
@@ -114,8 +74,8 @@ func nam_parse(source: str) -> NAstModule {
             control = nac_parse_choose(source, first);
         } else if first.text == "otherwise" or first.text == "case" {
             if array_len(stack) == 0 {
-                return NAstModule(nodes, "control-error", first.line,
-                                  "clause has no owning block");
+                return ["error", "control-error", to_str(first.line),
+                        "clause has no owning block"];
             }
             control = nac_parse_clause(source, first, stack);
         } else if first.text == "end" {
@@ -124,10 +84,10 @@ func nam_parse(source: str) -> NAstModule {
 
         if is_control {
             if nac_is_ok(control) == false {
-                return NAstModule(nodes, "control-error", first.line,
-                                  nac_message(control));
+                return ["error", "control-error", to_str(first.line),
+                        nac_message(control)];
             }
-            nodes = array_concat(nodes, [na_from_rendered(nac_node(control))]);
+            nodes = array_concat(nodes, [nac_node(control)]);
             if nac_action(control) == "push" {
                 stack = array_concat(stack, [nac_kind(control)]);
             } else if nac_action(control) == "pop" {
@@ -139,50 +99,119 @@ func nam_parse(source: str) -> NAstModule {
 
         let statement = nas_statement(source, position);
         if nas_is_ok(statement) == false {
-            return NAstModule(nodes, "ast-error", first.line, nas_message(statement));
+            return ["error", "ast-error", to_str(first.line), nas_message(statement)];
         }
-        nodes = array_concat(nodes, [na_from_rendered(nas_node(statement))]);
+        nodes = array_concat(nodes, [nas_node(statement)]);
         position = nas_next(statement);
     }
-    return NAstModule(nodes, "", 0, "");
+    return nodes;
+}
+
+func nam_add_expression(text: str, state: [str]) -> [str] {
+    if state[0] != "ok" { return state; }
+    let source: str = str_trim(text);
+    if source == "" or source == "Unit" { return state; }
+    let initial_nodes: [str] = slice(state, 2, array_len(state));
+    let parsed = nea_parse_expression(source, 0, 0, initial_nodes);
+    if nea_is_ok(parsed) == false { return ["error", nea_message(parsed)]; }
+    let end = natural_next(source, nea_next(parsed));
+    if end.kind != NT_EOF {
+        return ["error", "unexpected token after expression: " + end.text];
+    }
+    let old_roots: str = state[1];
+    let root_text: str = to_str(nea_root(parsed));
+    let roots: str = old_roots == "" ? root_text : old_roots + "," + root_text;
+    return array_concat(["ok", roots], nea_nodes(parsed));
+}
+
+func nam_attach_expressions(kind: str, text: str, state: [str]) -> [str] {
+    mut attached: [str] = state;
+    if kind == "binding" {
+        let equals: int = nam_find(text, " = ", 0);
+        if equals >= 0 {
+            attached = nam_add_expression(
+                substr(text, equals + 3, str_len(text)), attached);
+        }
+    } else if kind == "assignment" {
+        let to_at: int = nam_find(text, " to ", 0);
+        if to_at >= 0 {
+            attached = nam_add_expression(substr(text, 0, to_at), attached);
+            if attached[0] == "ok" {
+                attached = nam_add_expression(
+                    substr(text, to_at + 4, str_len(text)), attached);
+            }
+        }
+    } else if kind == "show" or kind == "when" or kind == "choose" or
+              kind == "case" or kind == "otherwise-when" or kind == "give" {
+        attached = nam_add_expression(text, attached);
+    } else if kind == "repeat" {
+        if str_len(text) >= 6 and substr(text, 0, 6) == "while " {
+            attached = nam_add_expression(substr(text, 6, str_len(text)), attached);
+        }
+    } else if kind == "each" {
+        let across: int = nam_find(text, " across ", 0);
+        if across >= 0 {
+            attached = nam_add_expression(substr(text, across + 8, str_len(text)), attached);
+        } else {
+            let from: int = nam_find(text, " from ", 0);
+            if from >= 0 {
+                let range: str = substr(text, from + 6, str_len(text));
+                let until: int = nam_find(range, " until ", 0);
+                let through: int = nam_find(range, " through ", 0);
+                let split: int = until >= 0 ? until : through;
+                let width: int = until >= 0 ? 7 : 9;
+                if split < 0 {
+                    attached = ["error", "range iteration requires until/through"];
+                } else {
+                    attached = nam_add_expression(substr(range, 0, split), attached);
+                    if attached[0] == "ok" {
+                        attached = nam_add_expression(
+                            substr(range, split + width, str_len(range)), attached);
+                    }
+                }
+            }
+        }
+    }
+    return attached;
 }
 
 func nam_join_roots(roots: str) -> str { return roots; }
 
 func nam_check(source: str) -> int {
-    let module: NAstModule = nam_parse(source);
-    if module.error_kind != "" {
-        println(module.error_kind + "|" + to_str(module.error_line) + "|" +
-                module.error_message);
+    let module: [str] = nam_parse(source);
+    if module[0] == "error" {
+        println(module[1] + "|" + module[2] + "|" + module[3]);
         return 1;
     }
-    mut i: int = 0;
-    while i < array_len(module.nodes) {
-        println(na_render(module.nodes[i]));
+    mut i: int = 1;
+    while i < array_len(module) {
+        println(module[i]);
         i += 1;
     }
     return 0;
 }
 
 func nam_check_typed(source: str) -> int {
-    let module: NAstModule = nam_parse(source);
-    if module.error_kind != "" {
-        println(module.error_kind + "|" + to_str(module.error_line) + "|" +
-                module.error_message);
+    let module: [str] = nam_parse(source);
+    if module[0] == "error" {
+        println(module[1] + "|" + module[2] + "|" + module[3]);
         return 1;
     }
     mut expressions: [str] = [];
-    mut i: int = 0;
-    while i < array_len(module.nodes) {
-        let node: NAstNode = module.nodes[i];
+    mut i: int = 1;
+    while i < array_len(module) {
+        let raw: str = module[i];
+        let kind: str = nam_node_kind(raw);
+        let line: int = nam_node_line(raw);
+        let text: str = nam_node_text(raw);
         let state: [str] = array_concat(["ok", ""], expressions);
-        let attached: [str] = nam_attach_expressions(node, state);
+        let attached: [str] = nam_attach_expressions(kind, text, state);
         if attached[0] == "error" {
-            println("expression-ast-error|" + to_str(node.line) + "|" + attached[1]);
+            println("expression-ast-error|" + to_str(line) + "|" + attached[1]);
             return 1;
         }
-        println("typed-node|" + to_str(i) + "|" + node.kind + "|" +
-                to_str(node.line) + "|" + nam_join_roots(attached[1]));
+        println("typed-node|" + to_str(i - 1) + "|" + kind + "|" +
+                to_str(line) + "|" + nam_join_roots(attached[1]));
         expressions = slice(attached, 2, array_len(attached));
         i += 1;
     }
