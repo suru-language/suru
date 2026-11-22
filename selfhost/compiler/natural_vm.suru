@@ -30,7 +30,11 @@ func vm_pop(stack: [str]) -> [str] {
     return slice(stack, 0, array_len(stack) - 1);
 }
 
-func vm_to_str(enc: str) -> str {
+func vm_to_str(enc: str, heap: [str]) -> str {
+    let handle: int = vm_handle_id(enc);
+    if handle >= 0 and sh_kind(heap, handle) == "str" {
+        return sh_payload(heap, handle);
+    }
     let tag: int = vm_tag(enc);
     if tag == 1 { return to_str(int_from_str(substr(enc, 1, str_len(enc)))); }
     if tag == 2 { return substr(enc, 1, str_len(enc)); }
@@ -123,6 +127,15 @@ func vm_heap_roots(stack: [str], frames: [[str]]) -> [int] {
         frame += 1;
     }
     return roots;
+}
+
+func vm_alloc_string(heap: [str], stack: [str],
+                        frames: [[str]], value: str) -> [[str]] {
+    let no_children: [int] = [];
+    let next: [str] = sh_collect(heap, vm_heap_roots(stack, frames));
+    let id: int = sh_find_free(next);
+    let updated: [str] = sh_alloc(next, "str", value, no_children);
+    return [updated, ["H" + to_str(id)]];
 }
 
 func natural_run_module(bytes: str) -> int {
@@ -249,7 +262,9 @@ func natural_run_module(bytes: str) -> int {
         } else if op == 2 {
             stack = vm_push(stack, "F" + f64_to_str(flpool[a]));
         } else if op == 3 {
-            stack = vm_push(stack, "S" + strpool[a]);
+            let allocated: [[str]] = vm_alloc_string(heap, stack, fr_locals, strpool[a]);
+            heap = allocated[0];
+            stack = vm_push(stack, allocated[1][0]);
         } else if op == 4 {
             stack = vm_push(stack, "N");
         } else if op == 5 {
@@ -345,15 +360,56 @@ func natural_run_module(bytes: str) -> int {
             let yb: bool = substr(y, 1, str_len(y)) == "1";
             let r: bool = op == 23 ? (xb and yb) : (xb or yb);
             stack = vm_push(stack, r ? "I1" : "I0");
-        } else if op == 41 {
+        } else if op == 41 or op == 42 or op == 43 or
+                  op == 44 or op == 45 or op == 46 {
             let n: int = array_len(stack);
             let y: str = stack[n - 1];
             let x: str = stack[n - 2];
             stack = vm_pop(stack);
             stack = vm_pop(stack);
-            let sx: str = substr(x, 1, str_len(x));
-            let sy: str = substr(y, 1, str_len(y));
-            stack = vm_push(stack, sx == sy ? "I1" : "I0");
+            let sx: str = vm_to_str(x, heap);
+            let sy: str = vm_to_str(y, heap);
+            let compared: int = str_compare(sx, sy);
+            mut result: bool = false;
+            if op == 41 { result = compared == 0; }
+            else if op == 42 { result = compared != 0; }
+            else if op == 43 { result = compared < 0; }
+            else if op == 44 { result = compared <= 0; }
+            else if op == 45 { result = compared > 0; }
+            else { result = compared >= 0; }
+            stack = vm_push(stack, result ? "I1" : "I0");
+        } else if op == 47 {
+            let n: int = array_len(stack);
+            let right: str = stack[n - 1];
+            let left: str = stack[n - 2];
+            let left_text: str = vm_to_str(left, heap);
+            let right_text: str = vm_to_str(right, heap);
+            let allocated: [[str]] = vm_alloc_string(
+                heap, stack, fr_locals, left_text + right_text);
+            heap = allocated[0];
+            stack = vm_pop(stack);
+            stack = vm_pop(stack);
+            stack = vm_push(stack, allocated[1][0]);
+        } else if op == 48 {
+            let n: int = array_len(stack);
+            let repeats: int = int_from_str(substr(stack[n - 1], 1, str_len(stack[n - 1])));
+            let source_text: str = vm_to_str(stack[n - 2], heap);
+            let source_len: int = str_len(source_text);
+            if repeats < 0 or (source_len > 0 and repeats > 16777216 / source_len) {
+                return 7;
+            }
+            mut result_text: str = "";
+            mut repeat_index: int = 0;
+            while repeat_index < repeats {
+                result_text = result_text + source_text;
+                repeat_index += 1;
+            }
+            let allocated: [[str]] = vm_alloc_string(
+                heap, stack, fr_locals, result_text);
+            heap = allocated[0];
+            stack = vm_pop(stack);
+            stack = vm_pop(stack);
+            stack = vm_push(stack, allocated[1][0]);
         } else if op == 51 {
             let n: int = array_len(stack);
             let cnt: int = a;
@@ -581,22 +637,31 @@ func natural_run_module(bytes: str) -> int {
                 let n: int = array_len(stack);
                 let v: str = stack[n - 1];
                 stack = vm_pop(stack);
-                print(vm_to_str(v));
+                print(vm_to_str(v, heap));
             } else if a == 1 {
                 let n: int = array_len(stack);
                 let v: str = stack[n - 1];
                 stack = vm_pop(stack);
-                println(vm_to_str(v));
+                println(vm_to_str(v, heap));
             } else if a == 5 {
                 let n: int = array_len(stack);
                 let v: str = stack[n - 1];
-                stack = vm_pop(stack);
-                stack = vm_push(stack, "S" + vm_to_str(v));
+                let handle: int = vm_handle_id(v);
+                if handle >= 0 and sh_kind(heap, handle) == "str" {
+                    stack = vm_pop(stack);
+                    stack = vm_push(stack, v);
+                } else {
+                    let allocated: [[str]] = vm_alloc_string(
+                        heap, stack, fr_locals, vm_to_str(v, heap));
+                    heap = allocated[0];
+                    stack = vm_pop(stack);
+                    stack = vm_push(stack, allocated[1][0]);
+                }
             } else if a == 2 {
                 let n: int = array_len(stack);
                 let v: str = stack[n - 1];
                 stack = vm_pop(stack);
-                stack = vm_push(stack, "I" + to_str(str_len(vm_to_str(v))));
+                stack = vm_push(stack, "I" + to_str(str_len(vm_to_str(v, heap))));
             } else if a == 11 {
                 let n: int = array_len(stack);
                 let len_e: str = stack[n - 1];
@@ -607,15 +672,18 @@ func natural_run_module(bytes: str) -> int {
                 stack = vm_pop(stack);
                 let leni: int = int_from_str(substr(len_e, 1, str_len(len_e)));
                 let posi: int = int_from_str(substr(pos_e, 1, str_len(pos_e)));
-                let txt: str = vm_to_str(sv);
-                stack = vm_push(stack, "S" + substr(txt, posi, leni));
+                let txt: str = vm_to_str(sv, heap);
+                let allocated: [[str]] = vm_alloc_string(
+                    heap, stack, fr_locals, substr(txt, posi, leni));
+                heap = allocated[0];
+                stack = vm_push(stack, allocated[1][0]);
             } else if a == 12 {
                 let n: int = array_len(stack);
                 let needle: str = stack[n - 1];
                 let hay: str = stack[n - 2];
                 stack = vm_pop(stack);
                 stack = vm_pop(stack);
-                let found: bool = str_contains(vm_to_str(hay), vm_to_str(needle));
+                let found: bool = str_contains(vm_to_str(hay, heap), vm_to_str(needle, heap));
                 stack = vm_push(stack, found ? "I1" : "I0");
             } else {
                 return 2;
