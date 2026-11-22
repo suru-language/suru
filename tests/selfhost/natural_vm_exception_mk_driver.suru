@@ -17,7 +17,7 @@ func main() {
     // 1..4 build inner exception and store it in local 0
     // 5..9 build outer exception with local 0 as its cause
     // 10 throw; 11 handler pops the exception and prints "caught"
-    let ops0: [int] = [69, 4, 3, 3, 53, 6, 3, 3, 5, 53, 71, 7, 3, 63, 65];
+    let ops0: [int] = [69, 3, 3, 4, 53, 6, 3, 3, 5, 53, 71, 7, 3, 63, 65];
     let as0: [int] = [11, 0, 1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 3, 1, 0];
     let bs0: [int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     let cs0: [int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
