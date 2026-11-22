@@ -146,6 +146,7 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_compile_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_verify_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_build_run.sh $(BINDIR)/suru
+	@tests/selfhost/natural_cli_selfhost_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_reader_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_corpus_run.sh $(BINDIR)/suru
