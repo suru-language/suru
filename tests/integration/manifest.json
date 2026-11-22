@@ -255,6 +255,14 @@
       }
     },
     {
+      "name": "forward_call_late_declaration",
+      "source": "forward_call_late_declaration.suru",
+      "exit_code": 0,
+      "stdout": {
+        "golden": "forward_call_late_declaration.out"
+      }
+    },
+    {
       "name": "gc_interval1",
       "source": "gc_interval1.suru",
       "exit_code": 0,

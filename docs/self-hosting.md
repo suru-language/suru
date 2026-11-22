@@ -326,6 +326,14 @@ until the self-hosted route reaches complete language and diagnostic parity.
 The native backend is not yet part of this flag; it remains a separate Stage 3
 path.
 
+The C17 bytecode compiler now publishes every function's name and
+parameter count before verifying individual function bodies. This is required
+for forward calls: the verifier uses the callee's parameter count to compute
+the caller's stack effect even when the callee appears later in source order.
+`tests/integration/forward_call_late_declaration.suru` keeps a three-argument
+forward call inside a loop so a missing signature prepass is caught as a
+branch-stack merge mismatch.
+
 The Stage 1 CLI gate checks byte-identical output against the reference
 compiler, check/run behavior, module execution, and paths containing spaces.
 The corpus-wide build parity gate now exercises the public
