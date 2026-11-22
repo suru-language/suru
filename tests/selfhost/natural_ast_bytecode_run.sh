@@ -24,4 +24,11 @@ if [ "$actual" != "$expected" ]; then
     echo "AST bytecode execution mismatch: '$actual'" >&2
     exit 1
 fi
-echo "natural AST bytecode: AST-predeclared forward routine calls, bindings, nested when/otherwise, repeat, show and give matched reference"
+bad_source="$ROOT/tests/natural/routine_ast_bytecode_bad_call.suru"
+if "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+       "$bad_source" "$tmp/bad.sbc" >/dev/null 2>&1; then
+    echo "AST bytecode accepted an invalid user-routine argument type" >&2
+    exit 1
+fi
+echo "natural AST bytecode: forward routine signatures, nested when/otherwise, repeat and invalid-call rejection passed"
+
