@@ -103,45 +103,45 @@ func sh_alloc(heap: [str], kind: str, payload: str, children: [int]) -> [str] {
 
 func sh_set_children(heap: [str], id: int, children: [int]) -> [str] {
     if id < 0 or id >= sh_object_count(heap) { return heap; }
-    if heap[id * 4] == "" { return heap; }
+    if heap[id * 5] == "" { return heap; }
     let next: [str] = heap;
-    next[id * 4 + 3] = sh_join_ids(children);
+    next[id * 5 + 4] = sh_join_ids(children);
     return next;
 }
 
 func sh_set_payload(heap: [str], id: int, payload: str) -> [str] {
     if id < 0 or id >= sh_object_count(heap) { return heap; }
-    if heap[id * 4] == "" { return heap; }
+    if heap[id * 5] == "" { return heap; }
     let next: [str] = heap;
-    next[id * 4 + 2] = payload;
+    next[id * 5 + 3] = payload;
     return next;
 }
 
 func sh_alive(heap: [str], id: int) -> bool {
-    return id >= 0 and id < sh_object_count(heap) and heap[id * 4] != "";
+    return id >= 0 and id < sh_object_count(heap) and heap[id * 5] != "";
 }
 
 func sh_kind(heap: [str], id: int) -> str {
     if not sh_alive(heap, id) { return ""; }
-    return heap[id * 4];
+    return heap[id * 5];
 }
 
 func sh_payload(heap: [str], id: int) -> str {
     if not sh_alive(heap, id) { return ""; }
-    return heap[id * 4 + 2];
+    return heap[id * 5 + 3];
 }
 
 func sh_children(heap: [str], id: int) -> [int] {
     let empty: [int] = [];
     if not sh_alive(heap, id) { return empty; }
-    return sh_parse_ids(heap[id * 4 + 3]);
+    return sh_parse_ids(heap[id * 5 + 4]);
 }
 
 func sh_live_count(heap: [str]) -> int {
     mut count: int = 0;
     mut id: int = 0;
     while id < sh_object_count(heap) {
-        if heap[id * 4] != "" { count += 1; }
+        if heap[id * 5] != "" { count += 1; }
         id += 1;
     }
     return count;
@@ -154,7 +154,7 @@ func sh_mark_begin(heap: [str], roots: [int]) -> [[str]] {
     let count: int = sh_object_count(next);
     mut id: int = 0;
     while id < count {
-        if next[id * 4] != "" { next[id * 4 + 1] = "0"; }
+        if next[id * 5] != "" { next[id * 5 + 1] = "0"; }
         id += 1;
     }
     mut work: [str] = [];
@@ -162,8 +162,8 @@ func sh_mark_begin(heap: [str], roots: [int]) -> [[str]] {
     while r < array_len(roots) {
         let root: int = roots[r];
         if root >= 0 and root < count and
-           next[root * 4] != "" and next[root * 4 + 1] == "0" {
-            next[root * 4 + 1] = "1";
+           next[root * 5] != "" and next[root * 5 + 1] == "0" {
+            next[root * 5 + 1] = "1";
             work = array_concat(work, [to_str(root)]);
         }
         r += 1;
@@ -187,8 +187,8 @@ func sh_mark_step(state: [[str]], budget: int, roots: [int]) -> [[str]] {
     while r < array_len(roots) {
         let root: int = roots[r];
         if root >= 0 and root < count and
-           heap[root * 4] != "" and heap[root * 4 + 1] == "0" {
-            heap[root * 4 + 1] = "1";
+           heap[root * 5] != "" and heap[root * 5 + 1] == "0" {
+            heap[root * 5 + 1] = "1";
             work = array_concat(work, [to_str(root)]);
         }
         r += 1;
@@ -199,39 +199,33 @@ func sh_mark_step(state: [[str]], budget: int, roots: [int]) -> [[str]] {
         let last: int = array_len(work) - 1;
         let current: int = int_from_str(work[last]);
         work = slice(work, 0, last);
-        let refs: [int] = sh_parse_ids(heap[current * 4 + 3]);
+        let refs: [int] = sh_parse_ids(heap[current * 5 + 4]);
         mut child: int = 0;
         while child < array_len(refs) {
             let target: int = refs[child];
             if target >= 0 and target < count and
-               heap[target * 4] != "" and heap[target * 4 + 1] == "0" {
-                heap[target * 4 + 1] = "1";
+               heap[target * 5] != "" and heap[target * 5 + 1] == "0" {
+                heap[target * 5 + 1] = "1";
                 work = array_concat(work, [to_str(target)]);
             }
             child += 1;
         }
-        heap[current * 4 + 1] = "2";
+        heap[current * 5 + 1] = "2";
         processed += 1;
     }
     return [heap, work, state[2]];
-}
-
-func sh_find_free(heap: [str]) -> int {
-    mut id: int = 0;
-    let count: int = sh_object_count(heap);
-    while id < count and heap[id * 4] != "" { id += 1; }
-    return id;
 }
 
 func sh_alloc_incremental(state: [[str]], kind: str, payload: str,
                            children: [int]) -> [[str]] {
     if array_len(state) < 3 { return state; }
     let heap: [str] = state[0];
-    let id: int = sh_find_free(heap);
+    let required: int = sh_allocation_size(payload, children);
+    let id: int = sh_find_free(heap, required);
     let next: [str] = sh_alloc(heap, kind, payload, children);
     mut work: [str] = state[1];
     if kind != "" and state[2][0] == "1" {
-        next[id * 4 + 1] = "1";
+        next[id * 5 + 1] = "1";
         work = array_concat(work, [to_str(id)]);
     }
     return [next, work, state[2]];
@@ -245,10 +239,10 @@ func sh_write_barrier(state: [[str]], destination: int,
     let count: int = sh_object_count(heap);
     if destination >= 0 and destination < count and
        target >= 0 and target < count and
-       heap[destination * 4] != "" and heap[target * 4] != "" and
-       heap[destination * 4 + 1] == "2" and
-       heap[target * 4 + 1] == "0" {
-        heap[target * 4 + 1] = "1";
+       heap[destination * 5] != "" and heap[target * 5] != "" and
+       heap[destination * 5 + 1] == "2" and
+       heap[target * 5 + 1] == "0" {
+        heap[target * 5 + 1] = "1";
         work = array_concat(work, [to_str(target)]);
     }
     return [heap, work, state[2]];
@@ -271,13 +265,14 @@ func sh_sweep(heap: [str]) -> [str] {
     let next: [str] = heap;
     mut id: int = 0;
     while id < sh_object_count(next) {
-        let base: int = id * 4;
+        let base: int = id * 5;
         if next[base] != "" {
             if next[base + 1] == "0" {
                 next[base] = "";
                 next[base + 1] = "0";
-                next[base + 2] = "";
+                // Preserve base+2 capacity for the allocation size-class free list.
                 next[base + 3] = "";
+                next[base + 4] = "";
             } else {
                 next[base + 1] = "0";
             }
