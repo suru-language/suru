@@ -250,6 +250,30 @@ func net_infer(nodes: [str], id: int, names: [str], types: [str],
             args = array_concat(args, [arg[1]]);
             i += 1;
         }
+        let routine_signature: str = net_lookup(field_names, field_types,
+                                                "@routine:" + name);
+        if routine_signature != "" {
+            let signature: [str] = str_split(routine_signature, "|");
+            if array_len(signature) != 2 {
+                return net_error("invalid routine signature metadata for '" + name + "'");
+            }
+            let parameters: [str] = signature[1] == "" ? [] : str_split(signature[1], ",");
+            if array_len(parameters) != array_len(args) {
+                return net_error("routine '" + name + "' expects " +
+                    to_str(array_len(parameters)) + " arguments, got " +
+                    to_str(array_len(args)));
+            }
+            mut p: int = 0;
+            while p < array_len(parameters) {
+                let common: str = net_common_type(parameters[p], args[p]);
+                if common != parameters[p] {
+                    return net_error("argument " + to_str(p + 1) + " to '" +
+                        name + "' has type " + args[p] + ", expected " + parameters[p]);
+                }
+                p += 1;
+            }
+            return net_ok(signature[0]);
+        }
         return net_builtin_call(name, args);
     }
 
