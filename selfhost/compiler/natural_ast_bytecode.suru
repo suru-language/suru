@@ -43,6 +43,8 @@ func nab_collect_ast(source: str) -> [str] {
     mut current_function: str = "";
     mut return_type: str = "";
     mut returned: bool = false;
+    mut controls: [str] = [];
+    mut labels: int = 0;
     mut i: int = 1;
     while i < array_len(module) {
         let raw: str = module[i];
@@ -88,6 +90,9 @@ func nab_collect_ast(source: str) -> [str] {
 
         if kind == "end-routine" {
             if current_function == "" { return nab_fail("end routine without routine"); }
+            if array_len(controls) != 0 {
+                return nab_fail("unterminated control block in '" + current_function + "'");
+            }
             if return_type != "Unit" and not returned {
                 return nab_fail("non-Unit routine '" + current_function + "' has no give");
             }
@@ -179,6 +184,96 @@ func nab_collect_ast(source: str) -> [str] {
                 instructions = nbc_emit(instructions, "BC_RET_UNIT", "");
             }
             returned = true;
+        } else if kind == "when" {
+            if array_len(roots) != 1 {
+                return nab_fail("when requires one condition expression");
+            }
+            let condition: [str] = net_infer(nodes, roots[0], names, types,
+                                             field_names, field_types);
+            if condition[0] == "error" { return nab_fail(condition[1]); }
+            if condition[1] != "Bool" {
+                return nab_fail("when condition must be Bool, got " + condition[1]);
+            }
+            let finish: str = "ast-when-end-" + to_str(labels);
+            let next: str = "ast-when-next-" + to_str(labels);
+            labels += 1;
+            instructions = nbc_emit_ast_node(instructions, nodes, roots[0]);
+            instructions = nbc_emit(instructions, "BC_JZ", "@" + next);
+            controls = array_concat(controls, ["when|" + finish + "|" + next + "|0"]);
+        } else if kind == "otherwise" or kind == "otherwise-when" {
+            if array_len(controls) == 0 {
+                return nab_fail(kind + " without an open when");
+            }
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if array_len(current) < 4 or current[0] != "when" or current[3] == "2" {
+                return nab_fail("mismatched or repeated when clause");
+            }
+            if current[2] == "" {
+                return nab_fail("when clause has no pending false branch");
+            }
+            instructions = nbc_emit(instructions, "BC_JMP", "@" + current[1]);
+            instructions = nbc_label(instructions, current[2]);
+            if kind == "otherwise-when" {
+                if array_len(roots) != 1 {
+                    return nab_fail("otherwise when requires one condition expression");
+                }
+                let condition: [str] = net_infer(nodes, roots[0], names, types,
+                                                 field_names, field_types);
+                if condition[0] == "error" { return nab_fail(condition[1]); }
+                if condition[1] != "Bool" {
+                    return nab_fail("otherwise when condition must be Bool, got " + condition[1]);
+                }
+                let next: str = "ast-when-next-" + to_str(labels);
+                labels += 1;
+                instructions = nbc_emit_ast_node(instructions, nodes, roots[0]);
+                instructions = nbc_emit(instructions, "BC_JZ", "@" + next);
+                controls[array_len(controls) - 1] =
+                    "when|" + current[1] + "|" + next + "|1";
+            } else {
+                if array_len(roots) != 0 {
+                    return nab_fail("otherwise clause cannot have an expression");
+                }
+                controls[array_len(controls) - 1] = "when|" + current[1] + "||2";
+            }
+        } else if kind == "end-when" {
+            if array_len(controls) == 0 {
+                return nab_fail("end when without an open when");
+            }
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if array_len(current) < 4 or current[0] != "when" {
+                return nab_fail("mismatched when terminator");
+            }
+            if current[2] != "" { instructions = nbc_label(instructions, current[2]); }
+            instructions = nbc_label(instructions, current[1]);
+            controls = slice(controls, 0, array_len(controls) - 1);
+        } else if kind == "repeat" {
+            if array_len(roots) != 1 {
+                return nab_fail("repeat while requires one condition expression");
+            }
+            let condition: [str] = net_infer(nodes, roots[0], names, types,
+                                             field_names, field_types);
+            if condition[0] == "error" { return nab_fail(condition[1]); }
+            if condition[1] != "Bool" {
+                return nab_fail("repeat condition must be Bool, got " + condition[1]);
+            }
+            let start: str = "ast-repeat-start-" + to_str(labels);
+            let finish: str = "ast-repeat-end-" + to_str(labels);
+            labels += 1;
+            instructions = nbc_label(instructions, start);
+            instructions = nbc_emit_ast_node(instructions, nodes, roots[0]);
+            instructions = nbc_emit(instructions, "BC_JZ", "@" + finish);
+            controls = array_concat(controls, ["repeat|" + start + "|" + finish]);
+        } else if kind == "end-repeat" {
+            if array_len(controls) == 0 {
+                return nab_fail("end repeat without an open repeat");
+            }
+            let current: [str] = str_split(controls[array_len(controls) - 1], "|");
+            if array_len(current) < 3 or current[0] != "repeat" {
+                return nab_fail("mismatched repeat terminator");
+            }
+            instructions = nbc_emit(instructions, "BC_JMP", "@" + current[1]);
+            instructions = nbc_label(instructions, current[2]);
+            controls = slice(controls, 0, array_len(controls) - 1);
         } else {
             return nab_fail("AST bytecode slice does not yet lower '" + kind +
                             "' at line " + to_str(line));
