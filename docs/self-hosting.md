@@ -389,7 +389,11 @@ first-fit reuse when their capacity is sufficient. Sweeping retains the
 capacity class, while payload/reference growth raises the reservation without
 changing the stable handle. Live/reserved object and byte snapshots, including free-slot counts, are
 exposed for tests and future threshold tuning; byte values are logical SURU
-table estimates, not measurements of host memory.
+table estimates, not measurements of host memory. The incremental state also
+tracks allocations since the last completed cycle, completed cycle count, and
+cumulative logical allocation bytes. The VM currently advances a bounded mark
+slice on every managed allocation; parity with the C VM's 512-allocation /
+1 MiB start threshold is still open.
 The regression driver exercises shared references, unreachable cycles,
 exception causes, dropping roots, full reclamation, class-aware slot reuse,
 large first-fit reuse, capacity growth, incremental root discovery, allocation
