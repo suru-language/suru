@@ -591,9 +591,9 @@ func natural_run_module(bytes: str) -> int {
             }
         } else if op == 53 {
             let n: int = array_len(stack);
-            let typ: str = stack[n - 1];
+            let cause: str = stack[n - 1];
             let msg: str = stack[n - 2];
-            let cause: str = stack[n - 3];
+            let typ: str = stack[n - 3];
             let type_text: str = vm_to_str(typ, heap);
             let message_text: str = vm_to_str(msg, heap);
             heap = sh_collect(heap, vm_heap_roots(stack, fr_locals));
