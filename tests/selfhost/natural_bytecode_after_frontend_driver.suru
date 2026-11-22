@@ -1,0 +1,10 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_frontend.suru";
+use "../../selfhost/compiler/natural_bytecode.suru";
+
+func main() {
+    let source: str = source_load(args(0));
+    if natural_frontend_check(source) != 0 { exit(2); }
+    let clean: str = source_load(args(0));
+    exit(natural_emit_bytecode(clean));
+}
