@@ -1,40 +1,85 @@
-// Module-level typed AST collection for the current statement subset.
+// Module-level typed AST collection for the statement and control subset.
 // Expressions remain source-shaped payloads in NAstNode.text; subsequent
 // Stage 1 increments will replace those payloads with typed child nodes.
 
 use "natural_token_stream.suru";
-use "natural_statement_parser.suru";
+use "natural_control_parser.suru";
 use "natural_ast.suru";
 
 func nam_parse(source: str) -> NAstModule {
     mut nodes: [NAstNode] = [];
+    mut stack: [str] = [];
     mut position: int = 0;
     while true {
         let first = natural_next(source, position);
         if first.error {
-            return NAstModule(nodes, first.line, "lexical error " + to_str(first.error_code));
+            return NAstModule(nodes, "ast-error", first.line,
+                              "lexical error " + to_str(first.error_code));
         }
         if first.kind == NT_EOF {
-            return NAstModule(nodes, 0, "");
+            if array_len(stack) > 0 {
+                return NAstModule(nodes, "control-error", first.line,
+                                  "unterminated " + stack[array_len(stack) - 1]);
+            }
+            return NAstModule(nodes, "", 0, "");
         }
         if first.kind == NT_NEWLINE {
             position = first.next;
             continue;
         }
+
+        mut control: [str] = nac_fail(first.start, "unsupported control statement");
+        let is_control: bool = first.text == "when" or first.text == "repeat" or
+            first.text == "each" or first.text == "choose" or
+            first.text == "otherwise" or first.text == "case" or first.text == "end";
+        if first.text == "when" {
+            control = nac_parse_when(source, first);
+        } else if first.text == "repeat" {
+            control = nac_parse_repeat(source, first);
+        } else if first.text == "each" {
+            control = nac_parse_each(source, first);
+        } else if first.text == "choose" {
+            control = nac_parse_choose(source, first);
+        } else if first.text == "otherwise" or first.text == "case" {
+            if array_len(stack) == 0 {
+                return NAstModule(nodes, "control-error", first.line,
+                                  "clause has no owning block");
+            }
+            control = nac_parse_clause(source, first, stack);
+        } else if first.text == "end" {
+            control = nac_parse_end(source, first, stack);
+        }
+
+        if is_control {
+            if nac_is_ok(control) == false {
+                return NAstModule(nodes, "control-error", first.line,
+                                  nac_message(control));
+            }
+            nodes = array_concat(nodes, [na_from_rendered(nac_node(control))]);
+            if nac_action(control) == "push" {
+                stack = array_concat(stack, [nac_kind(control)]);
+            } else if nac_action(control) == "pop" {
+                stack = slice(stack, 0, array_len(stack) - 1);
+            }
+            position = nac_next(control);
+            continue;
+        }
+
         let statement = nas_statement(source, position);
         if nas_is_ok(statement) == false {
-            return NAstModule(nodes, first.line, nas_message(statement));
+            return NAstModule(nodes, "ast-error", first.line, nas_message(statement));
         }
         nodes = array_concat(nodes, [na_from_rendered(nas_node(statement))]);
         position = nas_next(statement);
     }
-    return NAstModule(nodes, 0, "");
+    return NAstModule(nodes, "", 0, "");
 }
 
 func nam_check(source: str) -> int {
     let module: NAstModule = nam_parse(source);
-    if module.error_message != "" {
-        println("ast-error|" + to_str(module.error_line) + "|" + module.error_message);
+    if module.error_kind != "" {
+        println(module.error_kind + "|" + to_str(module.error_line) + "|" +
+                module.error_message);
         return 1;
     }
     mut i: int = 0;
