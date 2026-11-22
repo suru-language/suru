@@ -341,15 +341,6 @@ func natural_run_module(bytes: str) -> int {
             else if op == 33 { r = iv > jv; }
             else { r = iv >= jv; }
             stack = vm_push(stack, r ? "I1" : "I0");
-        } else if op == 47 {
-            let n: int = array_len(stack);
-            let y: str = stack[n - 1];
-            let x: str = stack[n - 2];
-            stack = vm_pop(stack);
-            stack = vm_pop(stack);
-            let sx: str = substr(x, 1, str_len(x));
-            let sy: str = substr(y, 1, str_len(y));
-            stack = vm_push(stack, "S" + sx + sy);
         } else if op == 23 or op == 24 {
             let n: int = array_len(stack);
             let y: str = stack[n - 1];
