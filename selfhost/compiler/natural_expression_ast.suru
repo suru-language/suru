@@ -8,7 +8,8 @@ use "natural_expression.suru";
 type NAstExpr {
     let kind: str;
     let value: str;
-    let children: [int];
+    // Comma-separated child indices keep expression records scalar and flat.
+    let children: str;
 }
 
 type NAstExprParse {
@@ -27,9 +28,21 @@ func nea_fail(position: int, message: str, nodes: [NAstExpr]) -> NAstExprParse {
     return NAstExprParse(false, position, -1, nodes, message);
 }
 
+func nea_join_children(children: [int]) -> str {
+    mut out: str = "";
+    mut i: int = 0;
+    while i < array_len(children) {
+        if i > 0 { out = out + ","; }
+        out = out + to_str(children[i]);
+        i += 1;
+    }
+    return out;
+}
+
 func nea_append(nodes: [NAstExpr], kind: str, value: str,
                 children: [int]) -> NAstExprParse {
-    let updated: [NAstExpr] = array_concat(nodes, [NAstExpr(kind, value, children)]);
+    let updated: [NAstExpr] = array_concat(nodes,
+        [NAstExpr(kind, value, nea_join_children(children))]);
     return nea_ok(0, array_len(updated) - 1, updated);
 }
 
@@ -45,7 +58,8 @@ func nea_parse_expression(source: str, position: int, minimum: int,
         if ne_is_ok(routine) == false {
             return nea_fail(first.start, ne_message(routine), initial_nodes);
         }
-        result = nea_append(initial_nodes, "routine", ne_value(routine), []);
+        let no_children: [int] = [];
+        result = nea_append(initial_nodes, "routine", ne_value(routine), no_children);
         result = nea_ok(ne_next(routine), result.root, result.nodes);
     } else if first.text == "-" or first.text == "not" or first.text == "~" {
         let operand = nea_parse_expression(source, first.next, 10, initial_nodes);
@@ -56,7 +70,8 @@ func nea_parse_expression(source: str, position: int, minimum: int,
     } else if first.kind == NT_IDENT or first.kind == NT_WORD or
               first.kind == NT_INT or first.kind == NT_FLOAT or
               first.kind == NT_STRING {
-        result = nea_append(initial_nodes, "atom", first.text, []);
+        let no_children: [int] = [];
+        result = nea_append(initial_nodes, "atom", first.text, no_children);
         result = nea_ok(first.next, result.root, result.nodes);
     } else if first.text == "(" {
         let inner = nea_parse_expression(source, first.next, 0, initial_nodes);
@@ -185,7 +200,8 @@ func nea_parse_expression(source: str, position: int, minimum: int,
 }
 
 func nea_check(source: str) -> int {
-    let result = nea_parse_expression(source, 0, 0, []);
+    let empty_nodes: [NAstExpr] = [];
+    let result = nea_parse_expression(source, 0, 0, empty_nodes);
     if result.ok == false {
         println("expr-ast-error|" + result.message);
         return 1;
@@ -199,15 +215,8 @@ func nea_check(source: str) -> int {
     mut i: int = 0;
     while i < array_len(result.nodes) {
         let node: NAstExpr = result.nodes[i];
-        mut children: str = "";
-        mut j: int = 0;
-        while j < array_len(node.children) {
-            if j > 0 { children = children + ","; }
-            children = children + to_str(node.children[j]);
-            j += 1;
-        }
         println("expr-node|" + to_str(i) + "|" + node.kind + "|" +
-                node.value + "|" + children);
+                node.value + "|" + node.children);
         i += 1;
     }
     return 0;
