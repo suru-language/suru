@@ -326,16 +326,18 @@ until the self-hosted route reaches complete language and diagnostic parity.
 The native backend is not yet part of this flag; it remains a separate Stage 3
 path.
 
-Expression lowering in `natural_bytecode.suru` now parses each expression
-through `natural_expression_ast.suru` and recursively lowers the resulting
-atom/unary/binary/conditional/array/index/field/call node graph. The statement
-collector still identifies statement boundaries from source lines; replacing
-that remaining source-shaped collection with the typed module AST is the next
-compiler increment. `tests/natural/typed_expression_lowering.suru` exercises
-operator precedence, ternary selection, arrays/indexing, records/fields, string
-concatenation, builtins, and exact bytecode parity against the reference
-compiler.
-
+Expression lowering in `natural_bytecode.suru` parses expressions
+through `natural_expression_ast.suru` and recursively lowers atom, unary,
+binary, conditional, array, index, field, and call nodes. The bytecode collector
+now parses `value`/`change`, `set`, `show`, and `give` statements through
+`natural_ast_module.nam_parse`, attaches expression roots with
+`nam_attach_expressions`, and lowers those node tables directly. Routine
+boundaries/declarations and control/effect blocks still use source-line
+collection. The next increment is to parse each whole function body once and
+lower control-flow/effect nodes from the typed module AST.
+`tests/natural/typed_expression_lowering.suru` exercises operator precedence,
+ternary selection, arrays/indexing, records/fields, string concatenation,
+builtins, and exact bytecode parity against the reference compiler.
 
 The C17 bytecode compiler now publishes every function's name and
 parameter count before verifying individual function bodies. This is required
@@ -385,8 +387,10 @@ A typed expression AST increment adds `NAstExpr` nodes in a flat indexed table.
 The new Pratt parser records atom, unary, binary, array, call, field, index,
 routine-expression, and conditional nodes with child indices. The initial
 conformance gate checks operator precedence and logical/comparison tree shape
-against the existing expression parser. The expression tree is not yet attached
-to statement nodes or consumed by bytecode lowering; that is the next step.
+against the existing expression parser. The module collector now attaches these expression roots to statement nodes,
+and bytecode lowering consumes them for bindings, assignments, `show`, and
+`give`. Control/effect statement lowering still uses the source-shaped
+collector; converting those remaining nodes to direct AST traversal is next.
 
 
 ### Stage 1: typed expression attachment
