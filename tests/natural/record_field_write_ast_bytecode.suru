@@ -1,0 +1,9 @@
+record Point
+    change x: Whole
+end record
+routine main() -> Unit
+    value p: Point = none
+    value n: Whole = 7
+    set p.x to n
+    show(p.x)
+end routine
