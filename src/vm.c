@@ -1019,7 +1019,9 @@ static bool builtin_str_split(s_vm *vm) {
                 return false;
             }
             if (ln) memcpy(s_obj_str_data(o), data + start, ln);
-            dst[k++] = s_val_obj(o);
+            s_value part = s_val_obj(o);
+            dst[k++] = part;
+            s_heap_write_barrier(vm->heap, arr_root.u.o, part);
             i += pl;
             start = i;
         } else {
@@ -1036,7 +1038,9 @@ static bool builtin_str_split(s_vm *vm) {
             return false;
         }
         if (ln) memcpy(s_obj_str_data(o), data + start, ln);
-        dst[k++] = s_val_obj(o);
+        s_value part = s_val_obj(o);
+        dst[k++] = part;
+        s_heap_write_barrier(vm->heap, arr_root.u.o, part);
     }
     bool pushed = push(vm, arr_root);
     s_heap_remove_root(vm->heap, &arr_root);
