@@ -145,21 +145,41 @@ func nab_collect_ast(source: str) -> [str] {
             types = array_concat(types, [parts[1] == "" ? inferred[1] : parts[1]]);
         } else if kind == "assignment" {
             if array_len(roots) != 2 { return nab_fail("assignment requires target and value"); }
-            if nbc_ast_kind(nodes, roots[0]) != "atom" {
-                return nab_fail("AST bytecode slice only supports local assignment targets");
-            }
-            let target: str = nbc_ast_value(nodes, roots[0]);
-            let slot: int = nbc_slot(instructions, target);
-            if slot < 0 { return nab_fail("unknown local assignment target '" + target + "'"); }
+            let target_kind: str = nbc_ast_kind(nodes, roots[0]);
             let left: [str] = net_infer(nodes, roots[0], names, types, field_names, field_types);
             let right: [str] = net_infer(nodes, roots[1], names, types, field_names, field_types);
             if left[0] == "error" { return nab_fail(left[1]); }
             if right[0] == "error" { return nab_fail(right[1]); }
             if net_common_type(left[1], right[1]) == "" {
-                return nab_fail("assignment type mismatch for '" + target + "'");
+                return nab_fail("assignment type mismatch");
             }
-            instructions = nbc_emit_ast_node(instructions, nodes, roots[1]);
-            instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(slot));
+            if target_kind == "atom" {
+                let target: str = nbc_ast_value(nodes, roots[0]);
+                let slot: int = nbc_slot(instructions, target);
+                if slot < 0 { return nab_fail("unknown local assignment target '" + target + "'"); }
+                instructions = nbc_emit_ast_node(instructions, nodes, roots[1]);
+                instructions = nbc_emit(instructions, "BC_ST_LOCAL", to_str(slot));
+            } else if target_kind == "index" {
+                let target_children: [int] = nbc_ast_children(nodes, roots[0]);
+                if array_len(target_children) != 2 {
+                    return nab_fail("invalid indexed assignment target");
+                }
+                let array_type: [str] = net_infer(nodes, target_children[0], names, types,
+                                                  field_names, field_types);
+                let index_type: [str] = net_infer(nodes, target_children[1], names, types,
+                                                  field_names, field_types);
+                if array_type[0] == "error" { return nab_fail(array_type[1]); }
+                if index_type[0] == "error" { return nab_fail(index_type[1]); }
+                if not net_is_array(array_type[1]) or index_type[1] != "Whole" {
+                    return nab_fail("indexed assignment requires Array and Whole index");
+                }
+                instructions = nbc_emit_ast_node(instructions, nodes, target_children[0]);
+                instructions = nbc_emit_ast_node(instructions, nodes, target_children[1]);
+                instructions = nbc_emit_ast_node(instructions, nodes, roots[1]);
+                instructions = nbc_emit(instructions, "BC_IDX_ST", "");
+            } else {
+                return nab_fail("AST bytecode slice does not yet lower this assignment target");
+            }
         } else if kind == "show" {
             if array_len(roots) != 1 { return nab_fail("show requires one expression"); }
             instructions = nbc_emit_ast_node(instructions, nodes, roots[0]);

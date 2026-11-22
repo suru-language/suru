@@ -46,4 +46,18 @@ if [ "$actual" != "$expected" ]; then
     echo "AST each bytecode execution mismatch: '$actual'" >&2
     exit 1
 fi
+source="$ROOT/tests/natural/array_write_ast_bytecode.suru"
+"$SURU" --syntax=natural compile "$source" "$tmp/array-write-reference.sbc"
+"$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+    "$source" "$tmp/array-write-ast.sbc"
+if ! cmp -s "$tmp/array-write-reference.sbc" "$tmp/array-write-ast.sbc"; then
+    echo "AST indexed assignment bytecode differs from reference:" >&2
+    cmp -l "$tmp/array-write-reference.sbc" "$tmp/array-write-ast.sbc" | head -12 >&2 || true
+    exit 1
+fi
+actual="$("$SURU" exec "$tmp/array-write-ast.sbc")"
+if [ "$actual" != "9" ]; then
+    echo "AST indexed assignment execution mismatch: '$actual'" >&2
+    exit 1
+fi
 echo "natural AST bytecode: routine/binding/call/show/give output matched reference"

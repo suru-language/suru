@@ -1,0 +1,5 @@
+routine main() -> Unit
+    value items: [Whole] = [2, 4, 6]
+    set items[1] to 9
+    show(items[1])
+end routine
