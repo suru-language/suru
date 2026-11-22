@@ -1,0 +1,11 @@
+routine first(shared: Text) -> Text
+    give shared
+end routine
+
+routine second(x: Whole, shared: Whole) -> Whole
+    give x * 100 + shared
+end routine
+
+routine main() -> Unit
+    show(second(3, 4))
+end routine

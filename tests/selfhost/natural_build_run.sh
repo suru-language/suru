@@ -41,5 +41,22 @@ if [ "$actual" != "4" ] || [ "$runout" != "4" ]; then
     fail=$((fail + 1))
 fi
 
+# A parameter name reused from another routine must not inherit its
+# earlier global slot. The second routine deliberately has a different first
+# parameter so a leaked slot id would reverse the parameter-to-local mapping.
+"$SURU" --syntax=natural compile "$ROOT/tests/natural/per_function_slots.suru" \
+    "$tmp/per-function-c.sbc"
+"$SURU" run "$DIR/natural_build_driver.suru" \
+    "$ROOT/tests/natural/per_function_slots.suru" "$tmp/per-function-self.sbc" \
+    >/dev/null 2>&1
+cmp "$tmp/per-function-c.sbc" "$tmp/per-function-self.sbc"
+actual="$("$SURU" exec "$tmp/per-function-self.sbc" 2>/dev/null)"
+if [ "$actual" != "304" ]; then
+    echo "FAIL: per-function slot isolation (got '$actual', want '304')" >&2
+    fail=$((fail + 1))
+else
+    tests=$((tests + 1))
+fi
+
 echo "natural build driver: accepted=$accepted, $tests tests, $fail failures"
 [ "$fail" -eq 0 ]
