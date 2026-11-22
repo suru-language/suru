@@ -41,6 +41,10 @@ for input in "$ROOT"/tests/natural/*.suru; do
         od -An -tx1 -N64 "$tmp/c.sbc" >&2
         echo "  SURU header:" >&2
         od -An -tx1 -N64 "$tmp/u.sbc" >&2
+        echo "  C function bytes:" >&2
+        od -An -tx1 -j 120 -N100 "$tmp/c.sbc" >&2
+        echo "  SURU function bytes:" >&2
+        od -An -tx1 -j 120 -N100 "$tmp/u.sbc" >&2
         fail=$((fail + 1))
     fi
 done
