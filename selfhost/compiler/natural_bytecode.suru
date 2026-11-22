@@ -602,9 +602,10 @@ func nbc_collect_functions(instructions: [str], lines: [str]) -> [str] {
 }
 
 func nbc_ast_children(nodes: [str], node: int) -> [int] {
-    if node < 0 or node >= array_len(nodes) / 3 { return []; }
+    let empty_children: [int] = [];
+    if node < 0 or node >= array_len(nodes) / 3 { return empty_children; }
     let encoded: str = nodes[node * 3 + 2];
-    if encoded == "" { return []; }
+    if encoded == "" { return empty_children; }
     let parts: [str] = str_split(encoded, ",");
     mut children: [int] = [];
     mut i: int = 0;
@@ -863,7 +864,8 @@ func nbc_emit_ast_node(instructions: [str], nodes: [str], node: int) -> [str] {
 }
 
 func nbc_emit_expression(instructions: [str], expression: str) -> [str] {
-    let parsed = nea_parse_expression(expression, 0, 0, []);
+    let empty_nodes: [str] = [];
+    let parsed = nea_parse_expression(expression, 0, 0, empty_nodes);
     if nea_is_ok(parsed) == false {
         return nbc_emit(instructions, "BC_TRAP",
                         "typed expression parse failed: " + nea_message(parsed));
