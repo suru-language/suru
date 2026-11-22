@@ -129,26 +129,19 @@ func vm_heap_roots(stack: [str], frames: [[str]]) -> [int] {
     return roots;
 }
 
-// Mark continuously in bounded slices, but sweep only at the production
-// allocation-count/live-capacity trigger. Keeping marking active between
-// trigger points avoids an idle-to-active state transition; root reseeding,
-// allocation shading, and the write barrier protect mutator changes.
+// Advance one bounded mark slice per managed allocation. When the grey
+// queue drains, sweep and seed the next cycle from the current roots. This
+// allocation-driven progress rule is the validated Stage 2 scheduler; matching
+// the production VM's allocation-interval/threshold trigger remains future
+// work. Newly allocated objects are shaded while marking is active.
 func vm_heap_alloc(state: [[str]], stack: [str], frames: [[str]],
                    kind: str, payload: str, children: [int]) -> [[str]] {
     let roots: [int] = vm_heap_roots(stack, frames);
     mut next: [[str]] = [state[0], state[1], state[2]];
     next = sh_mark_step(next, 128, roots);
-    let allocation_counter: int = int_from_str(next[2][1]);
-    let should_collect: bool = allocation_counter >= 511 or
-        sh_live_bytes(next[0]) > 1048576;
-    if should_collect {
-        if sh_mark_pending(next) == 0 {
-            next = sh_mark_finish(next);
-            next = sh_mark_begin_with_metrics(next[0], roots, next[2]);
-        } else {
-            // Saturate the allocation trigger until this mark queue drains.
-            next[2][1] = "512";
-        }
+    if sh_mark_pending(next) == 0 {
+        next = sh_mark_finish(next);
+        next = sh_mark_begin_with_metrics(next[0], roots, next[2]);
     }
     let required: int = sh_allocation_size(payload, children);
     let id: int = sh_find_free(next[0], required);
