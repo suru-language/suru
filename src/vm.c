@@ -916,11 +916,17 @@ static bool builtin_str_repeat(s_vm *vm) {
         vm_trap(vm, "str_repeat too large");
         return false;
     }
+    /* The source was popped, so retain it across the allocation safepoint. */
+    s_heap_add_root(vm->heap, &s);
     s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
-    if (!o) return false;
+    if (!o) {
+        s_heap_remove_root(vm->heap, &s);
+        return false;
+    }
     char *d = s_obj_str_data(o);
     for (s_i64 i = 0; i < rep; ++i)
         memcpy(d + (s_size)i * slen, s_obj_str_data(s.u.o), slen);
+    s_heap_remove_root(vm->heap, &s);
     return push(vm, s_val_obj(o));
 }
 
@@ -1782,11 +1788,17 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                 vm_trap(vm, "repeat too large");
                 return 1;
             }
+            /* The source has been popped from the VM stack; root this C local. */
+            s_heap_add_root(vm->heap, &s);
             s_gcobj *o = vm_alloc(vm, S_OBJ_STR, (s_u32)total, total);
-            if (!o) return 1;
+            if (!o) {
+                s_heap_remove_root(vm->heap, &s);
+                return 1;
+            }
             char *d = s_obj_str_data(o);
             for (s_i64 i = 0; i < rep; ++i)
                 memcpy(d + (s_size)i * slen, s_obj_str_data(s.u.o), slen);
+            s_heap_remove_root(vm->heap, &s);
             if (!push(vm, s_val_obj(o))) return 1;
             pc++; break;
         }
@@ -1848,9 +1860,15 @@ int s_vm_run(s_vm *vm, s_heap *heap) {
                             (long long)i, arr.u.o->count);
                     return 1;
                 }
+                /* arr was popped above; keep its string storage alive. */
+                s_heap_add_root(vm->heap, &arr);
                 s_gcobj *o = vm_alloc(vm, S_OBJ_STR, 1, 1);
-                if (!o) return 1;
+                if (!o) {
+                    s_heap_remove_root(vm->heap, &arr);
+                    return 1;
+                }
                 s_obj_str_data(o)[0] = s_obj_str_data(arr.u.o)[i];
+                s_heap_remove_root(vm->heap, &arr);
                 if (!push(vm, s_val_obj(o))) return 1;
                 pc++; break;
             }
