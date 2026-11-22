@@ -388,22 +388,23 @@ cycles, exception causes, dropping roots, full reclamation, slot reuse,
 incremental root discovery, allocation shading, and the write barrier.
 
 The SURU-written interpreter in `natural_vm.suru` now stores text
-constants/results, bytecode arrays, and records as managed heap handles.
-String concatenation, comparisons, printing/conversion, length, substring, and
-contains operations resolve managed strings through the heap. Array/field reads
-and writes dereference handles; nested object references are recorded in the
-object graph, and shared aliases observe mutations through the same handle.
+constants/results, bytecode arrays, records, and typed exceptions as managed
+heap handles. String concatenation, comparisons, printing/conversion, length,
+substring, and contains operations resolve managed strings through the heap.
+Array/field reads and writes dereference handles; nested object references are
+recorded in the object graph, and shared aliases observe mutations through the
+same handle. Exception objects retain managed type and message strings and a
+managed cause link; typed handler dispatch matches the exception type name.
 Before object allocation the interpreter seeds the collector from its operand
 stack and all active call-frame locals. Inline arrays remain temporarily for
-closure capture environments, and exception records still use their
-transitional inline representation.
+closure capture environments.
 
 This remains a Stage 2 port, not a replacement for `src/mem.c` or the default
 C VM: the SURU interpreter itself still runs under the Stage 0 C17 VM. The
 current interpreter performs a full SURU heap collection before object
 allocation; integrating incremental slices with every mutator, moving closure
-and exception values onto managed objects, porting allocation accounting, and
-making the native/default runtime independent of C remain open work.
+environments onto managed objects, porting allocation accounting, and making
+the native/default runtime independent of C remain open work.
 The next Stage 1 AST increment adds `NAstModule`, a typed collection of
 `NAstNode` records with parse-error metadata. The statement parser's serialized
 nodes are rehydrated into the module array. The module driver is compared
