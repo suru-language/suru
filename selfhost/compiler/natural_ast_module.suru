@@ -1,0 +1,46 @@
+// Module-level typed AST collection for the current statement subset.
+// Expressions remain source-shaped payloads in NAstNode.text; subsequent
+// Stage 1 increments will replace those payloads with typed child nodes.
+
+use "natural_token_stream.suru";
+use "natural_statement_parser.suru";
+use "natural_ast.suru";
+
+func nam_parse(source: str) -> NAstModule {
+    mut nodes: [NAstNode] = [];
+    mut position: int = 0;
+    while true {
+        let first = natural_next(source, position);
+        if first.error {
+            return NAstModule(nodes, first.line, "lexical error " + to_str(first.error_code));
+        }
+        if first.kind == NT_EOF {
+            return NAstModule(nodes, 0, "");
+        }
+        if first.kind == NT_NEWLINE {
+            position = first.next;
+            continue;
+        }
+        let statement = nas_statement(source, position);
+        if nas_is_ok(statement) == false {
+            return NAstModule(nodes, first.line, nas_message(statement));
+        }
+        nodes = array_concat(nodes, [na_from_rendered(nas_node(statement))]);
+        position = nas_next(statement);
+    }
+    return NAstModule(nodes, 0, "");
+}
+
+func nam_check(source: str) -> int {
+    let module: NAstModule = nam_parse(source);
+    if module.error_message != "" {
+        println("ast-error|" + to_str(module.error_line) + "|" + module.error_message);
+        return 1;
+    }
+    mut i: int = 0;
+    while i < array_len(module.nodes) {
+        println(na_render(module.nodes[i]));
+        i += 1;
+    }
+    return 0;
+}
