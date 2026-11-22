@@ -123,11 +123,23 @@ func main() {
     if sh_live_bytes(classes) != 112 or sh_reserved_bytes(classes) != 112 {
         println("FAIL heap capacity accounting"); exit(1);
     }
+    let allocated_stats: [int] = sh_heap_stats(classes);
+    if allocated_stats[0] != 2 or allocated_stats[1] != 112 or
+       allocated_stats[2] != 2 or allocated_stats[3] != 112 or
+       allocated_stats[4] != 0 or allocated_stats[5] != 0 {
+        println("FAIL live heap statistics"); exit(1);
+    }
     classes = sh_collect(classes, no_roots);
     if sh_live_bytes(classes) != 0 or sh_reserved_bytes(classes) != 112 or
        sh_free_class_count(classes, 48) != 1 or
        sh_free_class_count(classes, 64) != 1 {
         println("FAIL swept size-class retention"); exit(1);
+    }
+    let swept_stats: [int] = sh_heap_stats(classes);
+    if swept_stats[0] != 0 or swept_stats[1] != 0 or
+       swept_stats[2] != 2 or swept_stats[3] != 112 or
+       swept_stats[4] != 2 or swept_stats[5] != 112 {
+        println("FAIL swept heap statistics"); exit(1);
     }
     classes = sh_alloc(classes, "str", "b", no_children);
     if sh_kind(classes, 0) != "str" or sh_capacity(classes, 0) != 48 {
