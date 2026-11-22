@@ -20,7 +20,7 @@ for input in "$ROOT"/tests/natural/*.suru; do
         continue
     fi
     tests=$((tests + 1))
-    if ! SURU_GC_DEBUG=1 "$SURU" run "$DIR/natural_vm_driver.suru" \
+    if ! "$SURU" run "$DIR/natural_vm_driver.suru" \
             "$tmp/x.sbc" > "$tmp/v.out" 2>"$tmp/v.err"; then
         echo "FAIL: SURU VM crashed on $(basename "$input")" >&2
         cat "$tmp/v.err" >&2
