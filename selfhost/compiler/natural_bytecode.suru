@@ -72,8 +72,36 @@ func nbc_intern(instructions: [str], kind: str, value: str) -> [str] {
     return array_concat(instructions, ["#" + kind + "|" + value]);
 }
 
+// Slot/type metadata is scoped by the most recently opened routine.
+// Function parameters therefore always receive slots 0..nparams-1, and
+// identically named bindings in other routines cannot alias these entries.
+func nbc_current_func(instructions: [str]) -> str {
+    mut i: int = array_len(instructions);
+    while i > 0 {
+        i -= 1;
+        if nbc_has_prefix(instructions[i], "#funcbody|") {
+            let header: str = substr(instructions[i], 10, str_len(instructions[i]));
+            let bar: int = nbc_find(header, "|");
+            return bar < 0 ? header : substr(header, 0, bar);
+        }
+    }
+    return "main";
+}
+
+func nbc_func_slot_count(instructions: [str], function: str) -> int {
+    let prefix: str = "#slot|" + function + "|";
+    mut count: int = 0;
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], prefix) { count += 1; }
+        i += 1;
+    }
+    return count;
+}
+
 func nbc_find_type(instructions: [str], name: str) -> str {
-    let needle: str = "#type|" + name + "|";
+    let function: str = nbc_current_func(instructions);
+    let needle: str = "#type|" + function + "|" + name + "|";
     mut i: int = 0;
     while i < array_len(instructions) {
         if nbc_has_prefix(instructions[i], needle) {
@@ -87,11 +115,13 @@ func nbc_find_type(instructions: [str], name: str) -> str {
 func nbc_note_type(instructions: [str], name: str, typ: str) -> [str] {
     if typ == "" { return instructions; }
     if nbc_find_type(instructions, name) != "" { return instructions; }
-    return array_concat(instructions, ["#type|" + name + "|" + typ]);
+    let function: str = nbc_current_func(instructions);
+    return array_concat(instructions, ["#type|" + function + "|" + name + "|" + typ]);
 }
 
 func nbc_slot(instructions: [str], name: str) -> int {
-    let wanted: str = "#slot|" + name + "|";
+    let function: str = nbc_current_func(instructions);
+    let wanted: str = "#slot|" + function + "|" + name + "|";
     mut i: int = 0;
     while i < array_len(instructions) {
         if nbc_has_prefix(instructions[i], wanted) {
@@ -105,8 +135,9 @@ func nbc_slot(instructions: [str], name: str) -> int {
 
 func nbc_bind(instructions: [str], name: str) -> [str] {
     if nbc_slot(instructions, name) >= 0 { return instructions; }
-    let index: int = 0 + nbc_pool_count(instructions, "slot");
-    let marker: str = "#slot|" + name + "|" + to_str(index);
+    let function: str = nbc_current_func(instructions);
+    let index: int = nbc_func_slot_count(instructions, function);
+    let marker: str = "#slot|" + function + "|" + name + "|" + to_str(index);
     let stable: str = substr(marker, 0, str_len(marker));
     return array_concat(instructions, [stable]);
 }
