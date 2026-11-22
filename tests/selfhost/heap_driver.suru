@@ -2,10 +2,12 @@ use "../../selfhost/runtime/heap.suru";
 
 func main() {
     mut heap: [str] = [];
+    let no_children: [int] = [];
+    let no_roots: [int] = [];
 
     // A dead object plus a shared, reachable graph.
-    heap = sh_alloc(heap, "str", "garbage", []);
-    heap = sh_alloc(heap, "str", "leaf", []);
+    heap = sh_alloc(heap, "str", "garbage", no_children);
+    heap = sh_alloc(heap, "str", "leaf", no_children);
     heap = sh_alloc(heap, "record", "branch", [1]);
     heap = sh_alloc(heap, "array", "root", [2, 1]);
 
@@ -14,10 +16,10 @@ func main() {
     heap = sh_alloc(heap, "record", "cycle-b", [4]);
 
     // A rooted exception keeps its type, message, cause, and cause strings.
-    heap = sh_alloc(heap, "str", "FileError", []);
-    heap = sh_alloc(heap, "str", "read failed", []);
-    heap = sh_alloc(heap, "str", "CleanupError", []);
-    heap = sh_alloc(heap, "str", "close failed", []);
+    heap = sh_alloc(heap, "str", "FileError", no_children);
+    heap = sh_alloc(heap, "str", "read failed", no_children);
+    heap = sh_alloc(heap, "str", "CleanupError", no_children);
+    heap = sh_alloc(heap, "str", "close failed", no_children);
     heap = sh_alloc(heap, "exception", "cause", [8, 9]);
     heap = sh_alloc(heap, "exception", "primary", [6, 7, 10]);
 
@@ -43,11 +45,11 @@ func main() {
     }
 
     // No roots reclaims the complete graph, including the cause chain.
-    heap = sh_collect(heap, []);
+    heap = sh_collect(heap, no_children);
     if sh_live_count(heap) != 0 { println("FAIL full reclamation"); exit(1); }
 
     // The allocator reuses the lowest reclaimed stable handle.
-    heap = sh_alloc(heap, "str", "reused", []);
+    heap = sh_alloc(heap, "str", "reused", no_children);
     if sh_live_count(heap) != 1 or sh_kind(heap, 0) != "str" or
        sh_payload(heap, 0) != "reused" {
         println("FAIL reclaimed slot reuse"); exit(1);
