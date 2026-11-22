@@ -402,6 +402,10 @@ from the operand stack and every active frame on each slice. The 520-allocation
 suspended-caller regression exercises the integrated trigger and checks that a
 caller-local value survives collection. Logical byte accounting is an estimate
 based on SURU's object-table representation, not host allocator byte parity.
+The direct `natural_vm_gc_schedule_driver.suru` gate also calls the allocation
+wrapper at the 511th/512th allocation boundary and checks the independent
+logical-live-byte trigger.
+
 The regression driver exercises shared references, unreachable cycles,
 exception causes, dropping roots, full reclamation, class-aware slot reuse,
 large first-fit reuse, capacity growth, incremental root discovery, allocation
@@ -423,12 +427,12 @@ the operand stack. A C-vs-SURU VM regression captures a managed string and reads
 it inside the called routine; the existing closure parity fixture remains
 intact.
 
-The interpreter advances a bounded mark slice (budget 128 objects) on
-each managed allocation, re-seeding roots from its operand stack and active
-call-frame locals. New objects are shaded grey during an active cycle, and
-mutable array/record writes use the tri-colour barrier when a black object gains
-a white child. When the grey queue drains, the VM sweeps and seeds the next
-cycle. The large self-hosted tokenizer VM corpus exercises repeated string
+When a collection is due, the interpreter advances marking in bounded
+128-object slices at managed-allocation safepoints, re-seeding roots from its
+operand stack and all active call-frame locals. New objects are shaded grey
+during an active cycle, and mutable array/record writes use the tri-colour
+barrier when a black object gains a white child. When the grey queue drains,
+the VM sweeps and returns to the idle allocation state. The large self-hosted tokenizer VM corpus exercises repeated string
 allocation under this scheduler; the interval-one GC gate also covers the
 interpreter's host allocations.
 
