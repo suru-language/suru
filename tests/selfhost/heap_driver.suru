@@ -259,11 +259,13 @@ func main() {
         println("FAIL adaptive threshold headroom/clamps"); exit(1);
     }
 
-    // Stress the state machine with more than one slice of a 520-object chain.
+    // Stress the state machine with more than one slice of a 40-object chain.
+    // The allocation counter is seeded at 511 to test the 512th-allocation edge
+    // without creating a large Stage 0 host array as part of this regression.
     mut chain_heap: [str] = [];
     mut chain_children: [int] = [];
     mut chain_index: int = 0;
-    while chain_index < 520 {
+    while chain_index < 40 {
         chain_heap = sh_alloc(chain_heap, "record", "", chain_children);
         chain_children = [chain_index];
         chain_index += 1;
@@ -272,16 +274,19 @@ func main() {
         "0", "511", "0", "0", "1048576", "1048576", "0"
     ];
     mut chain_state: [[str]] = sh_mark_idle(chain_heap, chain_metrics);
-    chain_state = sh_gc_advance(chain_state, [519], 512, 16);
+    chain_state = sh_gc_advance(chain_state, [39], 512, 16);
     mut chain_slices: int = 1;
-    while sh_gc_stats(chain_state)[3] == 1 and chain_slices < 100 {
-        chain_state = sh_gc_advance(chain_state, [519], 512, 16);
+    let chain_progress: [int] = sh_gc_stats(chain_state);
+    while chain_progress[3] == 1 and chain_slices < 100 {
+        chain_state = sh_gc_advance(chain_state, [39], 512, 16);
         chain_slices += 1;
+        chain_progress = sh_gc_stats(chain_state);
     }
     let chain_stats: [int] = sh_gc_stats(chain_state);
     if chain_stats[3] != 0 or chain_stats[1] != 1 or
-       chain_stats[4] != 0 or sh_live_count(chain_state[0]) != 520 {
-        println("FAIL multi-slice large live graph"); exit(1);
+       chain_stats[4] != 0 or sh_live_count(chain_state[0]) != 40 or
+       chain_slices < 2 {
+        println("FAIL multi-slice live object graph"); exit(1);
     }
 
     println("SURU heap: reachability, cycles, barriers, size classes, allocation accounting and GC threshold policy passed");
