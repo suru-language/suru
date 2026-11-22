@@ -1,0 +1,152 @@
+// Stage 2 managed heap seed, implemented entirely in SURU.
+//
+// Objects use stable integer handles. Each object occupies four strings in the
+// flat table: kind, colour/reserved, payload, and comma-separated child IDs.
+// An empty kind is a reclaimed slot. Strings, arrays, records, closures, and
+// exceptions all participate in the same object graph.
+//
+// This first port is a stop-the-world mark/sweep collector. Mutators provide
+// their live object handles as roots; object children are traversed iteratively
+// so cycles are safe and host-language recursion is not required.
+
+func sh_join_ids(ids: [int]) -> str {
+    mut out: str = "";
+    mut i: int = 0;
+    while i < array_len(ids) {
+        if i > 0 { out = out + ","; }
+        out = out + to_str(ids[i]);
+        i += 1;
+    }
+    return out;
+}
+
+func sh_parse_ids(encoded: str) -> [int] {
+    mut out: [int] = [];
+    if encoded == "" { return out; }
+    let parts: [str] = str_split(encoded, ",");
+    mut i: int = 0;
+    while i < array_len(parts) {
+        out = array_concat(out, [int_from_str(parts[i])]);
+        i += 1;
+    }
+    return out;
+}
+
+func sh_object_count(heap: [str]) -> int {
+    return array_len(heap) / 4;
+}
+
+func sh_alloc(heap: [str], kind: str, payload: str, children: [int]) -> [str] {
+    if kind == "" { return heap; }
+    let encoded: str = sh_join_ids(children);
+    let count: int = sh_object_count(heap);
+    mut id: int = 0;
+    while id < count and heap[id * 4] != "" { id += 1; }
+    if id == count {
+        return array_concat(heap, [kind, "0", payload, encoded]);
+    }
+    let next: [str] = heap;
+    next[id * 4] = kind;
+    next[id * 4 + 1] = "0";
+    next[id * 4 + 2] = payload;
+    next[id * 4 + 3] = encoded;
+    return next;
+}
+
+func sh_set_children(heap: [str], id: int, children: [int]) -> [str] {
+    if id < 0 or id >= sh_object_count(heap) { return heap; }
+    if heap[id * 4] == "" { return heap; }
+    let next: [str] = heap;
+    next[id * 4 + 3] = sh_join_ids(children);
+    return next;
+}
+
+func sh_alive(heap: [str], id: int) -> bool {
+    return id >= 0 and id < sh_object_count(heap) and heap[id * 4] != "";
+}
+
+func sh_kind(heap: [str], id: int) -> str {
+    if not sh_alive(heap, id) { return ""; }
+    return heap[id * 4];
+}
+
+func sh_payload(heap: [str], id: int) -> str {
+    if not sh_alive(heap, id) { return ""; }
+    return heap[id * 4 + 2];
+}
+
+func sh_children(heap: [str], id: int) -> [int] {
+    if not sh_alive(heap, id) { return []; }
+    return sh_parse_ids(heap[id * 4 + 3]);
+}
+
+func sh_live_count(heap: [str]) -> int {
+    mut count: int = 0;
+    mut id: int = 0;
+    while id < sh_object_count(heap) {
+        if heap[id * 4] != "" { count += 1; }
+        id += 1;
+    }
+    return count;
+}
+
+func sh_collect(heap: [str], roots: [int]) -> [str] {
+    let count: int = sh_object_count(heap);
+    mut marked: [int] = [];
+    mut id: int = 0;
+    while id < count {
+        marked = array_concat(marked, [0]);
+        id += 1;
+    }
+
+    // Seed the grey worklist from every valid root.
+    mut work: [int] = [];
+    mut r: int = 0;
+    while r < array_len(roots) {
+        let root: int = roots[r];
+        if root >= 0 and root < count and heap[root * 4] != "" and marked[root] == 0 {
+            marked[root] = 1;
+            work = array_concat(work, [root]);
+        }
+        r += 1;
+    }
+
+    // Iterative transitive closure. State 1 is grey, state 2 is black.
+    while array_len(work) > 0 {
+        let last: int = array_len(work) - 1;
+        let current: int = work[last];
+        work = slice(work, 0, last);
+        let refs: [int] = sh_parse_ids(heap[current * 4 + 3]);
+        mut child: int = 0;
+        while child < array_len(refs) {
+            let target: int = refs[child];
+            if target >= 0 and target < count and
+               heap[target * 4] != "" and marked[target] == 0 {
+                marked[target] = 1;
+                work = array_concat(work, [target]);
+            }
+            child += 1;
+        }
+        marked[current] = 2;
+    }
+
+    // Sweep unmarked objects. Keep stable handle indices so references never
+    // change; allocation reuses reclaimed slots after the collection.
+    let next: [str] = heap;
+    id = 0;
+    while id < count {
+        let base: int = id * 4;
+        if next[base] != "" {
+            if marked[id] == 0 {
+                next[base] = "";
+                next[base + 1] = "0";
+                next[base + 2] = "";
+                next[base + 3] = "";
+            } else {
+                next[base + 1] = "0";
+            }
+        }
+        id += 1;
+    }
+    return next;
+}
