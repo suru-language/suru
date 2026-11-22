@@ -23,4 +23,4 @@ if [ "$actual" != "5" ]; then
     echo "AST bytecode execution mismatch: '$actual'" >&2
     exit 1
 fi
-echo "natural AST bytecode: routine/binding/call/show/give output matched reference"
+echo "natural AST bytecode: routines, bindings, calls, nested when/otherwise, repeat, show and give matched reference"
