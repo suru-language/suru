@@ -1,7 +1,7 @@
 name: M0 trustworthy baseline
 on:
   push:
-    branches: [m0-trustworthy-baseline, stage1-per-function-slots]
+    branches: [m0-trustworthy-baseline, stage1-per-function-slots, stage1-typed-ast-module]
   pull_request:
     branches: [main]
 permissions:
