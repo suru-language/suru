@@ -62,5 +62,12 @@ else
     fail=$((fail + 1))
 fi
 
+if compile_and_run multi 'routine main() -> Unit\\n    show("first")\\n    show("")\\n    show("last")\\nend routine' "first
+
+last"; then
+    tests=$((tests + 1))
+else
+    fail=$((fail + 1))
+fi
 echo "natural ELF compile: $tests tests, $fail failures"
 [ "$fail" -eq 0 ]
