@@ -46,3 +46,17 @@ func na_from_rendered(rendered: str) -> NAstNode {
     let payload: str = substr(rendered, third + 1, str_len(rendered));
     return na_make(kind, line, payload);
 }
+
+type NAstExpr {
+    let kind: str;
+    let value: str;
+    let children: [int];
+}
+
+type NAstExprParse {
+    let ok: bool;
+    let next: int;
+    let root: int;
+    let nodes: [NAstExpr];
+    let message: str;
+}
