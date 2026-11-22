@@ -156,6 +156,48 @@ func nw_emit_elf_int_expr(ops: [int], avs: [int]) -> str {
     return nw_elf_header(total, 0x400000 + 120) + code;
 }
 
+// Emit a sequence of constant-string println calls in one standalone ELF.
+// Each write syscall uses a RIP-relative pointer into the trailing read-only
+// message area; the code contains no relocations and needs no external linker.
+func nw_emit_elf_messages(messages: [str]) -> str {
+    let count: int = array_len(messages);
+    if count == 0 { return ""; }
+    let code_len: int = count * 30 + 16;
+    mut code: str = "";
+    mut data: str = "";
+    mut i: int = 0;
+    while i < count {
+        let msg: str = messages[i];
+        let block_start: int = i * 30;
+        // mov rax, 1 (write)
+        code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) +
+            str_chr_byte(0xC0) + nw_u32(1);
+        // mov rdi, 1 (stdout)
+        code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) +
+            str_chr_byte(0xC7) + nw_u32(1);
+        // lea rsi, [rip + data]; displacement is relative to next RIP.
+        code = code + str_chr_byte(0x48) + str_chr_byte(0x8D) +
+            str_chr_byte(0x35);
+        let displacement: int = code_len + str_len(data) - (block_start + 21);
+        code = code + nw_u32(displacement);
+        // mov rdx, message byte length
+        code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) +
+            str_chr_byte(0xC2) + nw_u32(str_len(msg));
+        // syscall
+        code = code + str_chr_byte(0x0F) + str_chr_byte(0x05);
+        data = data + msg;
+        i += 1;
+    }
+    // mov rax, 60; mov rdi, 0; syscall
+    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) +
+        str_chr_byte(0xC0) + nw_u32(60);
+    code = code + str_chr_byte(0x48) + str_chr_byte(0xC7) +
+        str_chr_byte(0xC7) + nw_u32(0);
+    code = code + str_chr_byte(0x0F) + str_chr_byte(0x05);
+    let total: int = 120 + str_len(code) + str_len(data);
+    return nw_elf_header(total, 0x400078) + code + data;
+}
+
 func nw_emit_elf_message(msg: str) -> str {
     let base: int = 0x400000;
     let code_off: int = 120;
