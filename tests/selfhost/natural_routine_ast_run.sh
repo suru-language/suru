@@ -10,9 +10,9 @@ trap 'rm -rf "$tmp"' EXIT
 "$SURU" run "$DIR/natural_ast_module_driver.suru" \
     "$ROOT/tests/natural/routine_ast_valid.suru" > "$tmp/valid.out"
 grep -F -q 'ast|routine|1|add|a:Whole,b:Whole|Whole|' "$tmp/valid.out"
-grep -F -q 'ast|routine|6|main||Unit|' "$tmp/valid.out"
-grep -F -q 'ast|end-routine|5|' "$tmp/valid.out"
-grep -F -q 'ast|end-routine|9|' "$tmp/valid.out"
+grep -F -q 'ast|routine|5|main||Unit|' "$tmp/valid.out"
+grep -F -q 'ast|end-routine|4|' "$tmp/valid.out"
+grep -F -q 'ast|end-routine|7|' "$tmp/valid.out"
 
 for input in routine_ast_invalid_parameter.suru routine_ast_mismatched_end.suru; do
     if "$SURU" run "$DIR/natural_ast_module_driver.suru" \
