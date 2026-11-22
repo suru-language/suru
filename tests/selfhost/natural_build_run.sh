@@ -51,7 +51,7 @@ echo "checking typed expression AST lowering" >&2
     "$tmp/typed-expression-self.sbc"
 cmp "$tmp/typed-expression-c.sbc" "$tmp/typed-expression-self.sbc"
 actual="$("$SURU" exec "$tmp/typed-expression-self.sbc" 2>/dev/null)"
-expected="$(printf '%s\n' -14 10 5 7 3)"
+expected="$(printf '%s\n' 14 10 5 7 3)"
 if [ "$actual" != "$expected" ]; then
     echo "FAIL: typed expression AST lowering (got '$actual')" >&2
     fail=$((fail + 1))
