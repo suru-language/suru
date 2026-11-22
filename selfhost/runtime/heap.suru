@@ -76,7 +76,8 @@ func sh_payload(heap: [str], id: int) -> str {
 }
 
 func sh_children(heap: [str], id: int) -> [int] {
-    if not sh_alive(heap, id) { return []; }
+    let empty: [int] = [];
+    if not sh_alive(heap, id) { return empty; }
     return sh_parse_ids(heap[id * 4 + 3]);
 }
 
