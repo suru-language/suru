@@ -1,18 +1,21 @@
 // Typed expression AST for the Stage 1 operator/postfix subset.
-// Nodes are stored in a flat table; child indices refer to earlier entries.
-// This avoids recursive record storage while preserving tree structure.
+// Nodes are stored as flat triplets: kind, value, comma-separated child IDs.
+// Parse results use [str] fields to avoid recursive record/array identity issues.
 
 use "natural_token_stream.suru";
 use "natural_expression.suru";
-use "natural_expression_types.suru";
 
-func nea_ok(next: int, root: int, nodes: [NAstExpr]) -> NAstExprParse {
-    return NAstExprParse(true, next, root, nodes, "");
+func nea_ok(next: int, root: int, nodes: [str]) -> [str] {
+    return array_concat(["ok", to_str(next), to_str(root), ""], nodes);
 }
-
-func nea_fail(position: int, message: str, nodes: [NAstExpr]) -> NAstExprParse {
-    return NAstExprParse(false, position, -1, nodes, message);
+func nea_fail(position: int, message: str, nodes: [str]) -> [str] {
+    return array_concat(["error", to_str(position), "-1", message], nodes);
 }
+func nea_is_ok(result: [str]) -> bool { return array_len(result) >= 4 and result[0] == "ok"; }
+func nea_next(result: [str]) -> int { return int_from_str(result[1]); }
+func nea_root(result: [str]) -> int { return int_from_str(result[2]); }
+func nea_message(result: [str]) -> str { return result[3]; }
+func nea_nodes(result: [str]) -> [str] { return slice(result, 4, array_len(result)); }
 
 func nea_join_children(children: [int]) -> str {
     mut out: str = "";
@@ -25,68 +28,68 @@ func nea_join_children(children: [int]) -> str {
     return out;
 }
 
-func nea_append(nodes: [NAstExpr], kind: str, value: str,
-                children: [int]) -> NAstExprParse {
-    let updated: [NAstExpr] = array_concat(nodes,
-        [NAstExpr(kind, value, nea_join_children(children))]);
-    return nea_ok(0, array_len(updated) - 1, updated);
+func nea_append(nodes: [str], kind: str, value: str,
+                children: [int]) -> [str] {
+    let updated: [str] = array_concat(nodes,
+        [kind, value, nea_join_children(children)]);
+    return nea_ok(0, array_len(updated) / 3 - 1, updated);
 }
 
 func nea_parse_expression(source: str, position: int, minimum: int,
-                          initial_nodes: [NAstExpr]) -> NAstExprParse {
+                          initial_nodes: [str]) -> [str] {
     let p: int = ne_skip_lines(source, position);
     let first = natural_next(source, p);
     if first.error { return nea_fail(p, "lexical error", initial_nodes); }
 
-    mut result: NAstExprParse = nea_fail(p, "expected expression", initial_nodes);
+    mut result: [str] = nea_fail(p, "expected expression", initial_nodes);
     if first.text == "routine" {
         let routine = ne_parse_routine(source, first);
         if ne_is_ok(routine) == false {
             return nea_fail(first.start, ne_message(routine), initial_nodes);
         }
         let no_children: [int] = [];
-        result = nea_append(initial_nodes, "routine", ne_value(routine), no_children);
-        result = nea_ok(ne_next(routine), result.root, result.nodes);
+        let node = nea_append(initial_nodes, "routine", ne_value(routine), no_children);
+        result = nea_ok(ne_next(routine), nea_root(node), nea_nodes(node));
     } else if first.text == "-" or first.text == "not" or first.text == "~" {
         let operand = nea_parse_expression(source, first.next, 10, initial_nodes);
-        if operand.ok == false { return operand; }
-        let children: [int] = [operand.root];
-        let node = nea_append(operand.nodes, "unary", first.text, children);
-        result = nea_ok(operand.next, node.root, node.nodes);
+        if nea_is_ok(operand) == false { return operand; }
+        let node = nea_append(nea_nodes(operand), "unary", first.text,
+                              [nea_root(operand)]);
+        result = nea_ok(nea_next(operand), nea_root(node), nea_nodes(node));
     } else if first.kind == NT_IDENT or first.kind == NT_WORD or
               first.kind == NT_INT or first.kind == NT_FLOAT or
               first.kind == NT_STRING {
         let no_children: [int] = [];
-        result = nea_append(initial_nodes, "atom", first.text, no_children);
-        result = nea_ok(first.next, result.root, result.nodes);
+        let node = nea_append(initial_nodes, "atom", first.text, no_children);
+        result = nea_ok(first.next, nea_root(node), nea_nodes(node));
     } else if first.text == "(" {
         let inner = nea_parse_expression(source, first.next, 0, initial_nodes);
-        if inner.ok == false { return inner; }
-        let close = natural_next(source, ne_skip_lines(source, inner.next));
-        if close.text != ")" { return nea_fail(close.start, "expected ')'", inner.nodes); }
-        result = nea_ok(close.next, inner.root, inner.nodes);
+        if nea_is_ok(inner) == false { return inner; }
+        let close = natural_next(source, ne_skip_lines(source, nea_next(inner)));
+        if close.text != ")" { return nea_fail(close.start, "expected ')'", nea_nodes(inner)); }
+        result = nea_ok(close.next, nea_root(inner), nea_nodes(inner));
     } else if first.text == "[" {
-        mut current_nodes: [NAstExpr] = initial_nodes;
+        mut current_nodes: [str] = initial_nodes;
         mut children: [int] = [];
         let empty = natural_next(source, ne_skip_lines(source, first.next));
         if empty.text == "]" {
             let node = nea_append(current_nodes, "array", "", children);
-            result = nea_ok(empty.next, node.root, node.nodes);
+            result = nea_ok(empty.next, nea_root(node), nea_nodes(node));
         } else {
             mut next: int = first.next;
             while true {
                 let item = nea_parse_expression(source, next, 0, current_nodes);
-                if item.ok == false { return item; }
-                current_nodes = item.nodes;
-                children = array_concat(children, [item.root]);
-                let separator = natural_next(source, ne_skip_lines(source, item.next));
+                if nea_is_ok(item) == false { return item; }
+                current_nodes = nea_nodes(item);
+                children = array_concat(children, [nea_root(item)]);
+                let separator = natural_next(source, ne_skip_lines(source, nea_next(item)));
                 if separator.text == "," {
                     next = separator.next;
                     continue;
                 }
                 if separator.text == "]" {
                     let node = nea_append(current_nodes, "array", "", children);
-                    result = nea_ok(separator.next, node.root, node.nodes);
+                    result = nea_ok(separator.next, nea_root(node), nea_nodes(node));
                     break;
                 }
                 return nea_fail(separator.start, "expected ',' or ']'", current_nodes);
@@ -96,9 +99,9 @@ func nea_parse_expression(source: str, position: int, minimum: int,
         return nea_fail(p, "expected expression", initial_nodes);
     }
 
-    mut next: int = result.next;
-    mut root: int = result.root;
-    mut current_nodes: [NAstExpr] = result.nodes;
+    mut next: int = nea_next(result);
+    mut root: int = nea_root(result);
+    mut current_nodes: [str] = nea_nodes(result);
     while true {
         let postfix_position: int = ne_skip_lines(source, next);
         let postfix = natural_next(source, postfix_position);
@@ -108,17 +111,17 @@ func nea_parse_expression(source: str, position: int, minimum: int,
                 return nea_fail(name.start, "expected field name", current_nodes);
             }
             let node = nea_append(current_nodes, "field", name.text, [root]);
-            current_nodes = node.nodes;
-            root = node.root;
+            current_nodes = nea_nodes(node);
+            root = nea_root(node);
             next = name.next;
         } else if postfix.text == "[" {
             let index = nea_parse_expression(source, postfix.next, 0, current_nodes);
-            if index.ok == false { return index; }
-            let close = natural_next(source, ne_skip_lines(source, index.next));
-            if close.text != "]" { return nea_fail(close.start, "expected ']'", index.nodes); }
-            let node = nea_append(index.nodes, "index", "", [root, index.root]);
-            current_nodes = node.nodes;
-            root = node.root;
+            if nea_is_ok(index) == false { return index; }
+            let close = natural_next(source, ne_skip_lines(source, nea_next(index)));
+            if close.text != "]" { return nea_fail(close.start, "expected ']'", nea_nodes(index)); }
+            let node = nea_append(nea_nodes(index), "index", "", [root, nea_root(index)]);
+            current_nodes = nea_nodes(node);
+            root = nea_root(node);
             next = close.next;
         } else if postfix.text == "(" {
             mut children: [int] = [root];
@@ -126,25 +129,25 @@ func nea_parse_expression(source: str, position: int, minimum: int,
             let empty = natural_next(source, ne_skip_lines(source, argument_position));
             if empty.text == ")" {
                 let node = nea_append(current_nodes, "call", "", children);
-                current_nodes = node.nodes;
-                root = node.root;
+                current_nodes = nea_nodes(node);
+                root = nea_root(node);
                 next = empty.next;
                 continue;
             }
             while true {
                 let argument = nea_parse_expression(source, argument_position, 0, current_nodes);
-                if argument.ok == false { return argument; }
-                current_nodes = argument.nodes;
-                children = array_concat(children, [argument.root]);
-                let separator = natural_next(source, ne_skip_lines(source, argument.next));
+                if nea_is_ok(argument) == false { return argument; }
+                current_nodes = nea_nodes(argument);
+                children = array_concat(children, [nea_root(argument)]);
+                let separator = natural_next(source, ne_skip_lines(source, nea_next(argument)));
                 if separator.text == "," {
                     argument_position = separator.next;
                     continue;
                 }
                 if separator.text == ")" {
                     let node = nea_append(current_nodes, "call", "", children);
-                    current_nodes = node.nodes;
-                    root = node.root;
+                    current_nodes = nea_nodes(node);
+                    root = nea_root(node);
                     next = separator.next;
                     break;
                 }
@@ -161,11 +164,12 @@ func nea_parse_expression(source: str, position: int, minimum: int,
         let precedence: int = ne_prec(operator.text);
         if precedence < minimum or precedence == 0 { break; }
         let right = nea_parse_expression(source, operator.next, precedence + 1, current_nodes);
-        if right.ok == false { return right; }
-        let node = nea_append(right.nodes, "binary", operator.text, [root, right.root]);
-        current_nodes = node.nodes;
-        root = node.root;
-        next = right.next;
+        if nea_is_ok(right) == false { return right; }
+        let node = nea_append(nea_nodes(right), "binary", operator.text,
+                              [root, nea_root(right)]);
+        current_nodes = nea_nodes(node);
+        root = nea_root(node);
+        next = nea_next(right);
     }
 
     if minimum <= 1 {
@@ -173,36 +177,38 @@ func nea_parse_expression(source: str, position: int, minimum: int,
         let maybe = natural_next(source, ternary_position);
         if maybe.text == "?" {
             let then = nea_parse_expression(source, maybe.next, 0, current_nodes);
-            if then.ok == false { return then; }
-            let colon = natural_next(source, ne_skip_lines(source, then.next));
-            if colon.text != ":" { return nea_fail(colon.start, "expected ':'", then.nodes); }
-            let els = nea_parse_expression(source, colon.next, 0, then.nodes);
-            if els.ok == false { return els; }
-            let node = nea_append(els.nodes, "conditional", "?", [root, then.root, els.root]);
-            return nea_ok(els.next, node.root, node.nodes);
+            if nea_is_ok(then) == false { return then; }
+            let colon = natural_next(source, ne_skip_lines(source, nea_next(then)));
+            if colon.text != ":" { return nea_fail(colon.start, "expected ':'", nea_nodes(then)); }
+            let els = nea_parse_expression(source, colon.next, 0, nea_nodes(then));
+            if nea_is_ok(els) == false { return els; }
+            let node = nea_append(nea_nodes(els), "conditional", "?",
+                                  [root, nea_root(then), nea_root(els)]);
+            return nea_ok(nea_next(els), nea_root(node), nea_nodes(node));
         }
     }
     return nea_ok(next, root, current_nodes);
 }
 
 func nea_check(source: str) -> int {
-    let empty_nodes: [NAstExpr] = [];
+    let empty_nodes: [str] = [];
     let result = nea_parse_expression(source, 0, 0, empty_nodes);
-    if result.ok == false {
-        println("expr-ast-error|" + result.message);
+    if nea_is_ok(result) == false {
+        println("expr-ast-error|" + nea_message(result));
         return 1;
     }
-    let end = natural_next(source, ne_skip_lines(source, result.next));
+    let end = natural_next(source, ne_skip_lines(source, nea_next(result)));
     if end.kind != NT_EOF {
         println("expr-ast-error|unexpected token|" + end.text);
         return 1;
     }
-    println("expr-root|" + to_str(result.root));
+    println("expr-root|" + to_str(nea_root(result)));
+    let nodes: [str] = nea_nodes(result);
     mut i: int = 0;
-    while i < array_len(result.nodes) {
-        let node: NAstExpr = result.nodes[i];
-        println("expr-node|" + to_str(i) + "|" + node.kind + "|" +
-                node.value + "|" + node.children);
+    while i < array_len(nodes) / 3 {
+        let base: int = i * 3;
+        println("expr-node|" + to_str(i) + "|" + nodes[base] + "|" +
+                nodes[base + 1] + "|" + nodes[base + 2]);
         i += 1;
     }
     return 0;
