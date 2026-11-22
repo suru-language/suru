@@ -142,7 +142,8 @@ func vm_heap_alloc(state: [[str]], stack: [str], frames: [[str]],
         let swept: [str] = sh_sweep(next[0]);
         next = sh_mark_begin(swept, roots);
     }
-    let id: int = sh_find_free(next[0]);
+    let required: int = sh_allocation_size(payload, children);
+    let id: int = sh_find_free(next[0], required);
     next = sh_alloc_incremental(next, kind, payload, children);
     return [next[0], next[1], next[2], ["H" + to_str(id)]];
 }
