@@ -10,6 +10,32 @@ func nab_fail(message: str) -> [str] {
     return ["#emit-failed"];
 }
 
+func nab_collect_routine_declarations(instructions: [str], module: [str]) -> [str] {
+    mut result: [str] = instructions;
+    mut i: int = 1;
+    while i < array_len(module) {
+        let raw: str = module[i];
+        if nam_node_kind(raw) == "routine" {
+            let signature: [str] = str_split(nam_node_text(raw), "|");
+            if array_len(signature) < 3 {
+                println("ast-bytecode-error|malformed routine declaration");
+                return ["#emit-failed"];
+            }
+            let name: str = signature[0];
+            if name == "" {
+                println("ast-bytecode-error|routine name is empty");
+                return ["#emit-failed"];
+            }
+            if nbc_func_index(result, name) < 0 {
+                let index: int = nbc_pool_count(result, "func");
+                result = array_concat(result, ["#func|" + name + "|" + to_str(index)]);
+            }
+        }
+        i += 1;
+    }
+    return result;
+}
+
 func nab_binding_parts(text: str) -> [str] {
     let equals: int = nam_find(text, " = ", 0);
     let first_space: int = nam_find(text, " ", 0);
@@ -31,7 +57,10 @@ func nab_collect_ast(source: str) -> [str] {
     }
     let lines: [str] = str_split(source, "\n");
     mut instructions: [str] = [];
-    instructions = nbc_collect_functions(instructions, lines);
+    instructions = nab_collect_routine_declarations(instructions, module);
+    if array_len(instructions) == 1 and instructions[0] == "#emit-failed" {
+        return instructions;
+    }
     instructions = nbc_collect_records(instructions, lines);
     instructions = nbc_collect_choices(instructions, lines);
 
