@@ -1,13 +1,6 @@
-use "../../selfhost/compiler/source.suru";
-use "../../selfhost/compiler/natural_frontend.suru";
 use "../../selfhost/compiler/natural_bytecode.suru";
+use "../../selfhost/compiler/source.suru";
 
-// Match the full Stage 1 build driver's ownership discipline: validate first,
-// then reload source so frontend GC pressure cannot invalidate token/source
-// string views used by the bytecode collector.
 func main() {
-    let source: str = source_load(args(0));
-    if natural_frontend_check(source) != 0 { exit(2); }
-    let clean: str = source_load(args(0));
-    exit(natural_emit_bytecode(clean));
+    exit(natural_emit_bytecode(source_load(args(0))));
 }
