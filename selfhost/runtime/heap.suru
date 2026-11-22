@@ -179,6 +179,25 @@ func sh_free_class_count(heap: [str], size_class: int) -> int {
     return count;
 }
 
+func sh_free_count(heap: [str]) -> int {
+    return sh_object_count(heap) - sh_live_count(heap);
+}
+
+func sh_free_bytes(heap: [str]) -> int {
+    return sh_reserved_bytes(heap) - sh_live_bytes(heap);
+}
+
+// Snapshot order: live objects, live bytes, reserved slots, reserved bytes,
+// free slots, and free bytes. Byte values are logical reservation estimates.
+func sh_heap_stats(heap: [str]) -> [int] {
+    let live_objects: int = sh_live_count(heap);
+    let live_bytes: int = sh_live_bytes(heap);
+    let reserved_slots: int = sh_object_count(heap);
+    let reserved_bytes: int = sh_reserved_bytes(heap);
+    return [live_objects, live_bytes, reserved_slots, reserved_bytes,
+            reserved_slots - live_objects, reserved_bytes - live_bytes];
+}
+
 func sh_live_count(heap: [str]) -> int {
     mut count: int = 0;
     mut id: int = 0;
