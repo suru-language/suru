@@ -28,27 +28,6 @@ typedef struct s_heap {
     bool incremental;
 } s_heap;
 
-typedef struct s_freed_debug {
-    const void *pointer;
-    s_u32 kind;
-    s_u32 count;
-    s_u64 collection;
-} s_freed_debug;
-
-#define SU_GC_DEBUG_FREED_HISTORY (1u << 20)
-static s_freed_debug s_freed_ring[SU_GC_DEBUG_FREED_HISTORY];
-static s_size s_freed_ring_next;
-
-static const s_freed_debug *debug_find_freed(const void *pointer) {
-    /* Search newest-first in case the same chunk address was recycled. */
-    for (s_size i = 0; i < SU_GC_DEBUG_FREED_HISTORY; ++i) {
-        s_size index = (s_freed_ring_next + SU_GC_DEBUG_FREED_HISTORY - 1 - i) %
-                       SU_GC_DEBUG_FREED_HISTORY;
-        if (s_freed_ring[index].pointer == pointer) return &s_freed_ring[index];
-    }
-    return NULL;
-}
-
 static s_size bucket_index(s_size rounded) {
     return (rounded - 1) / SU_HEAP_BUCKET;
 }
@@ -186,10 +165,6 @@ s_gcobj *s_heap_alloc(s_heap *h, s_obj_kind kind, s_u32 count, s_size payload_by
     h->live_objects++;
     h->live_bytes += rounded;
     h->total_bytes += rounded;
-    if (getenv("SURU_GC_DEBUG") && kind == S_OBJ_ARRAY && count >= 200) {
-        fprintf(stderr, "SURU GC: alloc large array %p count=%u live=%u\n",
-                (void *)o, (unsigned)count, (unsigned)h->live_objects);
-    }
 
     /* zero payload */
     char *payloadp = (char *)(o + 1);
@@ -266,26 +241,11 @@ void s_heap_remove_root(s_heap *h, s_value *slot) {
 /* Tri-color marking                                                    */
 /* ------------------------------------------------------------------ */
 
-/* Debug-only pointer membership check: pointer comparison is safe even
- * when a stale reference no longer points into a live object chunk. */
-static bool heap_contains_object(const s_heap *h, const s_gcobj *target) {
-    for (const s_gcobj *live = h->all_live; live; live = live->next_all) {
-        if (live == target) return true;
-    }
-    return false;
-}
-
 /* Queue a white object onto the grey worklist, turning it grey. */
-static void mark_push(s_heap *h, s_gcobj *o, const char *origin) {
-    if (getenv("SURU_GC_DEBUG") && !heap_contains_object(h, o)) {
-        fprintf(stderr, "SURU GC: stale object pointer %p from %s "
-                        "(live=%u)\n", (void *)o, origin, h->live_objects);
-        abort();
-    }
+static void mark_push(s_heap *h, s_gcobj *o) {
     if (o->magic != S_OBJ_MAGIC) {
         /* Corrupted object pointer; abort to surface the bug. */
-        fprintf(stderr, "SURU GC: corrupt object pointer %p from %s\n",
-                (void *)o, origin);
+        fprintf(stderr, "SURU GC: corrupt object pointer\n");
         abort();
     }
     if (o->colour != S_GC_WHITE) return;
@@ -305,9 +265,9 @@ static void mark_push(s_heap *h, s_gcobj *o, const char *origin) {
     h->mark_stack[h->mark_len++] = o;
 }
 
-static void mark_from_value(s_heap *h, s_value v, const char *origin) {
+static void mark_from_value(s_heap *h, s_value v) {
     if (v.tag == S_VAL_OBJ && v.u.o) {
-        mark_push(h, v.u.o, origin);
+        mark_push(h, v.u.o);
     }
 }
 
@@ -320,26 +280,7 @@ static bool mark_process_one(s_heap *h) {
         o->kind == S_OBJ_CLOSURE || o->kind == S_OBJ_EXCEPTION) {
         s_value *vals = s_obj_array_data(o);
         for (s_u32 i = 0; i < o->count; ++i) {
-            if (getenv("SURU_GC_DEBUG") &&
-                vals[i].tag == S_VAL_OBJ && vals[i].u.o &&
-                !heap_contains_object(h, vals[i].u.o)) {
-                const s_freed_debug *freed =
-                    debug_find_freed(vals[i].u.o);
-                fprintf(stderr,
-                        "SURU GC: stale child edge parent=%p kind=%u "
-                        "count=%u slot=%u child=%p",
-                        (void *)o, (unsigned)o->kind, (unsigned)o->count,
-                        (unsigned)i, (void *)vals[i].u.o);
-                if (freed) {
-                    fprintf(stderr, " freed-kind=%u freed-count=%u "
-                                    "freed-collection=%llu",
-                            (unsigned)freed->kind, (unsigned)freed->count,
-                            (unsigned long long)freed->collection);
-                }
-                fputc('\n', stderr);
-                abort();
-            }
-            mark_from_value(h, vals[i], "managed object child");
+            mark_from_value(h, vals[i]);
         }
     }
     o->colour = S_GC_BLACK;
@@ -349,11 +290,11 @@ static bool mark_process_one(s_heap *h) {
 static void seed_roots(s_heap *h) {
     if (h->stack_base) {
         for (s_size i = 0; i < h->stack_len; ++i) {
-            mark_from_value(h, h->stack_base[i], "operand stack");
+            mark_from_value(h, h->stack_base[i]);
         }
     }
     for (s_root_slot *r = h->roots; r; r = r->next) {
-        if (r->slot) mark_from_value(h, *r->slot, "registered root slot");
+        if (r->slot) mark_from_value(h, *r->slot);
     }
 }
 
@@ -394,7 +335,7 @@ void s_heap_write_barrier(s_heap *h, s_gcobj *dst, s_value v) {
     if (!h || !h->mark_active) return;
     if (dst->colour == S_GC_BLACK &&
         v.tag == S_VAL_OBJ && v.u.o && v.u.o->colour == S_GC_WHITE) {
-        mark_push(h, v.u.o, "write barrier");
+        mark_push(h, v.u.o);
     }
 }
 
@@ -425,13 +366,6 @@ bool s_heap_collect_incremental(s_heap *h, s_size budget) {
 }
 
 static void free_object(s_heap *h, s_gcobj *o) {
-    if (getenv("SURU_GC_DEBUG")) {
-        s_freed_ring[s_freed_ring_next] = (s_freed_debug){
-            o, (s_u32)o->kind, (s_u32)o->count, h->collections
-        };
-        s_freed_ring_next = (s_freed_ring_next + 1) %
-            SU_GC_DEBUG_FREED_HISTORY;
-    }
     h->live_objects--;
     h->live_bytes -= o->chunk_size;
     if (is_small(o->chunk_size)) {
