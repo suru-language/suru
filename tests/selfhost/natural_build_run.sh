@@ -45,9 +45,10 @@ fi
 # array/index, record/field, string concatenation and builtin calls.
 "$SURU" --syntax=natural compile "$ROOT/tests/natural/typed_expression_lowering.suru" \
     "$tmp/typed-expression-c.sbc"
+echo "checking typed expression AST lowering" >&2
 "$SURU" --syntax=natural --compiler=selfhost compile \
     "$ROOT/tests/natural/typed_expression_lowering.suru" \
-    "$tmp/typed-expression-self.sbc" >/dev/null 2>&1
+    "$tmp/typed-expression-self.sbc"
 cmp "$tmp/typed-expression-c.sbc" "$tmp/typed-expression-self.sbc"
 actual="$("$SURU" exec "$tmp/typed-expression-self.sbc" 2>/dev/null)"
 expected="$(printf '%s\n' -14 10 5 7 3)"
