@@ -1,7 +1,7 @@
 // Stage 2 managed heap seed, implemented entirely in SURU.
 //
-// Objects use stable integer handles. Each object occupies four strings in the
-// flat table: kind, colour/reserved, payload, and comma-separated child IDs.
+// Objects use stable integer handles. Each object occupies five strings in the
+// flat table: kind, colour, reserved capacity, payload, and child IDs.
 // An empty kind is a reclaimed slot. Strings, arrays, records, closures, and
 // exceptions all participate in the same object graph.
 //
@@ -35,23 +35,69 @@ func sh_parse_ids(encoded: str) -> [int] {
 }
 
 func sh_object_count(heap: [str]) -> int {
-    return array_len(heap) / 4;
+    return array_len(heap) / 5;
+}
+
+// Logical reservation size: a 32-byte header plus the encoded payload
+// and eight bytes per managed child handle, rounded up to a 16-byte class.
+// This tracks the SURU table representation; it is not a host malloc size.
+func sh_round_up_16(bytes: int) -> int {
+    return ((bytes + 15) / 16) * 16;
+}
+
+func sh_allocation_size(payload: str, children: [int]) -> int {
+    return sh_round_up_16(32 + str_len(payload) + array_len(children) * 8);
+}
+
+func sh_capacity(heap: [str], id: int) -> int {
+    if id < 0 or id >= sh_object_count(heap) { return 0; }
+    return int_from_str(heap[id * 5 + 2]);
+}
+
+// Small objects use ascending 16-byte size classes through 4096 bytes.
+// Large objects use first-fit reuse among free large slots.
+func sh_find_free(heap: [str], required: int) -> int {
+    let count: int = sh_object_count(heap);
+    if required <= 4096 {
+        mut size_class: int = required;
+        while size_class <= 4096 {
+            mut id: int = 0;
+            while id < count {
+                if heap[id * 5] == "" and sh_capacity(heap, id) == size_class {
+                    return id;
+                }
+                id += 1;
+            }
+            size_class += 16;
+        }
+    } else {
+        mut id: int = 0;
+        while id < count {
+            let capacity: int = sh_capacity(heap, id);
+            if heap[id * 5] == "" and capacity > 4096 and capacity >= required {
+                return id;
+            }
+            id += 1;
+        }
+    }
+    return count;
 }
 
 func sh_alloc(heap: [str], kind: str, payload: str, children: [int]) -> [str] {
     if kind == "" { return heap; }
     let encoded: str = sh_join_ids(children);
+    let required: int = sh_allocation_size(payload, children);
     let count: int = sh_object_count(heap);
-    mut id: int = 0;
-    while id < count and heap[id * 4] != "" { id += 1; }
+    let id: int = sh_find_free(heap, required);
     if id == count {
-        return array_concat(heap, [kind, "0", payload, encoded]);
+        return array_concat(heap, [kind, "0", to_str(required), payload, encoded]);
     }
     let next: [str] = heap;
-    next[id * 4] = kind;
-    next[id * 4 + 1] = "0";
-    next[id * 4 + 2] = payload;
-    next[id * 4 + 3] = encoded;
+    next[id * 5] = kind;
+    next[id * 5 + 1] = "0";
+    // Retain the capacity class of a reused slot.
+    next[id * 5 + 3] = payload;
+    next[id * 5 + 4] = encoded;
     return next;
 }
 
