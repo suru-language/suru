@@ -115,7 +115,7 @@ determinism-test: $(BINDIR)/suru
 		echo "determinism: bytecode outputs match"
 
 .PHONY: test
-test: unit integration selfhost-test
+test: unit selfhost-test integration
 
 .PHONY: selfhost-check
 selfhost-check: $(BINDIR)/suru $(SELFHOST_SRC) $(SELFHOST_DRIVERS)
