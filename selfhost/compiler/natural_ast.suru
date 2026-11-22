@@ -1,6 +1,6 @@
-// Initial Natural Syntax AST node representation.
-// The compiler will replace the textual payload with typed child nodes as the
-// full self-hosted AST is ported.
+// Stable statement/control AST API. Typed expression nodes live in the
+// separate natural_expression_ast module so the legacy Natural frontend can
+// continue to import this statement AST without depending on Stage 1 typing.
 
 type NAstNode {
     let kind: str;
@@ -23,8 +23,6 @@ type NAstModule {
     let error_message: str;
 }
 
-// Rehydrate a node emitted by the statement parser. Only the first three
-// separators are structural; expression text after them is kept intact.
 func na_find(text: str, needle: str, start: int) -> int {
     mut i: int = start;
     while i + str_len(needle) <= str_len(text) {
@@ -45,18 +43,4 @@ func na_from_rendered(rendered: str) -> NAstNode {
     let line: int = int_from_str(substr(rendered, second + 1, third - second - 1));
     let payload: str = substr(rendered, third + 1, str_len(rendered));
     return na_make(kind, line, payload);
-}
-
-type NAstExpr {
-    let kind: str;
-    let value: str;
-    let children: [int];
-}
-
-type NAstExprParse {
-    let ok: bool;
-    let next: int;
-    let root: int;
-    let nodes: [NAstExpr];
-    let message: str;
 }

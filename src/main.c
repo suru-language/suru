@@ -295,6 +295,12 @@ static int cmd_compile_natural(const char *path, const char *outpath,
          * regardless of the order slots are referenced in the body. */
         s_u32 slotmap[MAX_INS];
         s_u32 nslots = 0;
+        /* Parameter slots are part of the call ABI even when a parameter is
+         * unused in the body. Reserve 0..nparams-1 before collecting locals,
+         * otherwise a later used parameter is incorrectly compacted into an
+         * earlier argument's slot. */
+        for (s_u32 param = 0; param < fnparams[fi] && nslots < MAX_INS; ++param)
+            slotmap[nslots++] = param;
         for (s_u32 i = 0; i < nins; ++i) {
             if (fins[fi][i].op == BC_LD_LOCAL || fins[fi][i].op == BC_ST_LOCAL) {
                 s_u32 sid = fins[fi][i].a;

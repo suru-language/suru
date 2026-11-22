@@ -797,6 +797,19 @@ func nbc_expression_statement(instructions: [str], line: str) -> [str] {
     return nbc_emit_expression(result, line);
 }
 
+func nbc_attempt_fields(attempts: [str]) -> [str] {
+    let record: str = attempts[array_len(attempts) - 1];
+    let stable_record: str = substr(record, 0, str_len(record));
+    let fields: [str] = str_split(stable_record, "|");
+    mut copied: [str] = [];
+    mut i: int = 0;
+    while i < array_len(fields) {
+        copied = array_concat(copied, [substr(fields[i], 0, str_len(fields[i]))]);
+        i += 1;
+    }
+    return copied;
+}
+
 func nbc_next_handler_type(lines: [str], start: int) -> str {
     mut i: int = start;
     while i < array_len(lines) {
@@ -1218,7 +1231,7 @@ func nbc_collect(source: str) -> [str] {
         }
         if nbc_word(line) == "handle" {
             if array_len(attempts) == 0 { println("bytecode-error|handle outside attempt"); return ["#emit-failed"]; }
-            let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
+            let fields: [str] = nbc_attempt_fields(attempts);
             instructions = nbc_emit(instructions, "BC_POP_HANDLER", "");
             instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[1]);
             let handler_rest: str = nbc_after(line, "handle");
@@ -1240,7 +1253,7 @@ func nbc_collect(source: str) -> [str] {
         }
         if line == "ensure" {
             if array_len(attempts) == 0 { println("bytecode-error|ensure outside attempt"); return ["#emit-failed"]; }
-            let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
+            let fields: [str] = nbc_attempt_fields(attempts);
             if fields[3] == "1" {
                 instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[1]);
             }
@@ -1251,7 +1264,7 @@ func nbc_collect(source: str) -> [str] {
         }
         if line == "end exception" {
             if array_len(attempts) == 0 { println("bytecode-error|end exception outside attempt"); return ["#emit-failed"]; }
-            let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
+            let fields: [str] = nbc_attempt_fields(attempts);
             if fields[3] == "1" and next_line == "ensure" {
                 instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[1]);
             } else if fields[3] == "1" {
@@ -1263,7 +1276,7 @@ func nbc_collect(source: str) -> [str] {
         }
         if line == "end attempt" {
             if array_len(attempts) == 0 { println("bytecode-error|end attempt without attempt"); return ["#emit-failed"]; }
-            let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
+            let fields: [str] = nbc_attempt_fields(attempts);
             if fields[3] == "0" {
                 instructions = nbc_emit(instructions, "BC_POP_HANDLER", "");
                 instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[2]);
@@ -1281,7 +1294,7 @@ func nbc_collect(source: str) -> [str] {
                     instructions = nbc_emit_expression(instructions, value);
                     instructions = nbc_emit(instructions, "BC_POP", "");
                 }
-                let fields: [str] = str_split(attempts[array_len(attempts) - 1], "|");
+                let fields: [str] = nbc_attempt_fields(attempts);
                 if fields[3] == "2" {
                     instructions = nbc_emit(instructions, "BC_JMP", "@" + fields[2]);
                 } else {
