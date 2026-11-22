@@ -3,5 +3,21 @@ routine add(a: Whole, b: Whole) -> Whole
     give total
 end routine
 routine main() -> Unit
-    show(add(2, 3))
+    value result: Whole = 0
+    when true
+        set result to add(2, 1)
+        when false
+            set result to 99
+        otherwise
+            set result to result + 1
+        end when
+    otherwise when false
+        set result to 98
+    otherwise
+        set result to 97
+    end when
+    repeat while result < 5
+        set result to result + 1
+    end repeat
+    show(result)
 end routine
