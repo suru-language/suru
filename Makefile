@@ -194,6 +194,7 @@ selfhost-compare: $(BINDIR)/suru
 	@tests/selfhost/natural_vm_corpus_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_closure_run.sh $(BINDIR)/suru
 	@bash tests/selfhost/natural_vm_closure_string_run.sh $(BINDIR)/suru
+	@bash tests/selfhost/natural_vm_local_roots_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_exec_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_compile_run.sh $(BINDIR)/suru
