@@ -1,0 +1,6 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_ast_module.suru";
+
+func main() {
+    exit(nam_check(source_load(args(0))));
+}
