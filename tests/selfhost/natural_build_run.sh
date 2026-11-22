@@ -18,7 +18,7 @@ for input in "$ROOT"/tests/natural/*.suru; do
     if ! "$SURU" --syntax=natural compile "$input" "$tmp/c.sbc" 2>/dev/null; then
         continue
     fi
-    if "$SURU" run "$DIR/natural_build_driver.suru" \
+    if "$SURU" --syntax=natural --compiler=selfhost compile \
             "$input" "$tmp/b.sbc" >/dev/null 2>&1; then
         accepted=$((accepted + 1))
         tests=$((tests + 1))
@@ -31,7 +31,7 @@ done
 
 printf 'routine main() -> Unit\n    value x: Real = 1.5\n    value y: Real = 2.5\n    show(x + y)\nend routine\n' \
     > "$tmp/float.suru"
-"$SURU" run "$DIR/natural_build_driver.suru" \
+"$SURU" --syntax=natural --compiler=selfhost compile \
     "$tmp/float.suru" "$tmp/float.sbc" >/dev/null 2>&1
 actual="$("$SURU" --syntax=natural run "$tmp/float.suru" 2>/dev/null)"
 runout="$("$SURU" exec "$tmp/float.sbc" 2>/dev/null)"
@@ -46,7 +46,7 @@ fi
 # parameter so a leaked slot id would reverse the parameter-to-local mapping.
 "$SURU" --syntax=natural compile "$ROOT/tests/natural/per_function_slots.suru" \
     "$tmp/per-function-c.sbc"
-"$SURU" run "$DIR/natural_build_driver.suru" \
+"$SURU" --syntax=natural --compiler=selfhost compile \
     "$ROOT/tests/natural/per_function_slots.suru" "$tmp/per-function-self.sbc" \
     >/dev/null 2>&1
 cmp "$tmp/per-function-c.sbc" "$tmp/per-function-self.sbc"
