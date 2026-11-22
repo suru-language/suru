@@ -182,6 +182,31 @@ func main() {
         println("FAIL child reservation growth"); exit(1);
     }
 
+    // The GC scheduler counts allocations, saturates while a cycle is due,
+    // and tracks cumulative logical allocation bytes and completed cycles.
+    mut scheduled: [[str]] = sh_mark_idle([], ["0", "0", "0", "0"]);
+    mut allocation_index: int = 0;
+    while allocation_index < 520 {
+        scheduled = sh_alloc_incremental(
+            scheduled, "str", "x", no_children);
+        allocation_index += 1;
+    }
+    let pending_stats: [int] = sh_gc_stats(scheduled);
+    if pending_stats[0] != 512 or pending_stats[1] != 0 or
+       pending_stats[2] != 520 * 48 or pending_stats[3] != 0 {
+        println("FAIL GC allocation counters"); exit(1);
+    }
+    scheduled = sh_mark_begin_with_metrics(scheduled[0], [0], scheduled[2]);
+    while sh_mark_pending(scheduled) > 0 {
+        scheduled = sh_mark_step(scheduled, 2, no_roots);
+    }
+    scheduled = sh_mark_finish(scheduled);
+    let completed_stats: [int] = sh_gc_stats(scheduled);
+    if completed_stats[0] != 0 or completed_stats[1] != 1 or
+       completed_stats[2] != 520 * 48 or completed_stats[3] != 0 {
+        println("FAIL GC completion counters"); exit(1);
+    }
+
     println("SURU heap: reachability, cycles, write barrier, root reseeding, allocation shading and sweep passed");
     exit(0);
 }
