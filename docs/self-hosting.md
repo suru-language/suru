@@ -403,10 +403,14 @@ the operand stack. A C-vs-SURU VM regression captures a managed string and reads
 it inside the called routine; the existing closure parity fixture remains
 intact.
 
-Before each object allocation the interpreter currently runs a full SURU heap
-collection, seeding roots from its operand stack and all active call-frame
-locals. The incremental marking API is tested independently, but scheduling
-bounded incremental slices through every mutator is still open work.
+The interpreter advances a bounded mark slice (budget 128 objects) on
+each managed allocation, re-seeding roots from its operand stack and active
+call-frame locals. New objects are shaded grey during an active cycle, and
+mutable array/record writes use the tri-colour barrier when a black object gains
+a white child. When the grey queue drains, the VM sweeps and seeds the next
+cycle. The large self-hosted tokenizer VM corpus exercises repeated string
+allocation under this scheduler; the interval-one GC gate also covers the
+interpreter's host allocations.
 
 This remains a Stage 2 port, not a replacement for `src/mem.c` or the default
 C VM: the SURU interpreter itself still runs under the Stage 0 C17 VM. Porting
