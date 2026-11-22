@@ -105,6 +105,11 @@ func sh_set_children(heap: [str], id: int, children: [int]) -> [str] {
     if id < 0 or id >= sh_object_count(heap) { return heap; }
     if heap[id * 5] == "" { return heap; }
     let next: [str] = heap;
+    let payload: str = next[id * 5 + 3];
+    let required: int = sh_allocation_size(payload, children);
+    if required > sh_capacity(next, id) {
+        next[id * 5 + 2] = to_str(required);
+    }
     next[id * 5 + 4] = sh_join_ids(children);
     return next;
 }
@@ -113,6 +118,11 @@ func sh_set_payload(heap: [str], id: int, payload: str) -> [str] {
     if id < 0 or id >= sh_object_count(heap) { return heap; }
     if heap[id * 5] == "" { return heap; }
     let next: [str] = heap;
+    let children: [int] = sh_parse_ids(next[id * 5 + 4]);
+    let required: int = sh_allocation_size(payload, children);
+    if required > sh_capacity(next, id) {
+        next[id * 5 + 2] = to_str(required);
+    }
     next[id * 5 + 3] = payload;
     return next;
 }
@@ -135,6 +145,38 @@ func sh_children(heap: [str], id: int) -> [int] {
     let empty: [int] = [];
     if not sh_alive(heap, id) { return empty; }
     return sh_parse_ids(heap[id * 5 + 4]);
+}
+
+func sh_live_bytes(heap: [str]) -> int {
+    mut bytes: int = 0;
+    mut id: int = 0;
+    while id < sh_object_count(heap) {
+        if heap[id * 5] != "" { bytes += sh_capacity(heap, id); }
+        id += 1;
+    }
+    return bytes;
+}
+
+func sh_reserved_bytes(heap: [str]) -> int {
+    mut bytes: int = 0;
+    mut id: int = 0;
+    while id < sh_object_count(heap) {
+        bytes += sh_capacity(heap, id);
+        id += 1;
+    }
+    return bytes;
+}
+
+func sh_free_class_count(heap: [str], size_class: int) -> int {
+    mut count: int = 0;
+    mut id: int = 0;
+    while id < sh_object_count(heap) {
+        if heap[id * 5] == "" and sh_capacity(heap, id) == size_class {
+            count += 1;
+        }
+        id += 1;
+    }
+    return count;
 }
 
 func sh_live_count(heap: [str]) -> int {
