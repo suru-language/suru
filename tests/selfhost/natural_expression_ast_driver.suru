@@ -1,0 +1,6 @@
+use "../../selfhost/compiler/source.suru";
+use "../../selfhost/compiler/natural_expression_ast.suru";
+
+func main() {
+    exit(nea_check(source_load(args(0))));
+}

@@ -36,4 +36,12 @@ for input in expression_invalid.suru expression_unclosed.suru; do
     grep -q '^expr-error|' "$tmp/$input.out"
 done
 
+"$SURU" run "$DIR/natural_expression_ast_driver.suru" \
+    "$ROOT/tests/natural/expression_valid.suru" >"$tmp/typed-ast.out"
+grep -F -q 'expr-root|8' "$tmp/typed-ast.out"
+grep -F -q 'expr-node|3|binary|*|1,2' "$tmp/typed-ast.out"
+grep -F -q 'expr-node|4|binary|+|0,3' "$tmp/typed-ast.out"
+grep -F -q 'expr-node|6|binary|==|4,5' "$tmp/typed-ast.out"
+grep -F -q 'expr-node|8|binary|and|6,7' "$tmp/typed-ast.out"
+
 echo "natural expression parser: precedence and postfix corpus passed"
