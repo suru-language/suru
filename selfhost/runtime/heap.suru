@@ -244,7 +244,8 @@ func sh_mark_begin(heap: [str], roots: [int]) -> [[str]] {
 func sh_mark_idle(heap: [str], metrics: [str]) -> [[str]] {
     mut gc_metrics: [str] = metrics;
     gc_metrics[0] = "0";
-    return [heap, [], gc_metrics];
+    let no_work: [str] = [];
+    return [heap, no_work, gc_metrics];
 }
 
 func sh_mark_finish(state: [[str]]) -> [[str]] {
@@ -254,7 +255,8 @@ func sh_mark_finish(state: [[str]]) -> [[str]] {
     metrics[0] = "0";
     metrics[1] = "0";
     metrics[2] = to_str(int_from_str(metrics[2]) + 1);
-    return [swept, [], metrics];
+    let no_work: [str] = [];
+    return [swept, no_work, metrics];
 }
 
 func sh_gc_stats(state: [[str]]) -> [int] {
