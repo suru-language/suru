@@ -330,17 +330,28 @@ func nab_collect_ast(source: str) -> [str] {
             instructions = nbc_emit(instructions, "BC_JZ", "@" + loop_end);
             controls = array_concat(controls,
                 ["each|" + item_name + "|" + limit_name + "|" +
-                 loop_start + "|" + loop_end]);
+                 loop_start + "|" + loop_end + "|" + bound_word]);
         } else if kind == "end-each" {
             if array_len(controls) == 0 {
                 return nab_fail("end each without an open each");
             }
             let current: [str] = str_split(controls[array_len(controls) - 1], "|");
-            if array_len(current) < 5 or current[0] != "each" {
+            if array_len(current) < 6 or current[0] != "each" {
                 return nab_fail("mismatched each terminator");
             }
             let item_slot: int = nbc_slot(instructions, current[1]);
-            if item_slot < 0 { return nab_fail("missing each binding slot"); }
+            let limit_slot: int = nbc_slot(instructions, current[2]);
+            if item_slot < 0 or limit_slot < 0 {
+                return nab_fail("missing each iterator or limit slot");
+            }
+            // A through loop must stop before incrementing its maximum bound;
+            // otherwise the final increment could overflow Whole.
+            if current[5] == "through" {
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(item_slot));
+                instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(limit_slot));
+                instructions = nbc_emit(instructions, "BC_EQ_I", "");
+                instructions = nbc_emit(instructions, "BC_JNZ", "@" + current[4]);
+            }
             instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(item_slot));
             instructions = nbc_const(instructions, "int", "BC_CONST_INT", "1");
             instructions = nbc_emit(instructions, "BC_ADD_I", "");
