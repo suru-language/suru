@@ -319,10 +319,11 @@ SURU-writer bytecode with the reference and executes the result.
 The full SURU VM, managed runtime/GC, native backend completion, and
 C-independent self-rebuild remain later acceptance gates.
 The next Stage 1 AST increment adds `NAstModule`, a typed collection of
-`NAstNode` records. The current statement parser's serialized node records are
-rehydrated into the module array; the module driver is compared byte-for-byte
-with the existing statement AST output for bindings, assignments, show/give,
-routine-expression initializers, and invalid-binding diagnostics. Expression
-payloads are still source-shaped text at this point. The next compiler step is
-to replace those payloads with typed expression children and make bytecode
-lowering consume the AST instead of rescanning source lines.
+`NAstNode` records with parse-error metadata. The statement parser's serialized
+nodes are rehydrated into the module array. The module driver is compared
+byte-for-byte with the existing statement and control AST drivers for bindings,
+assignments, show/give, routine-expression initializers, `when`/`otherwise`,
+`repeat`, `each`, `choose`/`case`, and invalid statement/control diagnostics.
+Expression payloads are still source-shaped text at this point. The next
+compiler step is to replace those payloads with typed expression children and
+make bytecode lowering consume the AST instead of rescanning source lines.

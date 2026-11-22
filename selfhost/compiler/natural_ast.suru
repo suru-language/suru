@@ -18,6 +18,7 @@ func na_render(node: NAstNode) -> str {
 
 type NAstModule {
     let nodes: [NAstNode];
+    let error_kind: str;
     let error_line: int;
     let error_message: str;
 }
