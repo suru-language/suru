@@ -17,14 +17,6 @@ routine main() -> Unit
     end repeat
     show(result)
     show(add(2, 3))
-    value sum: Whole = 0
-    each index from 0 until 4
-        set sum to sum + index
-    end each
-    show(sum)
-    each j from 1 through 3
-        show(j)
-    end each
 end routine
 routine add(a: Whole, b: Whole) -> Whole
     value total: Whole = a + b
