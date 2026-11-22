@@ -372,6 +372,67 @@ and preservation of fixed parameter positions during slot compaction. The build 
 SURU-writer bytecode with the reference and executes the result.
 The full SURU VM, managed runtime/GC, native backend completion, and
 C-independent self-rebuild remain later acceptance gates.
+
+### Stage 2: SURU-managed heap foundation
+
+`selfhost/runtime/heap.suru` begins the managed-memory port in SURU. It
+represents heap objects using stable integer handles and a flat object table,
+with a kind, payload, and child-reference list for strings, arrays, records,
+closures, and exceptions. Its mark/sweep pass seeds roots and traverses the object graph
+iteratively, safely collects unreachable cycles, and reuses reclaimed handle
+slots. The incremental API advances a bounded number of grey objects per
+slice, re-seeds roots on each slice, shades new allocations during a mark
+cycle, and applies a tri-colour write barrier when a black object receives a
+white child. Allocation slots now retain a logical reservation size: small
+objects use ascending 16-byte classes through 4096 bytes, and larger slots use
+first-fit reuse when their capacity is sufficient. Sweeping retains the
+capacity class, while payload/reference growth raises the reservation without
+changing the stable handle. Live/reserved object and byte snapshots, including free-slot counts, are
+exposed for tests and threshold tuning; byte values are logical SURU table
+estimates, not measurements of host memory. The incremental state also tracks
+allocations since the last completed cycle, completed cycle count, cumulative
+logical allocation bytes, the current threshold, and the cycle's before-live
+snapshot. The heap module implements and tests the C VM's 512-allocation /
+1 MiB live-byte trigger and four-times-survivor threshold adaptation, including
+minimum/maximum clamps and the high-survival anti-thrashing rule. The
+SURU-written VM currently advances a bounded 128-object mark slice at every
+managed allocation; wiring the C-compatible interval/threshold trigger into
+the VM remains gated on complete runtime safepoint and root coverage. This
+conservative schedule is the version validated against the full VM corpus.
+The regression driver exercises shared references, unreachable cycles,
+exception causes, dropping roots, full reclamation, class-aware slot reuse,
+large first-fit reuse, capacity growth, incremental root discovery, allocation
+shading, write barriers, and trigger/threshold policy.
+
+The SURU-written interpreter in `natural_vm.suru` now stores text
+constants/results, bytecode arrays, records, and typed exceptions as managed
+heap handles. String concatenation, comparisons, printing/conversion, length,
+substring, and contains operations resolve managed strings through the heap.
+Array/field reads and writes dereference handles; nested object references are
+recorded in the object graph, and shared aliases observe mutations through the
+same handle. Exception objects retain managed type and message strings and a
+managed cause link; typed handler dispatch matches the exception type name.
+Closure values are also managed objects. A closure with captures owns a
+managed environment array, and the closure records that array as a child.
+Calling the closure installs the environment handle in the new call frame, so
+captured handles remain visible to root scanning after the closure value leaves
+the operand stack. A C-vs-SURU VM regression captures a managed string and reads
+it inside the called routine; the existing closure parity fixture remains
+intact.
+
+The interpreter advances a bounded mark slice (budget 128 objects) on
+each managed allocation, re-seeding roots from its operand stack and active
+call-frame locals. New objects are shaded grey during an active cycle, and
+mutable array/record writes use the tri-colour barrier when a black object gains
+a white child. When the grey queue drains, the VM sweeps and seeds the next
+cycle. The large self-hosted tokenizer VM corpus exercises repeated string
+allocation under this scheduler; the interval-one GC gate also covers the
+interpreter's host allocations.
+
+This remains a Stage 2 port, not a replacement for `src/mem.c` or the default
+C VM: the SURU interpreter itself still runs under the Stage 0 C17 VM. Porting
+allocation accounting/reuse policy parity and making the native/default runtime
+independent of C remain open work.
 The next Stage 1 AST increment adds `NAstModule`, a typed collection of
 `NAstNode` records with parse-error metadata. The statement parser's serialized
 nodes are rehydrated into the module array. The module driver is compared

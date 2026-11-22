@@ -29,7 +29,7 @@ run_case() {
     fi
     if ! s=$("$SURU" run "$DIR/natural_vm_driver.suru" \
             "$tmp/$name.sbc" 2>&1); then
-        echo "FAIL $name: SURU VM failed" >&2
+        echo "FAIL $name: SURU VM failed: [$s]" >&2
         fail=$((fail + 1))
         return
     fi
@@ -43,6 +43,9 @@ run_case hello 'routine main() -> Unit\n    show("hi")\nend routine'
 run_case arith 'routine main() -> Unit\n    show(to_str(1 + 2 * 3))\n    show(to_str(9 - 4))\nend routine'
 run_case neg 'routine main() -> Unit\n    show(to_str(0 - 5))\nend routine'
 run_case concat 'routine main() -> Unit\n    show("foo" + "bar")\nend routine'
+run_case strcmp 'routine main() -> Unit\n    show("a" < "b")\n    show("same" == "same")\n    show("z" >= "a")\nend routine'
+run_case strbuiltins 'routine main() -> Unit\n    show(str_len("hello"))\n    show(substr("hello", 1, 3))\n    show(str_contains("alphabet", "pha"))\nend routine'
+run_case tostring 'routine main() -> Unit\n    show(to_str(42))\n    show(to_str(1.5))\nend routine'
 run_case floatadd 'routine main() -> Unit\n    show(1.5 + 2.5)\nend routine'
 run_case floatmul 'routine main() -> Unit\n    show(2.0 * 3.0)\nend routine'
 run_case cmp 'routine main() -> Unit\n    show(3 < 5)\n    show(5 >= 5)\nend routine'
@@ -52,6 +55,9 @@ run_case call 'routine double(x: Whole) -> Whole\n    give x * 2\nend routine\nr
 run_case fib 'routine fib(n: Whole) -> Whole\n    when n < 2\n        give n\n    otherwise\n        give fib(n - 1) + fib(n - 2)\n    end when\nend routine\nroutine main() -> Unit\n    show(to_str(fib(6)))\nend routine'
 run_case arr 'routine main() -> Unit\n    value xs: [Whole] = [10, 20, 30]\n    show(xs[1])\nend routine'
 run_case arrset 'routine main() -> Unit\n    value xs: [Whole] = [1, 2]\n    set xs[0] to 9\n    show(xs[0])\nend routine'
+run_case aliasarr 'routine main() -> Unit\n    value xs: [Whole] = [1, 2]\n    value alias: [Whole] = xs\n    set xs[0] to 9\n    show(alias[0])\nend routine'
+run_case nestedarr 'routine main() -> Unit\n    value inner: [Whole] = [7, 8]\n    value outer = [inner]\n    show(outer[0][1])\nend routine'
+run_case recordarr 'record Holder\n    change items: [Whole]\nend record\nroutine main() -> Unit\n    value xs: [Whole] = [3, 4]\n    value box: Holder = none\n    set box.items to xs\n    show(box.items[1])\nend routine'
 run_case rec 'record Point\n    change x: Whole\n    change y: Whole\nend record\nroutine main() -> Unit\n    value p: Point = none\n    set p.x to 3\n    set p.y to 4\n    show(p.x + p.y)\nend routine'
 run_case recparam 'record Point\n    change x: Whole\nend record\nroutine f(n: Whole, p: Point) -> Whole\n    give p.x + n\nend routine\nroutine main() -> Unit\n    value p: Point = none\n    set p.x to 5\n    show(f(2, p))\nend routine'
 run_case handled 'routine handled() -> Unit\n    attempt\n        show("try")\n    handle problem: FileError\n        show("handled")\n    end exception\n    ensure\n        show("cleanup")\n    end exception\n    give\nend attempt\nend routine'

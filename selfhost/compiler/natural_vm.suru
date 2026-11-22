@@ -4,12 +4,14 @@
 // emitting output through SURU's own print/println. Differential parity with
 // the C VM is the acceptance gate.
 //
-// Values on the interpreter stack are encoded as single-character-tagged
-// strings: "I"<int>, "S"<str>, "B1"/"B0", "N" (none/unit). Surfacing only the
-// subset used by the corpus test programs (constants, locals, int arithmetic,
-// int/string comparison, control flow, print/println/to_str, returns).
+// Interpreter immediates use tagged strings. Text, arrays, and records use
+// "H"<stable heap handle>; closure capture environments and exception records
+// retain transitional inline encodings. The SURU heap traces handles from the
+// operand stack, all call-frame locals, closure environments, and exception
+// causes before object allocation.
 
 use "natural_module_reader.suru";
+use "../runtime/heap.suru";
 
 func vm_tag(enc: str) -> int {
     if enc[0] == "I" { return 1; }
@@ -28,7 +30,11 @@ func vm_pop(stack: [str]) -> [str] {
     return slice(stack, 0, array_len(stack) - 1);
 }
 
-func vm_to_str(enc: str) -> str {
+func vm_to_str(enc: str, heap: [str]) -> str {
+    let handle: int = vm_handle_id(enc);
+    if handle >= 0 and sh_kind(heap, handle) == "str" {
+        return sh_payload(heap, handle);
+    }
     let tag: int = vm_tag(enc);
     if tag == 1 { return to_str(int_from_str(substr(enc, 1, str_len(enc)))); }
     if tag == 2 { return substr(enc, 1, str_len(enc)); }
@@ -67,6 +73,86 @@ func vm_rec_build(count: int, elems: [str]) -> str {
         i += 1;
     }
     return out;
+}
+
+func vm_handle_id(enc: str) -> int {
+    if str_len(enc) < 2 or enc[0] != "H" { return -1; }
+    return int_from_str(substr(enc, 1, str_len(enc)));
+}
+
+func vm_heap_refs(values: [str]) -> [int] {
+    mut refs: [int] = [];
+    mut i: int = 0;
+    while i < array_len(values) {
+        let value: str = values[i];
+        let direct: int = vm_handle_id(value);
+        if direct >= 0 {
+            refs = array_concat(refs, [direct]);
+        } else if str_len(value) > 0 and value[0] == "C" {
+            // Closures still use the existing inline callable encoding. Trace
+            // managed handles embedded in their captured environment.
+            let bar: int = nbc_find(value, "|");
+            if bar >= 0 {
+                let env: str = substr(value, bar + 1, str_len(value));
+                let captured: [str] = vm_arr_parts(env);
+                mut j: int = 0;
+                while j < array_len(captured) {
+                    let child: int = vm_handle_id(captured[j]);
+                    if child >= 0 { refs = array_concat(refs, [child]); }
+                    j += 1;
+                }
+            }
+        } else if str_len(value) > 0 and value[0] == "X" {
+            // The exception's cause is the tail after type and message.
+            let first_bar: int = nbc_find(value, "|");
+            let second_bar: int = first_bar < 0 ? -1 :
+                nbc_find(substr(value, first_bar + 1, str_len(value)), "|");
+            if first_bar >= 0 and second_bar >= 0 {
+                let cause_at: int = first_bar + second_bar + 1;
+                let cause: str = substr(value, cause_at + 1, str_len(value));
+                let child: int = vm_handle_id(cause);
+                if child >= 0 { refs = array_concat(refs, [child]); }
+            }
+        }
+        i += 1;
+    }
+    return refs;
+}
+
+func vm_heap_roots(stack: [str], frames: [[str]]) -> [int] {
+    mut roots: [int] = vm_heap_refs(stack);
+    mut frame: int = 0;
+    while frame < array_len(frames) {
+        roots = array_concat(roots, vm_heap_refs(frames[frame]));
+        frame += 1;
+    }
+    return roots;
+}
+
+// Advance bounded marking during each allocation. This schedule is the
+// currently validated VM integration: it keeps the collector making progress
+// while roots are available at allocation safepoints. The C-compatible
+// interval/threshold policy is implemented and tested in heap.suru, but its
+// VM integration remains gated on complete mutator-root/safepoint coverage.
+func vm_heap_alloc(state: [[str]], stack: [str], frames: [[str]],
+                   kind: str, payload: str, children: [int]) -> [[str]] {
+    let roots: [int] = vm_heap_roots(stack, frames);
+    mut next: [[str]] = [state[0], state[1], state[2]];
+    next = sh_mark_step(next, 128, roots);
+    if sh_mark_pending(next) == 0 {
+        next = sh_mark_finish(next);
+        next = sh_mark_begin_with_metrics(next[0], roots, next[2]);
+    }
+    let required: int = sh_allocation_size(payload, children);
+    let id: int = sh_find_free(next[0], required);
+    next = sh_alloc_incremental(next, kind, payload, children);
+    return [next[0], next[1], next[2], ["H" + to_str(id)]];
+}
+
+func vm_alloc_string(state: [[str]], stack: [str],
+                     frames: [[str]], value: str) -> [[str]] {
+    let no_children: [int] = [];
+    return vm_heap_alloc(state, stack, frames, "str", value, no_children);
 }
 
 func natural_run_module(bytes: str) -> int {
@@ -169,6 +255,13 @@ func natural_run_module(bytes: str) -> int {
     fr_locals = array_concat(fr_locals, [loc0]);
 
     mut stack: [str] = [];
+    mut heap: [str] = [];
+    let initial_roots: [int] = [];
+    let initial_gc_metrics: [str] = [
+        "1", "0", "0", "0", "1048576", "1048576", "0"
+    ];
+    mut gc_state: [[str]] = sh_mark_begin_with_metrics(
+        heap, initial_roots, initial_gc_metrics);
     mut hdlrs: [str] = [];
     mut hdlr_frames: [int] = [];
     mut guard: int = 0;
@@ -192,7 +285,10 @@ func natural_run_module(bytes: str) -> int {
         } else if op == 2 {
             stack = vm_push(stack, "F" + f64_to_str(flpool[a]));
         } else if op == 3 {
-            stack = vm_push(stack, "S" + strpool[a]);
+            let allocated: [[str]] = vm_alloc_string(gc_state, stack, fr_locals, strpool[a]);
+            heap = allocated[0];
+            gc_state = slice(allocated, 0, 3);
+            stack = vm_push(stack, allocated[3][0]);
         } else if op == 4 {
             stack = vm_push(stack, "N");
         } else if op == 5 {
@@ -269,15 +365,6 @@ func natural_run_module(bytes: str) -> int {
             else if op == 33 { r = iv > jv; }
             else { r = iv >= jv; }
             stack = vm_push(stack, r ? "I1" : "I0");
-        } else if op == 47 {
-            let n: int = array_len(stack);
-            let y: str = stack[n - 1];
-            let x: str = stack[n - 2];
-            stack = vm_pop(stack);
-            stack = vm_pop(stack);
-            let sx: str = substr(x, 1, str_len(x));
-            let sy: str = substr(y, 1, str_len(y));
-            stack = vm_push(stack, "S" + sx + sy);
         } else if op == 23 or op == 24 {
             let n: int = array_len(stack);
             let y: str = stack[n - 1];
@@ -288,15 +375,56 @@ func natural_run_module(bytes: str) -> int {
             let yb: bool = substr(y, 1, str_len(y)) == "1";
             let r: bool = op == 23 ? (xb and yb) : (xb or yb);
             stack = vm_push(stack, r ? "I1" : "I0");
-        } else if op == 41 {
+        } else if op == 41 or op == 42 or op == 43 or
+                  op == 44 or op == 45 or op == 46 {
             let n: int = array_len(stack);
             let y: str = stack[n - 1];
             let x: str = stack[n - 2];
             stack = vm_pop(stack);
             stack = vm_pop(stack);
-            let sx: str = substr(x, 1, str_len(x));
-            let sy: str = substr(y, 1, str_len(y));
-            stack = vm_push(stack, sx == sy ? "I1" : "I0");
+            let sx: str = vm_to_str(x, heap);
+            let sy: str = vm_to_str(y, heap);
+            let compared: int = str_compare(sx, sy);
+            mut result: bool = false;
+            if op == 41 { result = compared == 0; }
+            else if op == 42 { result = compared != 0; }
+            else if op == 43 { result = compared < 0; }
+            else if op == 44 { result = compared <= 0; }
+            else if op == 45 { result = compared > 0; }
+            else { result = compared >= 0; }
+            stack = vm_push(stack, result ? "I1" : "I0");
+        } else if op == 47 {
+            let n: int = array_len(stack);
+            let right: str = stack[n - 1];
+            let left: str = stack[n - 2];
+            let left_text: str = vm_to_str(left, heap);
+            let right_text: str = vm_to_str(right, heap);
+            let allocated: [[str]] = vm_alloc_string(gc_state, stack, fr_locals, left_text + right_text);
+            heap = allocated[0];
+            gc_state = slice(allocated, 0, 3);
+            stack = vm_pop(stack);
+            stack = vm_pop(stack);
+            stack = vm_push(stack, allocated[3][0]);
+        } else if op == 48 {
+            let n: int = array_len(stack);
+            let repeats: int = int_from_str(substr(stack[n - 1], 1, str_len(stack[n - 1])));
+            let source_text: str = vm_to_str(stack[n - 2], heap);
+            let source_len: int = str_len(source_text);
+            if repeats < 0 or (source_len > 0 and repeats > 16777216 / source_len) {
+                return 7;
+            }
+            mut result_text: str = "";
+            mut repeat_index: int = 0;
+            while repeat_index < repeats {
+                result_text = result_text + source_text;
+                repeat_index += 1;
+            }
+            let allocated: [[str]] = vm_alloc_string(gc_state, stack, fr_locals, result_text);
+            heap = allocated[0];
+            gc_state = slice(allocated, 0, 3);
+            stack = vm_pop(stack);
+            stack = vm_pop(stack);
+            stack = vm_push(stack, allocated[3][0]);
         } else if op == 51 {
             let n: int = array_len(stack);
             let cnt: int = a;
@@ -306,10 +434,15 @@ func natural_run_module(bytes: str) -> int {
                 elems = array_concat(elems, [stack[n - cnt + k]]);
                 k += 1;
             }
-            let ar: str = vm_arr_build(cnt, elems);
+            // One bounded mark slice runs while operands remain VM roots.
+            let payload: str = vm_arr_build(cnt, elems);
+            let allocated: [[str]] = vm_heap_alloc(
+                gc_state, stack, fr_locals, "array", payload, vm_heap_refs(elems));
+            heap = allocated[0];
+            gc_state = slice(allocated, 0, 3);
             k = 0;
             while k < cnt { stack = vm_pop(stack); k += 1; }
-            stack = vm_push(stack, ar);
+            stack = vm_push(stack, allocated[3][0]);
         } else if op == 54 {
             let n: int = array_len(stack);
             let iv: str = stack[n - 1];
@@ -317,8 +450,15 @@ func natural_run_module(bytes: str) -> int {
             stack = vm_pop(stack);
             stack = vm_pop(stack);
             let idx: int = int_from_str(substr(iv, 1, str_len(iv)));
-            let parts: [str] = vm_arr_parts(ar);
-            stack = vm_push(stack, parts[idx]);
+            if str_len(ar) > 0 and ar[0] == "H" {
+                let obj_id: int = vm_handle_id(ar);
+                let parts: [str] = vm_arr_parts(sh_payload(heap, obj_id));
+                stack = vm_push(stack, parts[idx]);
+            } else {
+                // Legacy bytecode fixtures may still pass inline capture arrays.
+                let parts: [str] = vm_arr_parts(ar);
+                stack = vm_push(stack, parts[idx]);
+            }
         } else if op == 55 {
             let n: int = array_len(stack);
             let val: str = stack[n - 1];
@@ -328,24 +468,50 @@ func natural_run_module(bytes: str) -> int {
             stack = vm_pop(stack);
             stack = vm_pop(stack);
             let idx: int = int_from_str(substr(iv, 1, str_len(iv)));
-            let parts: [str] = vm_arr_parts(ar);
-            let cnt: int = array_len(parts);
-            parts[idx] = val;
-            let newar: str = vm_arr_build(cnt, parts);
-            mut k: int = 0;
-            while k < array_len(locals) {
-                if locals[k] == ar { locals[k] = newar; }
-                k += 1;
+            if str_len(ar) > 0 and ar[0] == "H" {
+                let obj_id: int = vm_handle_id(ar);
+                let parts: [str] = vm_arr_parts(sh_payload(heap, obj_id));
+                let cnt: int = array_len(parts);
+                parts[idx] = val;
+                let payload: str = vm_arr_build(cnt, parts);
+                heap = sh_set_payload(heap, obj_id, payload);
+                gc_state[0] = heap;
+                gc_state = sh_set_children_incremental(gc_state, obj_id,
+                                                        vm_heap_refs(parts));
+                heap = gc_state[0];
+                stack = vm_push(stack, ar);
+            } else {
+                // Preserve immutable-inline update semantics for legacy closure fixtures;
+                // current closure environments use managed array handles.
+                let parts: [str] = vm_arr_parts(ar);
+                let cnt: int = array_len(parts);
+                parts[idx] = val;
+                let newar: str = vm_arr_build(cnt, parts);
+                mut k: int = 0;
+                while k < array_len(locals) {
+                    if locals[k] == ar { locals[k] = newar; }
+                    k += 1;
+                }
+                fr_locals[top] = locals;
+                stack = vm_push(stack, newar);
             }
-            fr_locals[top] = locals;
-            stack = vm_push(stack, newar);
         } else if op == 56 {
             let n: int = array_len(stack);
             let ar: str = stack[n - 1];
             stack = vm_pop(stack);
-            stack = vm_push(stack, "I" + to_str(vm_arr_count(ar)));
+            if str_len(ar) > 0 and ar[0] == "H" {
+                let obj_id: int = vm_handle_id(ar);
+                stack = vm_push(stack, "I" + to_str(vm_arr_count(sh_payload(heap, obj_id))));
+            } else {
+                stack = vm_push(stack, "I" + to_str(vm_arr_count(ar)));
+            }
         } else if op == 60 {
-            stack = vm_push(stack, "C" + to_str(a));
+            let no_children: [int] = [];
+            let allocated: [[str]] = vm_heap_alloc(
+                gc_state, stack, fr_locals, "closure", to_str(a), no_children);
+            heap = allocated[0];
+            gc_state = slice(allocated, 0, 3);
+            stack = vm_push(stack, allocated[3][0]);
         } else if op == 61 {
             let n: int = array_len(stack);
             let cnt: int = b;
@@ -355,10 +521,26 @@ func natural_run_module(bytes: str) -> int {
                 elems = array_concat(elems, [stack[n - cnt + k]]);
                 k += 1;
             }
-            let env: str = vm_arr_build(cnt, elems);
+            // Materialize the capture environment as a managed array first.
+            // The environment handle remains on the operand stack while its
+            // closure is allocated, so incremental marking sees it as a root.
+            let env_payload: str = vm_arr_build(cnt, elems);
+            let env_allocated: [[str]] = vm_heap_alloc(
+                gc_state, stack, fr_locals, "array", env_payload, vm_heap_refs(elems));
+            heap = env_allocated[0];
+            gc_state = slice(env_allocated, 0, 3);
+            let env_handle: str = env_allocated[3][0];
+            let env_id: int = vm_handle_id(env_handle);
             k = 0;
             while k < cnt { stack = vm_pop(stack); k += 1; }
-            stack = vm_push(stack, "C" + to_str(a) + "|" + env);
+            stack = vm_push(stack, env_handle);
+            let closure_allocated: [[str]] = vm_heap_alloc(
+                gc_state, stack, fr_locals, "closure",
+                to_str(a) + "|" + env_handle, [env_id]);
+            heap = closure_allocated[0];
+            gc_state = slice(closure_allocated, 0, 3);
+            stack = vm_pop(stack);
+            stack = vm_push(stack, closure_allocated[3][0]);
         } else if op == 62 {
             let nargs: int = a;
             let nn: int = array_len(stack);
@@ -372,18 +554,35 @@ func natural_run_module(bytes: str) -> int {
             while k < nargs { stack = vm_pop(stack); k += 1; }
             let cl: str = stack[array_len(stack) - 1];
             stack = vm_pop(stack);
-            let bar: int = nbc_find(cl, "|");
-            let fid2: int = bar < 0 ?
-                int_from_str(substr(cl, 1, str_len(cl) - 1)) :
-                int_from_str(substr(cl, 1, bar - 1));
-            let has_env: bool = bar >= 0;
+            let closure_id: int = vm_handle_id(cl);
+            mut fid2: int = -1;
             mut callee: [str] = [];
-            if has_env {
-                let env2: str = substr(cl, bar + 1, str_len(cl));
-                callee = array_concat([env2], args);
+            if closure_id >= 0 and sh_kind(heap, closure_id) == "closure" {
+                let payload: str = sh_payload(heap, closure_id);
+                let bar: int = nbc_find(payload, "|");
+                fid2 = bar < 0 ? int_from_str(payload) :
+                    int_from_str(substr(payload, 0, bar));
+                if bar >= 0 {
+                    let env: str = substr(payload, bar + 1, str_len(payload));
+                    callee = array_concat([env], args);
+                } else {
+                    callee = args;
+                }
             } else {
-                callee = args;
+                // Transitional compatibility for older bytecode fixtures that still
+                // encode closure values inline rather than as managed handles.
+                let bar: int = nbc_find(cl, "|");
+                fid2 = bar < 0 ?
+                    int_from_str(substr(cl, 1, str_len(cl) - 1)) :
+                    int_from_str(substr(cl, 1, bar - 1));
+                if bar >= 0 {
+                    let env: str = substr(cl, bar + 1, str_len(cl));
+                    callee = array_concat([env], args);
+                } else {
+                    callee = args;
+                }
             }
+            if fid2 < 0 or fid2 >= array_len(fn_frames) { return 8; }
             let cf: int = fn_frames[fid2];
             while array_len(callee) < cf { callee = array_concat(callee, ["N"]); }
             fr_fid = array_concat(fr_fid, [fid2]);
@@ -399,15 +598,20 @@ func natural_run_module(bytes: str) -> int {
                 elems = array_concat(elems, [stack[n - cnt + k]]);
                 k += 1;
             }
-            let rec: str = vm_rec_build(cnt, elems);
+            let payload: str = vm_rec_build(cnt, elems);
+            let allocated: [[str]] = vm_heap_alloc(
+                gc_state, stack, fr_locals, "record", payload, vm_heap_refs(elems));
+            heap = allocated[0];
+            gc_state = slice(allocated, 0, 3);
             k = 0;
             while k < cnt { stack = vm_pop(stack); k += 1; }
-            stack = vm_push(stack, rec);
+            stack = vm_push(stack, allocated[3][0]);
         } else if op == 57 {
             let n: int = array_len(stack);
             let rec: str = stack[n - 1];
             stack = vm_pop(stack);
-            let parts: [str] = vm_arr_parts(rec);
+            let obj_id: int = vm_handle_id(rec);
+            let parts: [str] = vm_arr_parts(sh_payload(heap, obj_id));
             stack = vm_push(stack, parts[b]);
         } else if op == 58 {
             let n: int = array_len(stack);
@@ -415,17 +619,17 @@ func natural_run_module(bytes: str) -> int {
             let rec: str = stack[n - 2];
             stack = vm_pop(stack);
             stack = vm_pop(stack);
-            let parts: [str] = vm_arr_parts(rec);
+            let obj_id: int = vm_handle_id(rec);
+            let parts: [str] = vm_arr_parts(sh_payload(heap, obj_id));
             let cnt: int = array_len(parts);
             parts[b] = val;
-            let newrec: str = vm_rec_build(cnt, parts);
-            mut k: int = 0;
-            while k < array_len(locals) {
-                if locals[k] == rec { locals[k] = newrec; }
-                k += 1;
-            }
-            fr_locals[top] = locals;
-            stack = vm_push(stack, newrec);
+            let payload: str = vm_rec_build(cnt, parts);
+            heap = sh_set_payload(heap, obj_id, payload);
+            gc_state[0] = heap;
+            gc_state = sh_set_children_incremental(gc_state, obj_id,
+                                                    vm_heap_refs(parts));
+            heap = gc_state[0];
+            stack = vm_push(stack, rec);
         } else if op == 59 {
             let nargs: int = fn_nparams[a];
             mut callee: [str] = [];
@@ -457,25 +661,46 @@ func natural_run_module(bytes: str) -> int {
             }
         } else if op == 53 {
             let n: int = array_len(stack);
-            let typ: str = stack[n - 1];
+            let cause: str = stack[n - 1];
             let msg: str = stack[n - 2];
-            let cause: str = stack[n - 3];
+            let typ: str = stack[n - 3];
+            let type_text: str = vm_to_str(typ, heap);
+            let message_text: str = vm_to_str(msg, heap);
+            let allocated: [[str]] = vm_heap_alloc(
+                gc_state, stack, fr_locals, "exception",
+                type_text + "|" + message_text, vm_heap_refs([typ, msg, cause]));
+            heap = allocated[0];
+            gc_state = slice(allocated, 0, 3);
             stack = vm_pop(stack);
             stack = vm_pop(stack);
             stack = vm_pop(stack);
-            stack = vm_push(stack, "X" + typ + "|" + msg + "|" + cause);
+            stack = vm_push(stack, allocated[3][0]);
         } else if op == 71 {
             let n: int = array_len(stack);
             let ex: str = stack[n - 1];
             stack = vm_pop(stack);
+            let exception_id: int = vm_handle_id(ex);
+            mut exception_type: str = "";
+            if exception_id >= 0 and sh_kind(heap, exception_id) == "exception" {
+                let payload: str = sh_payload(heap, exception_id);
+                let separator: int = nbc_find(payload, "|");
+                exception_type = separator < 0 ? payload :
+                    substr(payload, 0, separator);
+            } else {
+                let separator: int = nbc_find(ex, "|");
+                let encoded_type: str = separator < 0 ? "" :
+                    substr(ex, 1, separator - 1);
+                exception_type = vm_to_str(encoded_type, heap);
+            }
             mut found: bool = false;
             while array_len(hdlrs) > 0 and not found {
                 let h: str = hdlrs[array_len(hdlrs) - 1];
                 let bar: int = nbc_find(h, "|");
                 let tgt: int = int_from_str(substr(h, 1, bar - 1));
                 let ht: int = int_from_str(substr(h, bar + 1, str_len(h)));
-                let etype: int = int_from_str(substr(ex, 1, nbc_find(ex, "|")));
-                if ht == 4294967295 or ht == etype {
+                let matches: bool = ht == 4294967295 or
+                    (ht >= 0 and ht < array_len(strpool) and strpool[ht] == exception_type);
+                if matches {
                     hdlrs = slice(hdlrs, 0, array_len(hdlrs) - 1);
                     let hf: int = hdlr_frames[array_len(hdlr_frames) - 1];
                     hdlr_frames = slice(hdlr_frames, 0, array_len(hdlr_frames) - 1);
@@ -494,22 +719,31 @@ func natural_run_module(bytes: str) -> int {
                 let n: int = array_len(stack);
                 let v: str = stack[n - 1];
                 stack = vm_pop(stack);
-                print(vm_to_str(v));
+                print(vm_to_str(v, heap));
             } else if a == 1 {
                 let n: int = array_len(stack);
                 let v: str = stack[n - 1];
                 stack = vm_pop(stack);
-                println(vm_to_str(v));
+                println(vm_to_str(v, heap));
             } else if a == 5 {
                 let n: int = array_len(stack);
                 let v: str = stack[n - 1];
-                stack = vm_pop(stack);
-                stack = vm_push(stack, "S" + vm_to_str(v));
+                let handle: int = vm_handle_id(v);
+                if handle >= 0 and sh_kind(heap, handle) == "str" {
+                    stack = vm_pop(stack);
+                    stack = vm_push(stack, v);
+                } else {
+                    let allocated: [[str]] = vm_alloc_string(gc_state, stack, fr_locals, vm_to_str(v, heap));
+                    heap = allocated[0];
+            gc_state = slice(allocated, 0, 3);
+                    stack = vm_pop(stack);
+                    stack = vm_push(stack, allocated[3][0]);
+                }
             } else if a == 2 {
                 let n: int = array_len(stack);
                 let v: str = stack[n - 1];
                 stack = vm_pop(stack);
-                stack = vm_push(stack, "I" + to_str(str_len(vm_to_str(v))));
+                stack = vm_push(stack, "I" + to_str(str_len(vm_to_str(v, heap))));
             } else if a == 11 {
                 let n: int = array_len(stack);
                 let len_e: str = stack[n - 1];
@@ -520,15 +754,18 @@ func natural_run_module(bytes: str) -> int {
                 stack = vm_pop(stack);
                 let leni: int = int_from_str(substr(len_e, 1, str_len(len_e)));
                 let posi: int = int_from_str(substr(pos_e, 1, str_len(pos_e)));
-                let txt: str = vm_to_str(sv);
-                stack = vm_push(stack, "S" + substr(txt, posi, leni));
+                let txt: str = vm_to_str(sv, heap);
+                let allocated: [[str]] = vm_alloc_string(gc_state, stack, fr_locals, substr(txt, posi, leni));
+                heap = allocated[0];
+            gc_state = slice(allocated, 0, 3);
+                stack = vm_push(stack, allocated[3][0]);
             } else if a == 12 {
                 let n: int = array_len(stack);
                 let needle: str = stack[n - 1];
                 let hay: str = stack[n - 2];
                 stack = vm_pop(stack);
                 stack = vm_pop(stack);
-                let found: bool = str_contains(vm_to_str(hay), vm_to_str(needle));
+                let found: bool = str_contains(vm_to_str(hay, heap), vm_to_str(needle, heap));
                 stack = vm_push(stack, found ? "I1" : "I0");
             } else {
                 return 2;

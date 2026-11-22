@@ -1,0 +1,294 @@
+use "../../selfhost/runtime/heap.suru";
+
+func main() {
+    mut heap: [str] = [];
+    let no_children: [int] = [];
+    let no_roots: [int] = [];
+
+    // A dead object plus a shared, reachable graph.
+    heap = sh_alloc(heap, "str", "garbage", no_children);
+    heap = sh_alloc(heap, "str", "leaf", no_children);
+    heap = sh_alloc(heap, "record", "branch", [1]);
+    heap = sh_alloc(heap, "array", "root", [2, 1]);
+
+    // An unreachable cycle must not keep itself alive.
+    heap = sh_alloc(heap, "record", "cycle-a", [5]);
+    heap = sh_alloc(heap, "record", "cycle-b", [4]);
+
+    // A rooted exception keeps its type, message, cause, and cause strings.
+    heap = sh_alloc(heap, "str", "FileError", no_children);
+    heap = sh_alloc(heap, "str", "read failed", no_children);
+    heap = sh_alloc(heap, "str", "CleanupError", no_children);
+    heap = sh_alloc(heap, "str", "close failed", no_children);
+    heap = sh_alloc(heap, "exception", "cause", [8, 9]);
+    heap = sh_alloc(heap, "exception", "primary", [6, 7, 10]);
+
+    heap = sh_collect(heap, [3, 11]);
+    if sh_live_count(heap) != 9 { println("FAIL rooted graph live count"); exit(1); }
+    if sh_alive(heap, 0) or sh_alive(heap, 4) or sh_alive(heap, 5) {
+        println("FAIL unreachable garbage or cycle survived"); exit(1);
+    }
+    if not sh_alive(heap, 1) or not sh_alive(heap, 2) or
+       not sh_alive(heap, 3) or not sh_alive(heap, 10) or
+       not sh_alive(heap, 11) {
+        println("FAIL reachable graph was reclaimed"); exit(1);
+    }
+    if sh_kind(heap, 11) != "exception" or sh_payload(heap, 11) != "primary" {
+        println("FAIL exception metadata"); exit(1);
+    }
+
+    // Dropping the aggregate root reclaims its graph but not the exception.
+    heap = sh_collect(heap, [11]);
+    if sh_live_count(heap) != 6 { println("FAIL second collection"); exit(1); }
+    if sh_alive(heap, 1) or sh_alive(heap, 2) or sh_alive(heap, 3) {
+        println("FAIL dropped root graph survived"); exit(1);
+    }
+
+    // No roots reclaims the complete graph, including the cause chain.
+    heap = sh_collect(heap, no_children);
+    if sh_live_count(heap) != 0 { println("FAIL full reclamation"); exit(1); }
+
+    // The allocator reuses the lowest reclaimed stable handle.
+    heap = sh_alloc(heap, "str", "reused", no_children);
+    if sh_live_count(heap) != 1 or sh_kind(heap, 0) != "str" or
+       sh_payload(heap, 0) != "reused" {
+        println("FAIL reclaimed slot reuse"); exit(1);
+    }
+
+    // Incremental mark: after a parent turns black, adding a white child
+    // must shade the child through the write barrier.
+    mut incremental: [str] = [];
+    incremental = sh_alloc(incremental, "record", "parent", no_children);
+    incremental = sh_alloc(incremental, "str", "child", no_children);
+    mut cycle: [[str]] = sh_mark_begin(incremental, [0]);
+    cycle = sh_mark_step(cycle, 1, no_roots);
+    if sh_mark_pending(cycle) != 0 {
+        println("FAIL incremental parent scan"); exit(1);
+    }
+    cycle = sh_set_children_incremental(cycle, 0, [1]);
+    if sh_mark_pending(cycle) != 1 {
+        println("FAIL black-to-white write barrier"); exit(1);
+    }
+    cycle = sh_mark_step(cycle, 1, no_roots);
+    if sh_mark_pending(cycle) != 0 {
+        println("FAIL incremental child scan"); exit(1);
+    }
+    incremental = sh_sweep(cycle[0]);
+    if sh_live_count(incremental) != 2 {
+        println("FAIL incremental write-barrier survivors"); exit(1);
+    }
+
+    // Roots published after marking starts are seeded on the next slice.
+    mut late_heap: [str] = [];
+    late_heap = sh_alloc(late_heap, "record", "late-root", [1]);
+    late_heap = sh_alloc(late_heap, "str", "late-leaf", no_children);
+    cycle = sh_mark_begin(late_heap, no_roots);
+    cycle = sh_mark_step(cycle, 1, [0]);
+    if sh_mark_pending(cycle) != 1 {
+        println("FAIL late root seeding"); exit(1);
+    }
+    cycle = sh_mark_step(cycle, 1, no_roots);
+    if sh_mark_pending(cycle) != 0 {
+        println("FAIL late root child scan"); exit(1);
+    }
+    late_heap = sh_sweep(cycle[0]);
+    if sh_live_count(late_heap) != 2 {
+        println("FAIL late root survivors"); exit(1);
+    }
+
+    // New allocations during an active cycle are shaded grey automatically.
+    mut allocation_heap: [str] = [];
+    cycle = sh_mark_begin(allocation_heap, no_roots);
+    cycle = sh_alloc_incremental(cycle, "str", "born-during-mark", no_children);
+    if sh_mark_pending(cycle) != 1 {
+        println("FAIL incremental allocation shading"); exit(1);
+    }
+    cycle = sh_mark_step(cycle, 1, no_roots);
+    if sh_mark_pending(cycle) != 0 {
+        println("FAIL incremental allocation scan"); exit(1);
+    }
+    allocation_heap = sh_sweep(cycle[0]);
+    if sh_live_count(allocation_heap) != 1 or
+       sh_payload(allocation_heap, 0) != "born-during-mark" {
+        println("FAIL incremental allocation survivor"); exit(1);
+    }
+
+    // Size classes retain each slot's reserved capacity after sweeping.
+    mut classes: [str] = [];
+    classes = sh_alloc(classes, "str", "a", no_children);
+    classes = sh_alloc(classes, "str", "12345678901234567", no_children);
+    if sh_capacity(classes, 0) != 48 or sh_capacity(classes, 1) != 64 {
+        println("FAIL 16-byte allocation classes"); exit(1);
+    }
+    if sh_live_bytes(classes) != 112 or sh_reserved_bytes(classes) != 112 {
+        println("FAIL heap capacity accounting"); exit(1);
+    }
+    let allocated_stats: [int] = sh_heap_stats(classes);
+    if allocated_stats[0] != 2 or allocated_stats[1] != 112 or
+       allocated_stats[2] != 2 or allocated_stats[3] != 112 or
+       allocated_stats[4] != 0 or allocated_stats[5] != 0 {
+        println("FAIL live heap statistics"); exit(1);
+    }
+    classes = sh_collect(classes, no_roots);
+    if sh_live_bytes(classes) != 0 or sh_reserved_bytes(classes) != 112 or
+       sh_free_class_count(classes, 48) != 1 or
+       sh_free_class_count(classes, 64) != 1 {
+        println("FAIL swept size-class retention"); exit(1);
+    }
+    let swept_stats: [int] = sh_heap_stats(classes);
+    if swept_stats[0] != 0 or swept_stats[1] != 0 or
+       swept_stats[2] != 2 or swept_stats[3] != 112 or
+       swept_stats[4] != 2 or swept_stats[5] != 112 {
+        println("FAIL swept heap statistics"); exit(1);
+    }
+    classes = sh_alloc(classes, "str", "b", no_children);
+    if sh_kind(classes, 0) != "str" or sh_capacity(classes, 0) != 48 {
+        println("FAIL matching small size-class reuse"); exit(1);
+    }
+    classes = sh_alloc(classes, "str", "12345678901234567", no_children);
+    if sh_kind(classes, 1) != "str" or sh_capacity(classes, 1) != 64 {
+        println("FAIL larger size-class reuse"); exit(1);
+    }
+
+    // Large slots use first-fit among free chunks with enough capacity.
+    let large_free: [str] = [
+        "", "0", "4144", "", "",
+        "", "0", "4224", "", ""
+    ];
+    if sh_find_free(large_free, 4112) != 0 or
+       sh_find_free(large_free, 4208) != 1 {
+        println("FAIL large-object first-fit reuse"); exit(1);
+    }
+
+    // Payload/child growth increases logical reservation without changing the
+    // stable handle index; shrinking does not reduce its reserved class.
+    mut growing: [str] = [];
+    growing = sh_alloc(growing, "array", "x", no_children);
+    let original_capacity: int = sh_capacity(growing, 0);
+    growing = sh_set_payload(growing, 0,
+        "0123456789012345678901234567890123456789");
+    if sh_capacity(growing, 0) <= original_capacity or
+       sh_kind(growing, 0) != "array" or
+       sh_payload(growing, 0) != "0123456789012345678901234567890123456789" {
+        println("FAIL payload reservation growth"); exit(1);
+    }
+    let grown_capacity: int = sh_capacity(growing, 0);
+    growing = sh_set_payload(growing, 0, "x");
+    if sh_capacity(growing, 0) != grown_capacity {
+        println("FAIL reservation shrank after payload update"); exit(1);
+    }
+    growing = sh_set_children(growing, 0, [1, 2, 3, 4, 5, 6, 7, 8]);
+    if sh_capacity(growing, 0) < grown_capacity {
+        println("FAIL child reservation growth"); exit(1);
+    }
+
+    // The GC scheduler saturates its allocation trigger at 512 and records
+    // cumulative logical bytes and completed collection cycles.
+    let empty_heap: [str] = [];
+    mut scheduled: [[str]] = sh_mark_idle(
+        empty_heap, ["0", "511", "0", "0"]);
+    scheduled = sh_alloc_incremental(scheduled, "str", "x", no_children);
+    let pending_stats: [int] = sh_gc_stats(scheduled);
+    if pending_stats[0] != 512 or pending_stats[1] != 0 or
+       pending_stats[2] != 48 or pending_stats[3] != 0 {
+        println("FAIL GC allocation counters"); exit(1);
+    }
+    scheduled = sh_mark_begin_with_metrics(scheduled[0], [0], scheduled[2]);
+    while sh_mark_pending(scheduled) > 0 {
+        scheduled = sh_mark_step(scheduled, 2, no_roots);
+    }
+    scheduled = sh_mark_finish(scheduled);
+    let completed_stats: [int] = sh_gc_stats(scheduled);
+    if completed_stats[0] != 0 or completed_stats[1] != 1 or
+       completed_stats[2] != 48 or completed_stats[3] != 0 {
+        println("FAIL GC completion counters"); exit(1);
+    }
+
+    // The production VM counts the allocation about to happen: 511 prior
+    // allocations do not trigger; the 512th allocation does.
+    let interval_510: [[str]] = sh_mark_idle(empty_heap,
+        ["0", "510", "0", "0", "1048576", "1048576", "0"]);
+    let interval_511: [[str]] = sh_mark_idle(empty_heap,
+        ["0", "511", "0", "0", "1048576", "1048576", "0"]);
+    if sh_gc_should_collect(interval_510, 512) or
+       not sh_gc_should_collect(interval_511, 512) {
+        println("FAIL 512-allocation GC interval"); exit(1);
+    }
+
+    // The byte threshold is an independent trigger, even before the interval.
+    let empty_threshold_heap: [str] = [];
+    let threshold_heap: [str] = sh_alloc(empty_threshold_heap, "str",
+        "0123456789012345678901234567890123456789", no_children);
+    let under_threshold: [[str]] = sh_mark_idle(threshold_heap,
+        ["0", "0", "0", "0", "80", "64", "0"]);
+    let over_threshold: [[str]] = sh_mark_idle(threshold_heap,
+        ["0", "0", "0", "0", "79", "64", "0"]);
+    if sh_gc_should_collect(under_threshold, 512) or
+       not sh_gc_should_collect(over_threshold, 512) {
+        println("FAIL live-byte GC threshold"); exit(1);
+    }
+
+    // A threshold-triggered collection reclaims dead objects, records the
+    // cycle, and grows the next threshold to four times the surviving set.
+    mut adaptive_heap: [str] = [];
+    adaptive_heap = sh_alloc(adaptive_heap, "str", "r", no_children);
+    adaptive_heap = sh_alloc(adaptive_heap, "str", "g1", no_children);
+    adaptive_heap = sh_alloc(adaptive_heap, "str", "g2", no_children);
+    adaptive_heap = sh_alloc(adaptive_heap, "str", "g3", no_children);
+    let adaptive_metrics: [str] = [
+        "0", "511", "0", "0", "1048576", "64", "0"
+    ];
+    mut adaptive_state: [[str]] = sh_mark_idle(adaptive_heap, adaptive_metrics);
+    adaptive_state = sh_gc_advance(adaptive_state, [0], 512, 16);
+    let adaptive_stats: [int] = sh_gc_stats(adaptive_state);
+    if adaptive_stats[0] != 0 or adaptive_stats[1] != 1 or
+       adaptive_stats[3] != 0 or sh_live_count(adaptive_state[0]) != 1 or
+       adaptive_stats[5] != 192 {
+        println("FAIL adaptive GC threshold/sweep"); exit(1);
+    }
+
+    // High survival ratios retain the existing threshold to avoid thrashing.
+    let retained_threshold: int = sh_gc_next_threshold(100, 80,
+        1024, 64, 4096);
+    let expanded_threshold: int = sh_gc_next_threshold(500, 80,
+        1024, 64, 4096);
+    let clamped_threshold: int = sh_gc_next_threshold(9000, 2000,
+        1024, 64, 4096);
+    if retained_threshold != 1024 or expanded_threshold != 320 or
+       clamped_threshold != 4096 {
+        println("FAIL adaptive threshold headroom/clamps"); exit(1);
+    }
+
+    // Stress the state machine with more than one slice of a 40-object chain.
+    // The allocation counter is seeded at 511 to test the 512th-allocation edge
+    // without creating a large Stage 0 host array as part of this regression.
+    mut chain_heap: [str] = [];
+    mut chain_children: [int] = [];
+    mut chain_index: int = 0;
+    while chain_index < 40 {
+        chain_heap = sh_alloc(chain_heap, "record", "", chain_children);
+        chain_children = [chain_index];
+        chain_index += 1;
+    }
+    let chain_metrics: [str] = [
+        "0", "511", "0", "0", "1048576", "1048576", "0"
+    ];
+    mut chain_state: [[str]] = sh_mark_idle(chain_heap, chain_metrics);
+    chain_state = sh_gc_advance(chain_state, [39], 512, 16);
+    mut chain_slices: int = 1;
+    mut chain_progress: [int] = sh_gc_stats(chain_state);
+    while chain_progress[3] == 1 and chain_slices < 100 {
+        chain_state = sh_gc_advance(chain_state, [39], 512, 16);
+        chain_slices += 1;
+        chain_progress = sh_gc_stats(chain_state);
+    }
+    let chain_stats: [int] = sh_gc_stats(chain_state);
+    if chain_stats[3] != 0 or chain_stats[1] != 1 or
+       chain_stats[4] != 0 or sh_live_count(chain_state[0]) != 40 or
+       chain_slices < 2 {
+        println("FAIL multi-slice live object graph"); exit(1);
+    }
+
+    println("SURU heap: reachability, cycles, barriers, size classes, allocation accounting and GC threshold policy passed");
+    exit(0);
+}
