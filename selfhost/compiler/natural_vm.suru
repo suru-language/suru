@@ -130,13 +130,13 @@ func vm_heap_roots(stack: [str], frames: [[str]]) -> [int] {
 }
 
 // Match the C VM's 512-allocation / 1 MiB live-byte nursery trigger.
-// Once started, a cycle receives a bounded 16-object slice at each allocation.
+// Once started, a cycle receives a bounded 128-object slice at each allocation.
 // Completed cycles adapt the next byte threshold to four times the survivor set.
 func vm_heap_alloc(state: [[str]], stack: [str], frames: [[str]],
                    kind: str, payload: str, children: [int]) -> [[str]] {
     let roots: [int] = vm_heap_roots(stack, frames);
     let old_collections: int = int_from_str(state[2][2]);
-    mut next: [[str]] = sh_gc_advance(state, roots, 512, 16);
+    mut next: [[str]] = sh_gc_advance(state, roots, 512, 128);
     let completed: bool = int_from_str(next[2][2]) > old_collections;
     let required: int = sh_allocation_size(payload, children);
     let id: int = sh_find_free(next[0], required);
