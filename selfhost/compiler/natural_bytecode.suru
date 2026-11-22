@@ -1479,9 +1479,15 @@ func nbc_collect(source: str) -> [str] {
             continue;
         }
         if nbc_word(line) == "give" {
+            let typed_give: [str] = nbc_typed_statement(line);
+            let typed_give_root: int = nbc_typed_statement_root(typed_give, 0);
             if array_len(attempts) > 0 {
                 let value: str = str_trim(nbc_after(line, "give"));
-                if value != "" {
+                if typed_give_root >= 0 {
+                    instructions = nbc_emit_typed_statement_root(
+                        instructions, typed_give, "give", 0);
+                    instructions = nbc_emit(instructions, "BC_POP", "");
+                } else if value != "" {
                     instructions = nbc_emit_expression(instructions, value);
                     instructions = nbc_emit(instructions, "BC_POP", "");
                 }
@@ -1493,8 +1499,13 @@ func nbc_collect(source: str) -> [str] {
                 }
             } else {
                 let value: str = str_trim(nbc_after(line, "give"));
-                if value == "" { instructions = nbc_emit(instructions, "BC_RET_UNIT", ""); }
-                else {
+                if typed_give_root >= 0 {
+                    instructions = nbc_emit_typed_statement_root(
+                        instructions, typed_give, "give", 0);
+                    instructions = nbc_emit(instructions, "BC_RET", "");
+                } else if value == "" {
+                    instructions = nbc_emit(instructions, "BC_RET_UNIT", "");
+                } else {
                     instructions = nbc_emit_expression(instructions, value);
                     instructions = nbc_emit(instructions, "BC_RET", "");
                 }
@@ -1543,13 +1554,25 @@ func nbc_collect(source: str) -> [str] {
                     continue;
                 }
             }
-            instructions = nbc_emit_expression(instructions,
-                substr(rest, equals + 1, str_len(rest)));
+            let typed_binding: [str] = nbc_typed_statement(line);
+            if array_len(typed_binding) > 0 and typed_binding[0] == "binding" {
+                instructions = nbc_emit_typed_statement_root(
+                    instructions, typed_binding, "binding", 0);
+            } else {
+                instructions = nbc_emit_expression(instructions,
+                    substr(rest, equals + 1, str_len(rest)));
+            }
             instructions = nbc_emit(instructions, "BC_ST_LOCAL",
                                     to_str(nbc_slot(instructions, name)));
             continue;
         }
         if nbc_word(line) == "set" {
+            let typed_assignment: [str] = nbc_typed_statement(line);
+            if array_len(typed_assignment) > 0 and
+               typed_assignment[0] == "assignment" {
+                instructions = nbc_emit_typed_assignment(instructions, line);
+                continue;
+            }
             let rest: str = nbc_after(line, "set");
             let to_at: int = nbc_find(rest, " to ");
             if to_at < 0 { println("bytecode-error|assignment requires 'to'"); return ["#emit-failed"]; }
