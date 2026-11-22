@@ -13,11 +13,15 @@ jobs:
       - name: Verify checkpoint in scratch clone
         env:
           REPOSITORY: ${{ github.repository }}
+          TARGET_REF: ${{ github.head_ref || github.ref_name }}
+          TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          TARGET_REF="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
-          git clone --depth=1 --branch "${TARGET_REF}" \
+          git clone --no-checkout --branch "${TARGET_REF}" \
             "https://github.com/${REPOSITORY}.git" "${RUNNER_TEMP}/suru-m0-scratch"
+          git -C "${RUNNER_TEMP}/suru-m0-scratch" fetch --no-tags origin "${TARGET_SHA}"
+          git -C "${RUNNER_TEMP}/suru-m0-scratch" checkout --detach "${TARGET_SHA}"
           cd "${RUNNER_TEMP}/suru-m0-scratch"
+          test "$(git rev-parse HEAD)" = "${TARGET_SHA}"
           test -s .kilo/plans/1794948281385-m0-trustworthy-baseline.md
           test -s docs/m0-trustworthy-baseline.md
           test -s tests/integration/manifest.json
