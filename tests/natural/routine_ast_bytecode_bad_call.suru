@@ -1,0 +1,6 @@
+routine identity(value: Whole) -> Whole
+    give value
+end routine
+routine main() -> Unit
+    show(identity("not a Whole"))
+end routine
