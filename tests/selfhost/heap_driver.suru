@@ -55,6 +55,64 @@ func main() {
         println("FAIL reclaimed slot reuse"); exit(1);
     }
 
-    println("SURU heap: reachability, shared references, cycles, exception causes, sweep and slot reuse passed");
+    // Incremental mark: after a parent turns black, adding a white child
+    // must shade the child through the write barrier.
+    mut incremental: [str] = [];
+    incremental = sh_alloc(incremental, "record", "parent", no_children);
+    incremental = sh_alloc(incremental, "str", "child", no_children);
+    mut cycle: [[str]] = sh_mark_begin(incremental, [0]);
+    cycle = sh_mark_step(cycle, 1, no_roots);
+    if sh_mark_pending(cycle) != 0 {
+        println("FAIL incremental parent scan"); exit(1);
+    }
+    cycle = sh_set_children_incremental(cycle, 0, [1]);
+    if sh_mark_pending(cycle) != 1 {
+        println("FAIL black-to-white write barrier"); exit(1);
+    }
+    cycle = sh_mark_step(cycle, 1, no_roots);
+    if sh_mark_pending(cycle) != 0 {
+        println("FAIL incremental child scan"); exit(1);
+    }
+    incremental = sh_sweep(cycle[0]);
+    if sh_live_count(incremental) != 2 {
+        println("FAIL incremental write-barrier survivors"); exit(1);
+    }
+
+    // Roots published after marking starts are seeded on the next slice.
+    mut late_heap: [str] = [];
+    late_heap = sh_alloc(late_heap, "record", "late-root", [1]);
+    late_heap = sh_alloc(late_heap, "str", "late-leaf", no_children);
+    cycle = sh_mark_begin(late_heap, no_roots);
+    cycle = sh_mark_step(cycle, 1, [0]);
+    if sh_mark_pending(cycle) != 1 {
+        println("FAIL late root seeding"); exit(1);
+    }
+    cycle = sh_mark_step(cycle, 1, no_roots);
+    if sh_mark_pending(cycle) != 0 {
+        println("FAIL late root child scan"); exit(1);
+    }
+    late_heap = sh_sweep(cycle[0]);
+    if sh_live_count(late_heap) != 2 {
+        println("FAIL late root survivors"); exit(1);
+    }
+
+    // New allocations during an active cycle are shaded grey automatically.
+    mut allocation_heap: [str] = [];
+    cycle = sh_mark_begin(allocation_heap, no_roots);
+    cycle = sh_alloc_incremental(cycle, "str", "born-during-mark", no_children);
+    if sh_mark_pending(cycle) != 1 {
+        println("FAIL incremental allocation shading"); exit(1);
+    }
+    cycle = sh_mark_step(cycle, 1, no_roots);
+    if sh_mark_pending(cycle) != 0 {
+        println("FAIL incremental allocation scan"); exit(1);
+    }
+    allocation_heap = sh_sweep(cycle[0]);
+    if sh_live_count(allocation_heap) != 1 or
+       sh_payload(allocation_heap, 0) != "born-during-mark" {
+        println("FAIL incremental allocation survivor"); exit(1);
+    }
+
+    println("SURU heap: reachability, cycles, write barrier, root reseeding, allocation shading and sweep passed");
     exit(0);
 }
