@@ -1,0 +1,58 @@
+use "../../selfhost/runtime/heap.suru";
+
+func main() {
+    mut heap: [str] = [];
+
+    // A dead object plus a shared, reachable graph.
+    heap = sh_alloc(heap, "str", "garbage", []);
+    heap = sh_alloc(heap, "str", "leaf", []);
+    heap = sh_alloc(heap, "record", "branch", [1]);
+    heap = sh_alloc(heap, "array", "root", [2, 1]);
+
+    // An unreachable cycle must not keep itself alive.
+    heap = sh_alloc(heap, "record", "cycle-a", [5]);
+    heap = sh_alloc(heap, "record", "cycle-b", [4]);
+
+    // A rooted exception keeps its type, message, cause, and cause strings.
+    heap = sh_alloc(heap, "str", "FileError", []);
+    heap = sh_alloc(heap, "str", "read failed", []);
+    heap = sh_alloc(heap, "str", "CleanupError", []);
+    heap = sh_alloc(heap, "str", "close failed", []);
+    heap = sh_alloc(heap, "exception", "cause", [8, 9]);
+    heap = sh_alloc(heap, "exception", "primary", [6, 7, 10]);
+
+    heap = sh_collect(heap, [3, 11]);
+    if sh_live_count(heap) != 9 { println("FAIL rooted graph live count"); exit(1); }
+    if sh_alive(heap, 0) or sh_alive(heap, 4) or sh_alive(heap, 5) {
+        println("FAIL unreachable garbage or cycle survived"); exit(1);
+    }
+    if not sh_alive(heap, 1) or not sh_alive(heap, 2) or
+       not sh_alive(heap, 3) or not sh_alive(heap, 10) or
+       not sh_alive(heap, 11) {
+        println("FAIL reachable graph was reclaimed"); exit(1);
+    }
+    if sh_kind(heap, 11) != "exception" or sh_payload(heap, 11) != "primary" {
+        println("FAIL exception metadata"); exit(1);
+    }
+
+    // Dropping the aggregate root reclaims its graph but not the exception.
+    heap = sh_collect(heap, [11]);
+    if sh_live_count(heap) != 6 { println("FAIL second collection"); exit(1); }
+    if sh_alive(heap, 1) or sh_alive(heap, 2) or sh_alive(heap, 3) {
+        println("FAIL dropped root graph survived"); exit(1);
+    }
+
+    // No roots reclaims the complete graph, including the cause chain.
+    heap = sh_collect(heap, []);
+    if sh_live_count(heap) != 0 { println("FAIL full reclamation"); exit(1); }
+
+    // The allocator reuses the lowest reclaimed stable handle.
+    heap = sh_alloc(heap, "str", "reused", []);
+    if sh_live_count(heap) != 1 or sh_kind(heap, 0) != "str" or
+       sh_payload(heap, 0) != "reused" {
+        println("FAIL reclaimed slot reuse"); exit(1);
+    }
+
+    println("SURU heap: reachability, shared references, cycles, exception causes, sweep and slot reuse passed");
+    exit(0);
+}
