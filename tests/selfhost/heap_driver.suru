@@ -184,7 +184,8 @@ func main() {
 
     // The GC scheduler counts allocations, saturates while a cycle is due,
     // and tracks cumulative logical allocation bytes and completed cycles.
-    mut scheduled: [[str]] = sh_mark_idle([], ["0", "0", "0", "0"]);
+    let empty_heap: [str] = [];
+    mut scheduled: [[str]] = sh_mark_idle(empty_heap, ["0", "0", "0", "0"]);
     mut allocation_index: int = 0;
     while allocation_index < 520 {
         scheduled = sh_alloc_incremental(
