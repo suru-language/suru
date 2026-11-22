@@ -276,7 +276,7 @@ func main() {
     mut chain_state: [[str]] = sh_mark_idle(chain_heap, chain_metrics);
     chain_state = sh_gc_advance(chain_state, [39], 512, 16);
     mut chain_slices: int = 1;
-    let chain_progress: [int] = sh_gc_stats(chain_state);
+    mut chain_progress: [int] = sh_gc_stats(chain_state);
     while chain_progress[3] == 1 and chain_slices < 100 {
         chain_state = sh_gc_advance(chain_state, [39], 512, 16);
         chain_slices += 1;
