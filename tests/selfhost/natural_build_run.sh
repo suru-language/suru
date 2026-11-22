@@ -27,6 +27,10 @@ for input in "$ROOT"/tests/natural/*.suru; do
             echo "  C bytes: $(wc -c < "$tmp/c.sbc"), SURU bytes: $(wc -c < "$tmp/b.sbc")" >&2
             echo "  first differing offsets (1-based):" >&2
             cmp -l "$tmp/c.sbc" "$tmp/b.sbc" | head -20 >&2 || true
+            "$SURU" run "$DIR/natural_bytecode_driver.suru" "$input" >"$tmp/c.ir" 2>/dev/null || true
+            "$SURU" run "$DIR/natural_bytecode_after_frontend_driver.suru" "$input" >"$tmp/b.ir" 2>/dev/null || true
+            echo "  bytecode IR diff:" >&2
+            diff -u "$tmp/c.ir" "$tmp/b.ir" | head -60 >&2 || true
             fail=$((fail + 1))
         fi
     fi
