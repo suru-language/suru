@@ -326,6 +326,17 @@ until the self-hosted route reaches complete language and diagnostic parity.
 The native backend is not yet part of this flag; it remains a separate Stage 3
 path.
 
+Expression lowering in `natural_bytecode.suru` now parses each expression
+through `natural_expression_ast.suru` and recursively lowers the resulting
+atom/unary/binary/conditional/array/index/field/call node graph. The statement
+collector still identifies statement boundaries from source lines; replacing
+that remaining source-shaped collection with the typed module AST is the next
+compiler increment. `tests/natural/typed_expression_lowering.suru` exercises
+precedence, unary negation, ternary selection, arrays/indexing, records/fields,
+string concatenation, builtins, and exact bytecode parity against the reference
+compiler.
+
+
 The C17 bytecode compiler now publishes every function's name and
 parameter count before verifying individual function bodies. This is required
 for forward calls: the verifier uses the callee's parameter count to compute

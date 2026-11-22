@@ -41,6 +41,23 @@ if [ "$actual" != "4" ] || [ "$runout" != "4" ]; then
     fail=$((fail + 1))
 fi
 
+# Typed expression AST lowering: precedence, unary, conditional,
+# array/index, record/field, string concatenation and builtin calls.
+"$SURU" --syntax=natural compile "$ROOT/tests/natural/typed_expression_lowering.suru" \
+    "$tmp/typed-expression-c.sbc"
+"$SURU" --syntax=natural --compiler=selfhost compile \
+    "$ROOT/tests/natural/typed_expression_lowering.suru" \
+    "$tmp/typed-expression-self.sbc" >/dev/null 2>&1
+cmp "$tmp/typed-expression-c.sbc" "$tmp/typed-expression-self.sbc"
+actual="$("$SURU" exec "$tmp/typed-expression-self.sbc" 2>/dev/null)"
+expected="$(printf '%s\n' -14 10 5 7 3)"
+if [ "$actual" != "$expected" ]; then
+    echo "FAIL: typed expression AST lowering (got '$actual')" >&2
+    fail=$((fail + 1))
+else
+    tests=$((tests + 1))
+fi
+
 # A parameter name reused from another routine must not inherit its
 # earlier global slot. The second routine deliberately has a different first
 # parameter so a leaked slot id would reverse the parameter-to-local mapping.
