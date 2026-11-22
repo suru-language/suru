@@ -55,6 +55,7 @@ SELFHOST_DRIVERS = tests/selfhost/lexer_driver.suru \
 	tests/selfhost/natural_parser_driver.suru \
 	tests/selfhost/natural_token_driver.suru \
 	tests/selfhost/natural_expression_driver.suru \
+	tests/selfhost/natural_expression_ast_driver.suru \
 	tests/selfhost/natural_ast_driver.suru \
 	tests/selfhost/natural_ast_module_driver.suru \
 	tests/selfhost/natural_control_driver.suru \
