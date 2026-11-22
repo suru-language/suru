@@ -52,10 +52,12 @@ func main() {
         "0", "0", "0", "0", "64", "64", "0"
     ];
     let byte_work: [str] = [];
-    let byte_heap: [str] = [];
+    mut byte_heap: [str] = [];
+    byte_heap = sh_alloc(byte_heap, "str", "kept", no_children);
     mut byte_state: [[str]] = [byte_heap, byte_work, byte_metrics];
+    let byte_roots: [str] = ["H0"];
     let large: [[str]] = vm_heap_alloc(
-        byte_state, no_stack, no_frames, "str",
+        byte_state, byte_roots, no_frames, "str",
         "0123456789012345678901234567890123456789", no_children);
     byte_state = [large[0], large[1], large[2]];
     let byte_before: [int] = sh_gc_stats(byte_state);
@@ -64,13 +66,17 @@ func main() {
         exit(1);
     }
 
+    // The next allocation triggers collection: it keeps H0, reclaims the
+    // oversized temporary, and adapts the next threshold to four times the
+    // surviving logical live set (48 bytes * 4 = 192).
     let small: [[str]] = vm_heap_alloc(
-        byte_state, no_stack, no_frames, "str", "x", no_children);
+        byte_state, byte_roots, no_frames, "str", "x", no_children);
     byte_state = [small[0], small[1], small[2]];
     let byte_after: [int] = sh_gc_stats(byte_state);
     if byte_after[1] != 1 or byte_after[0] != 1 or
-       sh_live_count(byte_state[0]) != 1 {
-        println("FAIL VM logical-byte trigger did not collect");
+       byte_after[5] != 192 or sh_live_count(byte_state[0]) != 2 or
+       sh_payload(byte_state[0], 0) != "kept" {
+        println("FAIL VM logical-byte trigger/adaptive threshold");
         exit(1);
     }
 
