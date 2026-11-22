@@ -1,51 +1,53 @@
 use "../../selfhost/compiler/natural_vm.suru";
 
-// Exercise the actual VM allocation wrapper, not only the heap policy helpers.
-// The first case proves that 511 allocations remain below the nursery trigger
-// and that the 512th starts and completes a collection before its allocation.
-// The second case proves that logical live bytes independently trigger a cycle.
+// Call the VM allocation wrapper at the allocation-count boundary. Seed the
+// metrics at 510/511 so this checks the wrapper's trigger decision without
+// spending hundreds of allocations constructing an artificial test heap.
 func main() {
     let no_children: [int] = [];
     let no_stack: [str] = [];
     let no_frames: [[str]] = [];
-    let empty_heap: [str] = [];
-    let empty_work: [str] = [];
 
+    mut interval_heap: [str] = [];
+    interval_heap = sh_alloc(interval_heap, "str", "caller-root", no_children);
     let interval_metrics: [str] = [
-        "0", "0", "0", "0", "1048576", "1048576", "0"
+        "0", "510", "0", "0", "1048576", "1048576", "0"
     ];
+    let interval_work: [str] = [];
     mut interval_state: [[str]] = [
-        empty_heap, empty_work, interval_metrics
+        interval_heap, interval_work, interval_metrics
     ];
-    mut i: int = 0;
-    while i < 511 {
-        let allocated: [[str]] = vm_heap_alloc(
-            interval_state, no_stack, no_frames, "str", "x", no_children);
-        interval_state = [allocated[0], allocated[1], allocated[2]];
-        i += 1;
-    }
 
+    // The 511th allocation does not trigger collection.
+    let allocated_511: [[str]] = vm_heap_alloc(
+        interval_state, ["H0"], no_frames, "str", "first", no_children);
+    interval_state = [
+        allocated_511[0], allocated_511[1], allocated_511[2]
+    ];
     let before: [int] = sh_gc_stats(interval_state);
-    if before[0] != 511 or before[1] != 0 or
-       before[3] != 0 or sh_live_count(interval_state[0]) != 511 {
+    if before[0] != 511 or before[1] != 0 or before[3] != 0 or
+       sh_live_count(interval_state[0]) != 2 {
         println("FAIL VM GC interval fired before allocation 512");
         exit(1);
     }
 
+    // The 512th allocation starts and completes collection. H0 is the live
+    // operand-stack root; the new allocation is then appended to the heap.
     let allocated_512: [[str]] = vm_heap_alloc(
-        interval_state, no_stack, no_frames, "str", "x", no_children);
+        interval_state, ["H0"], no_frames, "str", "second", no_children);
     interval_state = [
         allocated_512[0], allocated_512[1], allocated_512[2]
     ];
     let after: [int] = sh_gc_stats(interval_state);
     if after[0] != 1 or after[1] != 1 or after[3] != 0 or
-       sh_live_count(interval_state[0]) != 1 {
+       sh_live_count(interval_state[0]) != 2 or
+       sh_payload(interval_state[0], 0) != "caller-root" {
         println("FAIL VM GC interval did not collect on allocation 512");
         exit(1);
     }
 
     // A large object crosses this deliberately small logical-byte threshold.
-    // The following allocation must collect the unrooted large object first.
+    // The next allocation must collect the unrooted large object first.
     let byte_metrics: [str] = [
         "0", "0", "0", "0", "64", "64", "0"
     ];
