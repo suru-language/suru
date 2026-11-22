@@ -240,8 +240,15 @@ func nw_emit_ins(items: [str]) -> [str] {
     return out;
 }
 
-func nw_slotmap(ins: [str]) -> [int] {
+func nw_slotmap(ins: [str], nparams: int) -> [int] {
     mut used: [int] = [];
+    // Parameters have fixed ABI positions even when an earlier parameter is
+    // never read or written by the function body.
+    mut parameter: int = 0;
+    while parameter < nparams {
+        used = array_concat(used, [parameter]);
+        parameter += 1;
+    }
     mut i: int = 0;
     while i < array_len(ins) {
         let fields: [str] = str_split(ins[i], "|");
@@ -333,7 +340,7 @@ func nw_serialize(instructions: [str]) -> str {
         mut items: [str] = [];
         if nfuncs > 1 or array_len(fns) > 0 { items = fns[i]; }
         let ins: [str] = nw_emit_ins(items);
-        let map: [int] = nw_slotmap(ins);
+        let map: [int] = nw_slotmap(ins, nparams);
         let nslots: int = array_len(map);
         mut frame: int = nslots < nparams ? nparams : nslots;
         if frame == 0 { frame = 1; }
