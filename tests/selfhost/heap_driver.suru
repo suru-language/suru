@@ -184,6 +184,7 @@ func main() {
 
     // The GC scheduler saturates its allocation trigger at 512 and records
     // cumulative logical bytes and completed collection cycles.
+    let empty_heap: [str] = [];
     mut scheduled: [[str]] = sh_mark_idle(
         empty_heap, ["0", "511", "0", "0"]);
     scheduled = sh_alloc_incremental(scheduled, "str", "x", no_children);
