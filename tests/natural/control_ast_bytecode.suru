@@ -1,0 +1,17 @@
+routine main() -> Unit
+    value attempts: Whole = 0
+    repeat while attempts < 3
+        when attempts < 2
+            set attempts to attempts + 1
+        otherwise
+            set attempts to attempts + 1
+        end when
+    end repeat
+    when attempts == 2
+        show("bad")
+    otherwise when attempts == 3
+        show("done")
+    otherwise
+        show("bad")
+    end when
+end routine

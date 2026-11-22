@@ -23,4 +23,18 @@ if [ "$actual" != "5" ]; then
     echo "AST bytecode execution mismatch: '$actual'" >&2
     exit 1
 fi
+source="$ROOT/tests/natural/control_ast_bytecode.suru"
+"$SURU" --syntax=natural compile "$source" "$tmp/control-reference.sbc"
+"$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+    "$source" "$tmp/control-ast.sbc"
+if ! cmp -s "$tmp/control-reference.sbc" "$tmp/control-ast.sbc"; then
+    echo "AST control bytecode differs from reference:" >&2
+    cmp -l "$tmp/control-reference.sbc" "$tmp/control-ast.sbc" | head -12 >&2 || true
+    exit 1
+fi
+actual="$("$SURU" exec "$tmp/control-ast.sbc")"
+if [ "$actual" != "done" ]; then
+    echo "AST control bytecode execution mismatch: '$actual'" >&2
+    exit 1
+fi
 echo "natural AST bytecode: routine/binding/call/show/give output matched reference"
