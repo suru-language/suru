@@ -230,7 +230,11 @@ The bytecode object-emitting half is now owned by SURU:
   (`ld_local`/`st_local` over a stack frame with a red zone so the print
   routine's scratch cannot overlap locals; precedence is already baked into the
   bytecode; values are printed via raw x86-64 decimal conversion)
-  (`natural_elf_compile_run.sh`). A micro-assembler (`nw_emit_elf_repeat`)
+  (`natural_elf_compile_run.sh`). The same native path now emits multiple
+  constant-string `show` calls, including empty strings, through separate
+  RIP-relative `write` syscalls with message bytes embedded in the ELF image;
+  it requires no C compiler, linker, or runtime for the produced executable.
+  A micro-assembler (`nw_emit_elf_repeat`)
   emits a `repeat while` loop with a counter, comparison (`setl`/`test`), and
   resolved `jz`/`jmp` rel32 targets; it prints "012" and is gated by
   `natural_elf_loop_run.sh`. A generic bytecode->x86-64 compiler
