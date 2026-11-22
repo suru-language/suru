@@ -68,7 +68,7 @@ if "$SURU" --syntax=natural compile "$ROOT/tests/natural/control_valid.suru" \
         "$tmp/control_valid.sbc" 2>/dev/null; then
     tests=$((tests + 1))
     c=$("$SURU" exec "$tmp/control_valid.sbc" 2>&1)
-    s=$("$SURU" run "$DIR/natural_vm_driver.suru" \
+    s=$(SURU_GC_ALLOC_INTERVAL=1000000 "$SURU" run "$DIR/natural_vm_driver.suru" \
         "$tmp/control_valid.sbc" 2>&1)
     if [ "$s" != "$c" ]; then
         echo "FAIL control_valid: C=[$c] SURU=[$s]" >&2
