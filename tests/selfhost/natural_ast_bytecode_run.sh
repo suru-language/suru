@@ -48,10 +48,6 @@ if [ "$indexed_actual" != "$indexed_expected" ]; then
     echo "AST indexed-assignment execution mismatch: '$indexed_actual'" >&2
     exit 1
 fi
-echo "natural AST bytecode: exclusive until and inclusive through range loops executed correctly"
-echo "natural AST bytecode: indexed array assignment and indexed reads matched reference bytecode and output"
-echo "natural AST bytecode: AST-predeclared forward routine calls, bindings, nested when/otherwise, repeat, show and give matched reference"
-
 across_source="$ROOT/tests/natural/routine_ast_each_across.suru"
 "$SURU" --syntax=natural compile "$across_source" "$tmp/reference-across.sbc"
 "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
@@ -67,4 +63,5 @@ if [ "$across_actual" != "$across_expected" ]; then
     echo "AST each-across execution mismatch: '$across_actual'" >&2
     exit 1
 fi
-echo "natural AST bytecode: each-across array iteration matched reference bytecode and output"
+echo "natural AST bytecode: exclusive/inclusive ranges, indexed writes, and each-across arrays passed differential execution"
+echo "natural AST bytecode: predeclared calls, bindings, nested when/otherwise, repeat, show and give matched reference"
