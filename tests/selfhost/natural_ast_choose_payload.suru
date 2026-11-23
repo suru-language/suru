@@ -1,6 +1,6 @@
 choice NetworkState
     Connected(address: Text)
-    Disconnected
+    Disconnected(reason: Text)
 end choice
 
 routine main() -> Unit
@@ -8,15 +8,15 @@ routine main() -> Unit
     choose current
         case Connected(address)
             show(address)
-        case Disconnected
+        case Disconnected(reason)
             show("wrong")
     end choose
 
-    value other: NetworkState = Disconnected
+    value other: NetworkState = Disconnected("offline")
     choose other
         case Connected(name)
             show("wrong")
-        case Disconnected
-            show("none")
+        case Disconnected(reason)
+            show(reason)
     end choose
 end routine
