@@ -1,9 +1,0 @@
-routine main() -> Unit
-    change items: [Whole] = [4, 5, 6]
-    change total: Whole = 0
-    each item across items
-        show(item)
-        set total to total + item
-    end each
-    show(total)
-end routine
