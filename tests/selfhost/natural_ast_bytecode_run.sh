@@ -67,6 +67,30 @@ if [ "$wildcard_suru_actual" != "$wildcard_expected" ]; then
 fi
 echo "natural AST bytecode: explicit and wildcard choice matching passed in both VMs"
 
+echo "AST bytecode regression: choice payload binding fixture"
+payload_source="$DIR/natural_ast_choose_payload.suru"
+"$SURU" --syntax=natural compile "$payload_source" "$tmp/reference-choose-payload.sbc"
+"$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+    "$payload_source" "$tmp/ast-choose-payload.sbc"
+if ! cmp -s "$tmp/reference-choose-payload.sbc" "$tmp/ast-choose-payload.sbc"; then
+    echo "AST choice-payload bytecode differs from reference" >&2
+    cmp -l "$tmp/reference-choose-payload.sbc" "$tmp/ast-choose-payload.sbc" | head -12 >&2 || true
+    exit 1
+fi
+payload_actual="$("$SURU" exec "$tmp/ast-choose-payload.sbc")"
+payload_expected="$(printf 'node\\nnone')"
+if [ "$payload_actual" != "$payload_expected" ]; then
+    echo "AST choice payload C VM mismatch: '$payload_actual'" >&2
+    exit 1
+fi
+payload_suru_actual="$(timeout -k 1s 10s "$SURU" run \
+    "$DIR/natural_vm_driver.suru" "$tmp/ast-choose-payload.sbc" 2>&1)"
+if [ "$payload_suru_actual" != "$payload_expected" ]; then
+    echo "AST choice payload SURU VM mismatch: '$payload_suru_actual'" >&2
+    exit 1
+fi
+echo "natural AST bytecode: typed payload patterns matched reference bytecode and both VMs"
+
 echo "AST bytecode regression: nested forward routine-call fixture"
 call_source="$DIR/natural_ast_call_types.suru"
 if ! timeout -k 1s 10s "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
