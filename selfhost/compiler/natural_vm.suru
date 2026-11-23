@@ -396,6 +396,14 @@ func natural_run_module(bytes: str) -> int {
                 else { result = x >> y; }
             }
             stack = vm_push(stack, "I" + to_str(result));
+        } else if op == 28 {
+            // BC_BIT_NOT
+            let n: int = array_len(stack);
+            let value: str = stack[n - 1];
+            if vm_tag(value) != 1 { return 1; }
+            let number: int = int_from_str(substr(value, 1, str_len(value)));
+            stack = vm_pop(stack);
+            stack = vm_push(stack, "I" + to_str(~number));
         } else if op == 35 or op == 36 or op == 37 or
                   op == 38 or op == 39 or op == 40 {
             // BC_EQ_F through BC_GE_F.
