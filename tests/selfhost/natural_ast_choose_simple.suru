@@ -9,14 +9,6 @@ routine main() -> Unit
         case Up
             show("up")
         case Down
-            show("wrong")
-        end choose
-
-    value other: LinkState = Down
-    choose other
-        case Up
-            show("wrong")
-        case _
             show("down")
     end choose
 end routine
