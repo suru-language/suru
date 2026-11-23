@@ -48,7 +48,7 @@ if [ "$indexed_actual" != "$indexed_expected" ]; then
     echo "AST indexed-assignment execution mismatch: '$indexed_actual'" >&2
     exit 1
 fi
-across_source="$ROOT/tests/natural/routine_ast_each_across.suru"
+across_source="$DIR/natural_ast_each_across.suru"
 echo "natural AST bytecode: compiling each-across fixture"
 timeout 15 "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
     "$across_source" "$tmp/ast-across.sbc"
