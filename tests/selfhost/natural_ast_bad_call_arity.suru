@@ -1,5 +1,5 @@
-routine identity(value: Whole) -> Whole
-    give value
+routine identity(item: Whole) -> Whole
+    give item
 end routine
 routine main() -> Unit
     show(identity())
