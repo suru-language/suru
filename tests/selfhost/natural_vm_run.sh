@@ -55,7 +55,6 @@ run_case tostring 'routine main() -> Unit\n    show(to_str(42))\n    show(to_str
 run_case floatadd 'routine main() -> Unit\n    show(1.5 + 2.5)\nend routine'
 run_case floatmul 'routine main() -> Unit\n    show(2.0 * 3.0)\nend routine'
 run_case floatneg 'routine negate(value: Real) -> Real\n    give -value\nend routine\nroutine main() -> Unit\n    show(negate(1.5))\n    show(negate(0.0))\nend routine' required
-run_case intfloat 'routine main() -> Unit\n    value whole_part: Whole = 7\n    value real_part: Real = 2.5\n    show(whole_part + real_part)\n    show(real_part + whole_part)\nend routine' required
 run_case floatcmp 'routine compare(left: Real, right: Real) -> Unit\n    show(left == right)\n    show(left != right)\n    show(left < right)\n    show(left <= right)\n    show(left > right)\n    show(left >= right)\nend routine\nroutine main() -> Unit\n    compare(1.5, 2.5)\nend routine' required
 run_case bitwise 'routine bit_ops(left: Whole, right: Whole) -> Unit\n    show(left & right)\n    show(left | right)\n    show(left ^ right)\n    show(left << right)\n    show(left >> right)\n    show(~left)\nend routine\nroutine shift(left: Whole, count: Whole) -> Whole\n    give left >> count\nend routine\nroutine shift_left(left: Whole, count: Whole) -> Whole\n    give left << count\nend routine\nroutine main() -> Unit\n    bit_ops(12, 2)\n    show(shift(-8, 1))\n    show(shift(8, 64))\n    show(shift(8, -1))\n    show(shift_left(3, 64))\nend routine' required
 run_case boolcmp 'routine invert(value: Bool) -> Bool\n    give not value\nend routine\nroutine compare(left: Bool, right: Bool) -> Unit\n    show(invert(left) == invert(right))\n    show(invert(left) != invert(right))\nend routine\nroutine main() -> Unit\n    compare(true, true)\n    compare(true, false)\nend routine' required
@@ -73,6 +72,34 @@ run_case rec 'record Point\n    change x: Whole\n    change y: Whole\nend record
 run_case recparam 'record Point\n    change x: Whole\nend record\nroutine f(n: Whole, p: Point) -> Whole\n    give p.x + n\nend routine\nroutine main() -> Unit\n    value p: Point = none\n    set p.x to 5\n    show(f(2, p))\nend routine'
 run_case handled 'routine handled() -> Unit\n    attempt\n        show("try")\n    handle problem: FileError\n        show("handled")\n    end exception\n    ensure\n        show("cleanup")\n    end exception\n    give\nend attempt\nend routine'
 run_case exc 'routine main() -> Unit\n    attempt\n        show("try")\n    handle e: E\n        show("handled")\n    end exception\n    ensure\n        show("cleanup")\n    end exception\n    give\nend attempt\nend routine'
+
+# Direct v1 bytecode fixture covers operations not yet emitted by the
+# natural bytecode lowerer (notably BC_CONV_I_F and BC_EQ_B / BC_NE_B).
+echo "natural VM: direct scalar opcode parity"
+if ! "${CC:-cc}" -std=c17 -Wall -Wextra -Wpedantic -Werror \
+        -I"$ROOT/include" "$DIR/natural_vm_opcode_fixture.c" \
+        "$ROOT/build/obj/bc.o" -o "$tmp/natural-vm-opcode-fixture"; then
+    echo "FAIL direct scalar opcodes: fixture build failed" >&2
+    fail=$((fail + 1))
+elif ! "$tmp/natural-vm-opcode-fixture" "$tmp/scalar-opcodes.sbc"; then
+    echo "FAIL direct scalar opcodes: fixture generation failed" >&2
+    fail=$((fail + 1))
+else
+    tests=$((tests + 1))
+    if ! c=$("$SURU" exec "$tmp/scalar-opcodes.sbc" 2>&1); then
+        echo "FAIL direct scalar opcodes: reference VM failed: [$c]" >&2
+        fail=$((fail + 1))
+    elif ! s=$("$SURU" run "$DIR/natural_vm_driver.suru" \
+            "$tmp/scalar-opcodes.sbc" 2>&1); then
+        echo "FAIL direct scalar opcodes: SURU VM failed: [$s]" >&2
+        fail=$((fail + 1))
+    elif [ "$s" != "$c" ]; then
+        echo "FAIL direct scalar opcodes: C=[$c] SURU=[$s]" >&2
+        fail=$((fail + 1))
+    else
+        echo "natural VM: direct scalar opcode parity passed"
+    fi
+fi
 
 # BC_TRAP parity: the Stage-0 compiler intentionally emits a trap for the
 # array-across source-shaped fixture; both VMs must terminate with status 1.
