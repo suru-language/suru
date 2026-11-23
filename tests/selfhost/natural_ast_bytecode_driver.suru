@@ -7,7 +7,15 @@ func main() {
     let source: str = source_load(args(0));
     let instructions: [str] = nab_collect_ast(source);
     if array_len(instructions) == 1 and instructions[0] == "#emit-failed" { exit(3); }
-    if natural_verify(instructions) != 0 { exit(4); }
+    if natural_verify(instructions) != 0 {
+        println("ast-bytecode-verify-failed");
+        mut debug_index: int = 0;
+        while debug_index < array_len(instructions) {
+            println("AST-VERIFY|" + to_str(debug_index) + "|" + instructions[debug_index]);
+            debug_index += 1;
+        }
+        exit(4);
+    }
     write_file(args(1), nw_serialize(instructions));
     exit(0);
 }
