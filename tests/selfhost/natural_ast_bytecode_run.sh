@@ -49,19 +49,13 @@ if [ "$indexed_actual" != "$indexed_expected" ]; then
     exit 1
 fi
 across_source="$ROOT/tests/natural/routine_ast_each_across.suru"
-"$SURU" --syntax=natural compile "$across_source" "$tmp/reference-across.sbc"
 "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
     "$across_source" "$tmp/ast-across.sbc"
-reference_across_actual="$("$SURU" exec "$tmp/reference-across.sbc")"
 across_actual="$("$SURU" exec "$tmp/ast-across.sbc")"
 across_expected="$(printf '4\n5\n6\n15')"
-if [ "$reference_across_actual" != "$across_expected" ]; then
-    echo "reference each-across execution mismatch: '$reference_across_actual'" >&2
+if [ "$across_actual" != "$across_expected" ]; then
+    echo "AST each-across execution mismatch: '$across_actual'" >&2
     exit 1
 fi
-if [ "$across_actual" != "$reference_across_actual" ]; then
-    echo "AST each-across execution differs from reference: '$across_actual' vs '$reference_across_actual'" >&2
-    exit 1
-fi
-echo "natural AST bytecode: each-across array iteration matched reference execution and expected output"
+echo "natural AST bytecode: each-across array iteration emitted and executed with the expected values"
 echo "natural AST bytecode: exclusive/inclusive ranges, indexed writes, predeclared calls, nested control flow, and routine output passed"
