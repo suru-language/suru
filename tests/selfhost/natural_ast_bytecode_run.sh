@@ -193,3 +193,11 @@ if [ "$suru_vm_across_actual" != "$across_expected" ]; then
 fi
 echo "natural AST bytecode: each-across array iteration passed C VM and SURU VM execution"
 echo "natural AST bytecode: exclusive/inclusive ranges, indexed writes, predeclared calls, nested control flow, and routine output passed"
+bad_source="$ROOT/tests/natural/routine_ast_bytecode_bad_call.suru"
+if "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+       "$bad_source" "$tmp/bad.sbc" >/dev/null 2>&1; then
+    echo "AST bytecode accepted an invalid user-routine argument type" >&2
+    exit 1
+fi
+echo "natural AST bytecode: forward routine signatures, nested when/otherwise, repeat and invalid-call rejection passed"
+
