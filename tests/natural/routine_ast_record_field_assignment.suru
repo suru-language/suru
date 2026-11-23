@@ -1,0 +1,10 @@
+record Counter
+    change value: Whole
+    label: Text
+end record
+
+routine main() -> Unit
+    value counter: Counter = none
+    set counter.value to 41
+    show(counter.value)
+end routine
