@@ -5,6 +5,7 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$DIR/../.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
+echo "AST bytecode regression: baseline routine/control fixture"
 source="$ROOT/tests/natural/routine_ast_bytecode.suru"
 "$SURU" --syntax=natural compile "$source" "$tmp/reference.sbc"
 "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
@@ -24,6 +25,7 @@ if [ "$actual" != "$expected" ]; then
     echo "AST bytecode execution mismatch: '$actual'" >&2
     exit 1
 fi
+echo "AST bytecode regression: range-loop fixture"
 range_source="$ROOT/tests/natural/routine_ast_each_range.suru"
 "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
     "$range_source" "$tmp/ast-each-range.sbc"
@@ -33,6 +35,7 @@ if [ "$range_actual" != "$range_expected" ]; then
     echo "AST each-range execution mismatch: '$range_actual'" >&2
     exit 1
 fi
+echo "AST bytecode regression: indexed-assignment fixture"
 indexed_source="$ROOT/tests/natural/routine_ast_index_assignment.suru"
 "$SURU" --syntax=natural compile "$indexed_source" "$tmp/reference-index.sbc"
 "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
@@ -48,6 +51,7 @@ if [ "$indexed_actual" != "$indexed_expected" ]; then
     echo "AST indexed-assignment execution mismatch: '$indexed_actual'" >&2
     exit 1
 fi
+echo "AST bytecode regression: array-across fixture"
 across_source="$DIR/natural_ast_each_across.suru"
 echo "natural AST bytecode: compiling each-across fixture"
 timeout -k 1s 5s "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
