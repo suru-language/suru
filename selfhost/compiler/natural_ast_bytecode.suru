@@ -31,6 +31,9 @@ func nab_collect_routine_declarations(instructions: [str], module: [str]) -> [st
                 let index: int = nbc_pool_count(result, "func");
                 result = array_concat(result, ["#func|" + name + "|" + to_str(index)]);
             }
+            if nbc_func_return_type(result, name) == "" {
+                result = array_concat(result, ["#functype|" + name + "|" + signature[2]]);
+            }
         }
         i += 1;
     }
@@ -106,6 +109,41 @@ func nab_collect_ast(source: str) -> [str] {
             }
         }
         field_meta_index += 1;
+    }
+    // Make every routine signature visible before lowering any body. This
+    // permits forward calls and gives expression typing one shared namespace
+    // for record fields and routine signatures.
+    mut routine_meta_index: int = 1;
+    while routine_meta_index < array_len(module) {
+        let declaration: str = module[routine_meta_index];
+        if nam_node_kind(declaration) == "routine" {
+            let signature: [str] = str_split(nam_node_text(declaration), "|");
+            if array_len(signature) < 3 {
+                return nab_fail("malformed routine signature during type prepass");
+            }
+            mut parameters: [str] = [];
+            if signature[1] != "" { parameters = str_split(signature[1], ","); }
+            mut parameter_types: [str] = [];
+            mut parameter_index: int = 0;
+            while parameter_index < array_len(parameters) {
+                let colon: int = nbc_find(parameters[parameter_index], ":");
+                if colon < 1 {
+                    return nab_fail("malformed parameter type in routine '" + signature[0] + "'");
+                }
+                let parameter_type: str = str_trim(substr(
+                    parameters[parameter_index], colon + 1,
+                    str_len(parameters[parameter_index])));
+                if parameter_type == "" {
+                    return nab_fail("empty parameter type in routine '" + signature[0] + "'");
+                }
+                parameter_types = array_concat(parameter_types, [parameter_type]);
+                parameter_index += 1;
+            }
+            field_names = array_concat(field_names, ["@routine:" + signature[0]]);
+            field_types = array_concat(field_types,
+                [signature[2] + "|" + nam_join(parameter_types, ",")]);
+        }
+        routine_meta_index += 1;
     }
     mut current_function: str = "";
     mut return_type: str = "";
@@ -282,6 +320,9 @@ func nab_collect_ast(source: str) -> [str] {
             }
         } else if kind == "show" {
             if array_len(roots) != 1 { return nab_fail("show requires one expression"); }
+            let checked: [str] = net_infer(nodes, roots[0], names, types,
+                                           field_names, field_types);
+            if checked[0] == "error" { return nab_fail(checked[1]); }
             instructions = nbc_emit_ast_node(instructions, nodes, roots[0]);
             instructions = nbc_emit(instructions, "BC_BUILTIN", "1");
             instructions = nbc_emit(instructions, "BC_POP", "");
