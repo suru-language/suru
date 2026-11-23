@@ -1,0 +1,7 @@
+routine main() -> Unit
+    show(add(add(2, 1), 3))
+end routine
+
+routine add(left: Whole, right: Whole) -> Whole
+    give left + right
+end routine

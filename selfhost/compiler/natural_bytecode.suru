@@ -144,6 +144,18 @@ func nbc_bind(instructions: [str], name: str) -> [str] {
     return array_concat(instructions, [stable]);
 }
 
+func nbc_func_return_type(instructions: [str], name: str) -> str {
+    let wanted: str = "#functype|" + name + "|";
+    mut i: int = 0;
+    while i < array_len(instructions) {
+        if nbc_has_prefix(instructions[i], wanted) {
+            return substr(instructions[i], str_len(wanted), str_len(instructions[i]));
+        }
+        i += 1;
+    }
+    return "";
+}
+
 func nbc_is_digit(c: str) -> bool {
     return c >= "0" and c <= "9";
 }
@@ -672,6 +684,7 @@ func nbc_ast_type(instructions: [str], nodes: [str], node: int) -> str {
         if callee == "str_contains" { return "Truth"; }
         if callee == "str_len" or callee == "array_len" or
            callee == "str_compare" { return "Whole"; }
+        return nbc_func_return_type(instructions, callee);
     }
     return "";
 }

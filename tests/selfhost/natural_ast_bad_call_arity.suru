@@ -1,0 +1,6 @@
+routine identity(item: Whole) -> Whole
+    give item
+end routine
+routine main() -> Unit
+    show(identity())
+end routine
