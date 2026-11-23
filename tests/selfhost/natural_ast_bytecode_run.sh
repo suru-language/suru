@@ -60,8 +60,14 @@ echo "natural AST bytecode: executing each-across module"
 across_actual="$(timeout -k 1s 5s "$SURU" exec "$tmp/ast-across.sbc")"
 across_expected="$(printf '4\n5\n6\n15')"
 if [ "$across_actual" != "$across_expected" ]; then
-    echo "AST each-across execution mismatch: '$across_actual'" >&2
+    echo "AST each-across C VM execution mismatch: '$across_actual'" >&2
     exit 1
 fi
-echo "natural AST bytecode: each-across array iteration emitted and executed with the expected values"
+suru_vm_across_actual="$(timeout -k 1s 10s "$SURU" run \
+    "$DIR/natural_vm_driver.suru" "$tmp/ast-across.sbc" 2>&1)"
+if [ "$suru_vm_across_actual" != "$across_expected" ]; then
+    echo "AST each-across SURU VM execution mismatch: '$suru_vm_across_actual'" >&2
+    exit 1
+fi
+echo "natural AST bytecode: each-across array iteration passed C VM and SURU VM execution"
 echo "natural AST bytecode: exclusive/inclusive ranges, indexed writes, predeclared calls, nested control flow, and routine output passed"
