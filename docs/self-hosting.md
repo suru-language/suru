@@ -422,10 +422,12 @@ includes float negation and integer-to-float conversion, all six floating-point
 comparisons, Boolean equality/inequality, integer AND/OR/XOR and shifts,
 integer bitwise-not, and explicit trap handling. Bitwise operations use
 `Whole` operands; shifts outside the range 0 through 63 produce zero, matching
-the reference VM. The scalar opcode parity gate uses non-constant routine
-parameters to exercise runtime operations rather than relying on constant
-folding, and separately checks that the Stage-0 array-across trap terminates
-both VMs with the same status. Bytecode version 1 and its serialized format
+the reference VM. The scalar opcode parity gate uses non-constant routine parameters for the
+source-expressible operations, and a hand-built bytecode-v1 module directly
+checks `BC_CONV_I_F` and the Boolean comparison opcodes that the current
+natural bytecode lowerer does not yet emit. Each direct check traps on a
+mismatched result; a separate array-across fixture checks that the Stage-0
+compiler trap terminates both VMs with the same status. Bytecode version 1 and its serialized format
 are unchanged.
 
 The SURU-written interpreter in `natural_vm.suru` now stores text
