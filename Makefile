@@ -70,6 +70,8 @@ SELFHOST_DRIVERS = tests/selfhost/lexer_driver.suru \
 	tests/selfhost/heap_driver.suru \
 	tests/selfhost/natural_vm_exception_mk_driver.suru \
 	tests/selfhost/natural_vm_closure_string_mk_driver.suru \
+	tests/selfhost/natural_vm_local_roots_mk_driver.suru \
+	tests/selfhost/natural_vm_gc_schedule_driver.suru \
 	tests/selfhost/natural_bytecode_driver.suru \
 	tests/selfhost/natural_ast_bytecode_driver.suru
 SELFHOST_REF = $(UNITDIR)/selfhost_reference_lexer
@@ -169,6 +171,8 @@ selfhost-test: selfhost-check $(SELFHOST_REF)
 	@tests/selfhost/natural_vm_corpus_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_closure_run.sh $(BINDIR)/suru
 	@bash tests/selfhost/natural_vm_closure_string_run.sh $(BINDIR)/suru
+	@bash tests/selfhost/natural_vm_local_roots_run.sh $(BINDIR)/suru
+	@bash tests/selfhost/natural_vm_gc_schedule_run.sh $(BINDIR)/suru
 	@bash tests/selfhost/heap_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_exec_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_run.sh $(BINDIR)/suru
@@ -192,6 +196,8 @@ selfhost-compare: $(BINDIR)/suru
 	@tests/selfhost/natural_vm_corpus_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_vm_closure_run.sh $(BINDIR)/suru
 	@bash tests/selfhost/natural_vm_closure_string_run.sh $(BINDIR)/suru
+	@bash tests/selfhost/natural_vm_local_roots_run.sh $(BINDIR)/suru
+	@bash tests/selfhost/natural_vm_gc_schedule_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_exec_vm_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_run.sh $(BINDIR)/suru
 	@tests/selfhost/natural_elf_compile_run.sh $(BINDIR)/suru

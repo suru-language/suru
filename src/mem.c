@@ -80,7 +80,7 @@ static void free_free_lists(s_heap *h) {
     }
     s_gcobj *o = h->large_free;
     while (o) {
-        s_gcobj *next = *(s_gcobj **)o;
+        s_gcobj *next = o->next_all;
         raw_free(o);
         o = next;
     }
@@ -114,16 +114,17 @@ static s_gcobj *take_free(s_heap *h, s_size rounded) {
         }
         return NULL;
     }
-    /* large: use first large chunk of sufficient size. free_object stores the
-     * free-list link in the object's first word; traverse it the same way. */
+    /* Large blocks need first-fit size checks, so preserve chunk_size and
+     * keep the free-list link in next_all (the object is no longer live). */
     s_gcobj **pp = &h->large_free;
     while (*pp) {
         s_gcobj *o = *pp;
         if (o->chunk_size >= rounded) {
-            *pp = *(s_gcobj **)o;
+            *pp = o->next_all;
+            o->next_all = NULL;
             return o;
         }
-        pp = (s_gcobj **)o;
+        pp = &o->next_all;
     }
     return NULL;
 }
@@ -372,7 +373,8 @@ static void free_object(s_heap *h, s_gcobj *o) {
         *(s_gcobj **)o = h->free_buckets[bi];
         h->free_buckets[bi] = o;
     } else {
-        *(s_gcobj **)o = h->large_free;
+        /* Keep chunk_size intact for large-list first-fit capacity checks. */
+        o->next_all = h->large_free;
         h->large_free = o;
     }
 }

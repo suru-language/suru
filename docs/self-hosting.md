@@ -209,7 +209,7 @@ The bytecode object-emitting half is now owned by SURU:
   frontend first imposes GC pressure that corrupts aliasing source views (a
   known SURU string-aliasing fragility); re-reading yields deterministic,
   C-identical output.   This is the first execution step of the Stage 2 VM port. The interpreter now
-  implements the full instruction set, including closures (`BC_MKCLOSURE`,
+  implements the currently supported instruction subset, including closures (`BC_MKCLOSURE`,
   `BC_MKCLOSURE_V`, `BC_CALLV`) matching the C VM's capture/call convention
   (env placed in callee local slot 0, args after it); a hand-built module gate
   (`natural_vm_closure_run.sh`) verifies identical output on both VMs.
@@ -230,7 +230,11 @@ The bytecode object-emitting half is now owned by SURU:
   (`ld_local`/`st_local` over a stack frame with a red zone so the print
   routine's scratch cannot overlap locals; precedence is already baked into the
   bytecode; values are printed via raw x86-64 decimal conversion)
-  (`natural_elf_compile_run.sh`). A micro-assembler (`nw_emit_elf_repeat`)
+  (`natural_elf_compile_run.sh`). The same native path now emits multiple
+  constant-string `show` calls, including empty strings, through separate
+  RIP-relative `write` syscalls with message bytes embedded in the ELF image;
+  it requires no C compiler, linker, or runtime for the produced executable.
+  A micro-assembler (`nw_emit_elf_repeat`)
   emits a `repeat while` loop with a counter, comparison (`setl`/`test`), and
   resolved `jz`/`jmp` rel32 targets; it prints "012" and is gated by
   `natural_elf_loop_run.sh`. A generic bytecode->x86-64 compiler
@@ -394,11 +398,19 @@ allocations since the last completed cycle, completed cycle count, cumulative
 logical allocation bytes, the current threshold, and the cycle's before-live
 snapshot. The heap module implements and tests the C VM's 512-allocation /
 1 MiB live-byte trigger and four-times-survivor threshold adaptation, including
-minimum/maximum clamps and the high-survival anti-thrashing rule. The
-SURU-written VM currently advances a bounded 128-object mark slice at every
-managed allocation; wiring the C-compatible interval/threshold trigger into
-the VM remains gated on complete runtime safepoint and root coverage. This
-conservative schedule is the version validated against the full VM corpus.
+minimum/maximum clamps and the high-survival anti-thrashing rule. The SURU-written VM now invokes the C-compatible allocation trigger before
+managed allocations: collection starts at the 512-allocation interval or
+when logical live reservations exceed the 1 MiB starting threshold. It advances
+marking in 128-object slices at allocation safepoints and republishes roots
+from the operand stack and every active frame on each slice. The 520-allocation
+suspended-caller regression exercises the integrated trigger and checks that a
+caller-local value survives collection. Logical byte accounting is an estimate
+based on SURU's object-table representation, not host allocator byte parity.
+The direct `natural_vm_gc_schedule_driver.suru` gate also calls the allocation
+wrapper at the 511th/512th allocation boundary, checks the independent
+logical-live-byte trigger, and verifies that the next threshold adapts to four
+times the surviving rooted heap after collection.
+
 The regression driver exercises shared references, unreachable cycles,
 exception causes, dropping roots, full reclamation, class-aware slot reuse,
 large first-fit reuse, capacity growth, incremental root discovery, allocation
@@ -420,12 +432,12 @@ the operand stack. A C-vs-SURU VM regression captures a managed string and reads
 it inside the called routine; the existing closure parity fixture remains
 intact.
 
-The interpreter advances a bounded mark slice (budget 128 objects) on
-each managed allocation, re-seeding roots from its operand stack and active
-call-frame locals. New objects are shaded grey during an active cycle, and
-mutable array/record writes use the tri-colour barrier when a black object gains
-a white child. When the grey queue drains, the VM sweeps and seeds the next
-cycle. The large self-hosted tokenizer VM corpus exercises repeated string
+When a collection is due, the interpreter advances marking in bounded
+128-object slices at managed-allocation safepoints, re-seeding roots from its
+operand stack and all active call-frame locals. New objects are shaded grey
+during an active cycle, and mutable array/record writes use the tri-colour
+barrier when a black object gains a white child. When the grey queue drains,
+the VM sweeps and returns to the idle allocation state. The large self-hosted tokenizer VM corpus exercises repeated string
 allocation under this scheduler; the interval-one GC gate also covers the
 interpreter's host allocations.
 
@@ -483,3 +495,36 @@ The SURU-written module AST parser now recognizes top-level routine declarations
 The AST-driven bytecode collector in `natural_ast_bytecode.suru` consumes routine/module AST nodes and attached expression-node IDs directly. Its executable subset now includes typed routine parameters and returns, local bindings and assignments, `show` and `give`, nested `when`/`otherwise`, `repeat while`, and integer range loops. The range-loop lowering evaluates the start and upper bound once, keeps the iterator and bound in function-local slots, uses an exclusive comparison for `until` and an inclusive comparison for `through`, and resolves loop branches through the SURU module writer. The emitted instruction records go through the existing SURU verifier and writer without changing bytecode v1.
 
 The differential test still compares the byte-identical two-routine subset supported by both collectors. A separate AST-only execution fixture checks `each ... from ... until` and `each ... from ... through`, because the older source-scanning reference collector does not yet lower these new range constructs. The source-scanning collector remains the reference for records, choices, exceptions, and wider language coverage; remaining AST lowering and removal of source-line collection from the normal Stage 1 compiler path are still open tasks.
+
+
+### Stage 2 root-coverage regression: suspended caller frames
+
+tests/selfhost/natural_vm_local_roots_mk_driver.suru builds a two-function
+bytecode module. main stores a managed string in local slot 0, calls a
+separate churn routine, and reads the string only after that routine
+returns. churn performs 520 managed string allocations, discarding each
+temporary value. This forces the SURU VM's incremental collector to make
+progress while the only live reference to the retained string is in a
+suspended caller frame.
+
+The regression runs the same module through the C reference VM and the
+SURU-written VM and requires identical output (caller-root). It specifically
+guards the VM root-set contract: every active call frame's locals, not merely
+the top frame's locals and the operand stack, must be scanned at allocation
+safepoints. The runner is included in both make selfhost-test and
+make selfhost-compare.
+
+The SURU VM now invokes the production-style allocation policy rather than
+running a mark slice on every allocation. A cycle starts when the current
+allocation reaches the 512-object interval or logical live reservations exceed
+the 1 MiB starting threshold. Marking advances in 128-object slices at
+allocation safepoints. New allocations during an active cycle are shaded, and
+each slice republishes roots from the operand stack and every active frame.
+The 520-allocation suspended-caller fixture therefore exercises both the
+production-style trigger and the suspended-frame root invariant.
+
+The Stage-0 C bootstrap heap also received a correctness fix discovered while
+running this regression: large free blocks now keep their capacity field intact
+while using a separate link for the large-object free list. A unit regression
+ensures first-fit reuse skips undersized blocks. This is a bootstrap safety
+fix; the managed heap and VM integration under test remain written in SURU.

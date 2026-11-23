@@ -1,0 +1,85 @@
+use "../../selfhost/compiler/natural_vm.suru";
+
+// Call the VM allocation wrapper at the allocation-count boundary. Seed the
+// metrics at 510/511 so this checks the wrapper's trigger decision without
+// spending hundreds of allocations constructing an artificial test heap.
+func main() {
+    let no_children: [int] = [];
+    let no_stack: [str] = [];
+    let no_frames: [[str]] = [];
+
+    mut interval_heap: [str] = [];
+    interval_heap = sh_alloc(interval_heap, "str", "caller-root", no_children);
+    let interval_metrics: [str] = [
+        "0", "510", "0", "0", "1048576", "1048576", "0"
+    ];
+    let interval_work: [str] = [];
+    mut interval_state: [[str]] = [
+        interval_heap, interval_work, interval_metrics
+    ];
+
+    // The 511th allocation does not trigger collection.
+    let allocated_511: [[str]] = vm_heap_alloc(
+        interval_state, ["H0"], no_frames, "str", "first", no_children);
+    interval_state = [
+        allocated_511[0], allocated_511[1], allocated_511[2]
+    ];
+    let before: [int] = sh_gc_stats(interval_state);
+    if before[0] != 511 or before[1] != 0 or before[3] != 0 or
+       sh_live_count(interval_state[0]) != 2 {
+        println("FAIL VM GC interval fired before allocation 512");
+        exit(1);
+    }
+
+    // The 512th allocation starts and completes collection. H0 is the live
+    // operand-stack root; the new allocation is then appended to the heap.
+    let allocated_512: [[str]] = vm_heap_alloc(
+        interval_state, ["H0"], no_frames, "str", "second", no_children);
+    interval_state = [
+        allocated_512[0], allocated_512[1], allocated_512[2]
+    ];
+    let after: [int] = sh_gc_stats(interval_state);
+    if after[0] != 1 or after[1] != 1 or after[3] != 0 or
+       sh_live_count(interval_state[0]) != 2 or
+       sh_payload(interval_state[0], 0) != "caller-root" {
+        println("FAIL VM GC interval did not collect on allocation 512");
+        exit(1);
+    }
+
+    // A large object crosses this deliberately small logical-byte threshold.
+    // The next allocation must collect the unrooted large object first.
+    let byte_metrics: [str] = [
+        "0", "0", "0", "0", "64", "64", "0"
+    ];
+    let byte_work: [str] = [];
+    mut byte_heap: [str] = [];
+    byte_heap = sh_alloc(byte_heap, "str", "kept", no_children);
+    mut byte_state: [[str]] = [byte_heap, byte_work, byte_metrics];
+    let byte_roots: [str] = ["H0"];
+    let large: [[str]] = vm_heap_alloc(
+        byte_state, byte_roots, no_frames, "str",
+        "0123456789012345678901234567890123456789", no_children);
+    byte_state = [large[0], large[1], large[2]];
+    let byte_before: [int] = sh_gc_stats(byte_state);
+    if sh_live_bytes(byte_state[0]) <= 64 or byte_before[1] != 0 {
+        println("FAIL VM byte threshold setup");
+        exit(1);
+    }
+
+    // The next allocation triggers collection: it keeps H0, reclaims the
+    // oversized temporary, and adapts the next threshold to four times the
+    // surviving logical live set (48 bytes * 4 = 192).
+    let small: [[str]] = vm_heap_alloc(
+        byte_state, byte_roots, no_frames, "str", "x", no_children);
+    byte_state = [small[0], small[1], small[2]];
+    let byte_after: [int] = sh_gc_stats(byte_state);
+    if byte_after[1] != 1 or byte_after[0] != 1 or
+       byte_after[5] != 192 or sh_live_count(byte_state[0]) != 2 or
+       sh_payload(byte_state[0], 0) != "kept" {
+        println("FAIL VM logical-byte trigger/adaptive threshold");
+        exit(1);
+    }
+
+    println("SURU VM GC scheduler: 512-allocation and logical-byte triggers passed");
+    exit(0);
+}
