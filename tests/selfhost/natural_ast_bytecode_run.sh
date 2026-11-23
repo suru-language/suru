@@ -34,14 +34,24 @@ if ! timeout -k 1s 10s "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
     cat "$tmp/calls-compile.log" >&2
     exit 1
 fi
-calls_actual="$("$SURU" exec "$tmp/ast-calls.sbc")"
+echo "AST nested forward-call fixture: executing in C VM"
+if ! calls_actual="$(timeout -k 1s 10s "$SURU" exec "$tmp/ast-calls.sbc" 2>&1)"; then
+    echo "AST nested routine-call C VM failed:" >&2
+    printf '%s\n' "$calls_actual" >&2
+    exit 1
+fi
 calls_expected="6"
 if [ "$calls_actual" != "$calls_expected" ]; then
     echo "AST nested routine-call C VM mismatch: '$calls_actual'" >&2
     exit 1
 fi
-calls_suru_actual="$(timeout -k 1s 10s "$SURU" run \
-    "$DIR/natural_vm_driver.suru" "$tmp/ast-calls.sbc" 2>&1)"
+echo "AST nested forward-call fixture: executing in SURU VM"
+if ! calls_suru_actual="$(timeout -k 1s 10s "$SURU" run \
+    "$DIR/natural_vm_driver.suru" "$tmp/ast-calls.sbc" 2>&1)"; then
+    echo "AST nested routine-call SURU VM failed:" >&2
+    printf '%s\n' "$calls_suru_actual" >&2
+    exit 1
+fi
 if [ "$calls_suru_actual" != "$calls_expected" ]; then
     echo "AST nested routine-call SURU VM mismatch: '$calls_suru_actual'" >&2
     exit 1
