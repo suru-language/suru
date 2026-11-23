@@ -149,6 +149,60 @@ func vm_alloc_string(state: [[str]], stack: [str],
     return vm_heap_alloc(state, stack, frames, "str", value, no_children);
 }
 
+func vm_scalar_unary(op: int, value: str) -> str {
+    if op == 12 {
+        if vm_tag(value) != 4 { return "!"; }
+        let number: float = str_to_f64(substr(value, 1, str_len(value)));
+        return "F" + f64_to_str(number * -1.0);
+    }
+    if op == 13 {
+        if vm_tag(value) != 1 { return "!"; }
+        let number: int = int_from_str(substr(value, 1, str_len(value)));
+        return "F" + f64_to_str(str_to_f64(to_str(number)));
+    }
+    if op == 28 {
+        if vm_tag(value) != 1 { return "!"; }
+        let number: int = int_from_str(substr(value, 1, str_len(value)));
+        return "I" + to_str(~number);
+    }
+    return "!";
+}
+
+func vm_integer_bitwise(op: int, left: str, right: str) -> str {
+    if vm_tag(left) != 1 or vm_tag(right) != 1 { return "!"; }
+    let x: int = int_from_str(substr(left, 1, str_len(left)));
+    let y: int = int_from_str(substr(right, 1, str_len(right)));
+    mut result: int = 0;
+    if op == 23 { result = x & y; }
+    else if op == 24 { result = x | y; }
+    else if op == 25 { result = x ^ y; }
+    else if y >= 0 and y < 64 {
+        if op == 26 { result = x << y; }
+        else { result = x >> y; }
+    }
+    return "I" + to_str(result);
+}
+
+func vm_float_compare_value(op: int, left: str, right: str) -> str {
+    if vm_tag(left) != 4 or vm_tag(right) != 4 { return "!"; }
+    let x: float = str_to_f64(substr(left, 1, str_len(left)));
+    let y: float = str_to_f64(substr(right, 1, str_len(right)));
+    mut result: bool = false;
+    if op == 35 { result = x == y; }
+    else if op == 36 { result = x != y; }
+    else if op == 37 { result = x < y; }
+    else if op == 38 { result = x <= y; }
+    else if op == 39 { result = x > y; }
+    else { result = x >= y; }
+    return result ? "I1" : "I0";
+}
+
+func vm_boolean_compare_value(op: int, left: str, right: str) -> str {
+    let equal: bool = vm_tag(left) == vm_tag(right) and left == right;
+    let result: bool = op == 49 ? equal : not equal;
+    return result ? "I1" : "I0";
+}
+
 func natural_run_module(bytes: str) -> int {
     let ver: [int] = nr_u32_at(bytes, 4);
     let entry: [int] = nr_u32_at(bytes, ver[1]);
@@ -316,6 +370,13 @@ func natural_run_module(bytes: str) -> int {
             let v: str = stack[n - 1];
             stack = vm_pop(stack);
             stack = vm_push(stack, "I" + to_str(0 - int_from_str(substr(v, 1, str_len(v)))));
+        } else if op == 12 or op == 13 or op == 28 {
+            let n: int = array_len(stack);
+            let value: str = stack[n - 1];
+            let mapped: str = vm_scalar_unary(op, value);
+            if mapped == "!" { return 1; }
+            stack = vm_pop(stack);
+            stack = vm_push(stack, mapped);
         } else if op == 14 or op == 15 or op == 16 or op == 17 or op == 18 {
             let n: int = array_len(stack);
             let y: str = stack[n - 1];
@@ -361,16 +422,25 @@ func natural_run_module(bytes: str) -> int {
             else if op == 33 { r = iv > jv; }
             else { r = iv >= jv; }
             stack = vm_push(stack, r ? "I1" : "I0");
-        } else if op == 23 or op == 24 {
+        } else if op == 23 or op == 24 or op == 25 or op == 26 or op == 27 {
             let n: int = array_len(stack);
-            let y: str = stack[n - 1];
-            let x: str = stack[n - 2];
+            let right: str = stack[n - 1];
+            let left: str = stack[n - 2];
+            let mapped: str = vm_integer_bitwise(op, left, right);
+            if mapped == "!" { return 1; }
             stack = vm_pop(stack);
             stack = vm_pop(stack);
-            let xb: bool = substr(x, 1, str_len(x)) == "1";
-            let yb: bool = substr(y, 1, str_len(y)) == "1";
-            let r: bool = op == 23 ? (xb and yb) : (xb or yb);
-            stack = vm_push(stack, r ? "I1" : "I0");
+            stack = vm_push(stack, mapped);
+        } else if op == 35 or op == 36 or op == 37 or
+                  op == 38 or op == 39 or op == 40 {
+            let n: int = array_len(stack);
+            let right: str = stack[n - 1];
+            let left: str = stack[n - 2];
+            let mapped: str = vm_float_compare_value(op, left, right);
+            if mapped == "!" { return 1; }
+            stack = vm_pop(stack);
+            stack = vm_pop(stack);
+            stack = vm_push(stack, mapped);
         } else if op == 41 or op == 42 or op == 43 or
                   op == 44 or op == 45 or op == 46 {
             let n: int = array_len(stack);
@@ -389,6 +459,14 @@ func natural_run_module(bytes: str) -> int {
             else if op == 45 { result = compared > 0; }
             else { result = compared >= 0; }
             stack = vm_push(stack, result ? "I1" : "I0");
+        } else if op == 49 or op == 50 {
+            let n: int = array_len(stack);
+            let right: str = stack[n - 1];
+            let left: str = stack[n - 2];
+            let mapped: str = vm_boolean_compare_value(op, left, right);
+            stack = vm_pop(stack);
+            stack = vm_pop(stack);
+            stack = vm_push(stack, mapped);
         } else if op == 47 {
             let n: int = array_len(stack);
             let right: str = stack[n - 1];
@@ -796,6 +874,9 @@ func natural_run_module(bytes: str) -> int {
             let v: str = stack[n - 1];
             stack = vm_pop(stack);
             if v[1] == "1" { fr_pc[top] = a; continue; }
+        } else if op == 72 {
+            // BC_TRAP has the same non-zero execution result as the C VM.
+            return 1;
         } else {
             return 3;
         }
