@@ -1,0 +1,22 @@
+choice NetworkState
+    Connected(address: Text)
+    Disconnected
+end choice
+
+routine main() -> Unit
+    value current: NetworkState = Connected("node")
+    choose current
+        case Connected(address)
+            show(address)
+        case Disconnected
+            show("wrong")
+    end choose
+
+    value other: NetworkState = Disconnected
+    choose other
+        case Connected(name)
+            show("wrong")
+        case Disconnected
+            show("none")
+    end choose
+end routine
