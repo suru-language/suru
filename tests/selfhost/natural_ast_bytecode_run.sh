@@ -34,6 +34,7 @@ if ! timeout -k 1s 10s "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
     cat "$tmp/calls-compile.log" >&2
     exit 1
 fi
+echo "AST nested-call compiler driver completed successfully"
 echo "AST nested forward-call fixture: executing in C VM"
 if ! calls_actual="$(timeout -k 1s 10s "$SURU" exec "$tmp/ast-calls.sbc" 2>&1)"; then
     echo "AST nested routine-call C VM failed:" >&2
