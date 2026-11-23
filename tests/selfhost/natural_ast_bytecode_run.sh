@@ -33,5 +33,21 @@ if [ "$range_actual" != "$range_expected" ]; then
     echo "AST each-range execution mismatch: '$range_actual'" >&2
     exit 1
 fi
+indexed_source="$ROOT/tests/natural/routine_ast_index_assignment.suru"
+"$SURU" --syntax=natural compile "$indexed_source" "$tmp/reference-index.sbc"
+"$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+    "$indexed_source" "$tmp/ast-index.sbc"
+if ! cmp -s "$tmp/reference-index.sbc" "$tmp/ast-index.sbc"; then
+    echo "AST indexed-assignment bytecode differs from reference" >&2
+    cmp -l "$tmp/reference-index.sbc" "$tmp/ast-index.sbc" | head -12 >&2 || true
+    exit 1
+fi
+indexed_actual="$("$SURU" exec "$tmp/ast-index.sbc")"
+indexed_expected="$(printf '2\\n9')"
+if [ "$indexed_actual" != "$indexed_expected" ]; then
+    echo "AST indexed-assignment execution mismatch: '$indexed_actual'" >&2
+    exit 1
+fi
 echo "natural AST bytecode: exclusive until and inclusive through range loops executed correctly"
+echo "natural AST bytecode: indexed array assignment and indexed reads matched reference bytecode and output"
 echo "natural AST bytecode: AST-predeclared forward routine calls, bindings, nested when/otherwise, repeat, show and give matched reference"
