@@ -50,10 +50,10 @@ if [ "$indexed_actual" != "$indexed_expected" ]; then
 fi
 across_source="$DIR/natural_ast_each_across.suru"
 echo "natural AST bytecode: compiling each-across fixture"
-timeout 15 "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+timeout -k 1s 5s "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
     "$across_source" "$tmp/ast-across.sbc"
 echo "natural AST bytecode: executing each-across module"
-across_actual="$(timeout 15 "$SURU" exec "$tmp/ast-across.sbc")"
+across_actual="$(timeout -k 1s 5s "$SURU" exec "$tmp/ast-across.sbc")"
 across_expected="$(printf '4\n5\n6\n15')"
 if [ "$across_actual" != "$across_expected" ]; then
     echo "AST each-across execution mismatch: '$across_actual'" >&2
