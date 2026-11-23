@@ -78,7 +78,7 @@ if ! cmp -s "$tmp/reference-choose-payload.sbc" "$tmp/ast-choose-payload.sbc"; t
     exit 1
 fi
 payload_actual="$("$SURU" exec "$tmp/ast-choose-payload.sbc")"
-payload_expected="$(printf 'node\\nnone')"
+payload_expected="$(printf 'node\noffline')"
 if [ "$payload_actual" != "$payload_expected" ]; then
     echo "AST choice payload C VM mismatch: '$payload_actual'" >&2
     exit 1
