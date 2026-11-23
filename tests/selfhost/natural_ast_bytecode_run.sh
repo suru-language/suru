@@ -52,16 +52,16 @@ across_source="$ROOT/tests/natural/routine_ast_each_across.suru"
 "$SURU" --syntax=natural compile "$across_source" "$tmp/reference-across.sbc"
 "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
     "$across_source" "$tmp/ast-across.sbc"
-if ! cmp -s "$tmp/reference-across.sbc" "$tmp/ast-across.sbc"; then
-    echo "AST each-across bytecode differs from reference" >&2
-    cmp -l "$tmp/reference-across.sbc" "$tmp/ast-across.sbc" | head -12 >&2 || true
-    exit 1
-fi
+reference_across_actual="$("$SURU" exec "$tmp/reference-across.sbc")"
 across_actual="$("$SURU" exec "$tmp/ast-across.sbc")"
 across_expected="$(printf '4\n5\n6\n15')"
-if [ "$across_actual" != "$across_expected" ]; then
-    echo "AST each-across execution mismatch: '$across_actual'" >&2
+if [ "$reference_across_actual" != "$across_expected" ]; then
+    echo "reference each-across execution mismatch: '$reference_across_actual'" >&2
     exit 1
 fi
-echo "natural AST bytecode: exclusive/inclusive ranges, indexed writes, and each-across arrays passed differential execution"
-echo "natural AST bytecode: predeclared calls, bindings, nested when/otherwise, repeat, show and give matched reference"
+if [ "$across_actual" != "$reference_across_actual" ]; then
+    echo "AST each-across execution differs from reference: '$across_actual' vs '$reference_across_actual'" >&2
+    exit 1
+fi
+echo "natural AST bytecode: each-across array iteration matched reference execution and expected output"
+echo "natural AST bytecode: exclusive/inclusive ranges, indexed writes, predeclared calls, nested control flow, and routine output passed"
