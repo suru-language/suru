@@ -65,7 +65,7 @@ func nab_strip_record_declarations(source: str) -> str {
 }
 
 func nab_strip_choice_declarations(source: str) -> str {
-    let lines: [str] = str_split(source, "\\n");
+    let lines: [str] = str_split(source, "\n");
     mut out: str = "";
     mut in_choice: bool = false;
     mut i: int = 0;
@@ -81,7 +81,7 @@ func nab_strip_choice_declarations(source: str) -> str {
             kept = "";
             in_choice = true;
         }
-        if i > 0 { out = out + "\\n"; }
+        if i > 0 { out = out + "\n"; }
         out = out + kept;
         i += 1;
     }
