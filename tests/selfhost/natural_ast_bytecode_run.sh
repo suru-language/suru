@@ -58,7 +58,7 @@ if ! cmp -s "$tmp/reference-across.sbc" "$tmp/ast-across.sbc"; then
     exit 1
 fi
 across_actual="$("$SURU" exec "$tmp/ast-across.sbc")"
-across_expected="$(printf '4\\n5\\n6\\n15')"
+across_expected="$(printf '4\n5\n6\n15')"
 if [ "$across_actual" != "$across_expected" ]; then
     echo "AST each-across execution mismatch: '$across_actual'" >&2
     exit 1
