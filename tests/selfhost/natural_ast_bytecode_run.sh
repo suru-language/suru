@@ -43,7 +43,7 @@ if ! cmp -s "$tmp/reference-index.sbc" "$tmp/ast-index.sbc"; then
     exit 1
 fi
 indexed_actual="$("$SURU" exec "$tmp/ast-index.sbc")"
-indexed_expected="$(printf '2\\n9')"
+indexed_expected="$(printf '2\n9')"
 if [ "$indexed_actual" != "$indexed_expected" ]; then
     echo "AST indexed-assignment execution mismatch: '$indexed_actual'" >&2
     exit 1
