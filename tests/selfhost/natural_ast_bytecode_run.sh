@@ -26,7 +26,7 @@ if [ "$actual" != "$expected" ]; then
     exit 1
 fi
 
-echo "AST bytecode regression: simple choice match fixture"
+echo "AST bytecode regression: simple explicit choice match fixture"
 choice_source="$DIR/natural_ast_choose_simple.suru"
 "$SURU" --syntax=natural compile "$choice_source" "$tmp/reference-choose.sbc"
 "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
@@ -37,7 +37,7 @@ if ! cmp -s "$tmp/reference-choose.sbc" "$tmp/ast-choose.sbc"; then
     exit 1
 fi
 choice_actual="$("$SURU" exec "$tmp/ast-choose.sbc")"
-choice_expected="$(printf 'up\ndown')"
+choice_expected="up"
 if [ "$choice_actual" != "$choice_expected" ]; then
     echo "AST choice-match C VM execution mismatch: '$choice_actual'" >&2
     exit 1
@@ -48,7 +48,24 @@ if [ "$choice_suru_actual" != "$choice_expected" ]; then
     echo "AST choice-match SURU VM execution mismatch: '$choice_suru_actual'" >&2
     exit 1
 fi
-echo "natural AST bytecode: simple exhaustive choice matching passed bytecode parity and both VMs"
+
+echo "AST bytecode regression: wildcard choice match fixture"
+wildcard_source="$DIR/natural_ast_choose_wildcard.suru"
+"$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+    "$wildcard_source" "$tmp/ast-choose-wildcard.sbc"
+wildcard_actual="$("$SURU" exec "$tmp/ast-choose-wildcard.sbc")"
+wildcard_expected="down"
+if [ "$wildcard_actual" != "$wildcard_expected" ]; then
+    echo "AST wildcard choice C VM mismatch: '$wildcard_actual'" >&2
+    exit 1
+fi
+wildcard_suru_actual="$(timeout -k 1s 10s "$SURU" run \
+    "$DIR/natural_vm_driver.suru" "$tmp/ast-choose-wildcard.sbc" 2>&1)"
+if [ "$wildcard_suru_actual" != "$wildcard_expected" ]; then
+    echo "AST wildcard choice SURU VM mismatch: '$wildcard_suru_actual'" >&2
+    exit 1
+fi
+echo "natural AST bytecode: explicit and wildcard choice matching passed in both VMs"
 
 echo "AST bytecode regression: nested forward routine-call fixture"
 call_source="$DIR/natural_ast_call_types.suru"
