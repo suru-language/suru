@@ -51,6 +51,29 @@ if [ "$indexed_actual" != "$indexed_expected" ]; then
     echo "AST indexed-assignment execution mismatch: '$indexed_actual'" >&2
     exit 1
 fi
+echo "AST bytecode regression: record-field assignment fixture"
+record_source="$ROOT/tests/natural/routine_ast_record_field_assignment.suru"
+"$SURU" --syntax=natural compile "$record_source" "$tmp/reference-record.sbc"
+"$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+    "$record_source" "$tmp/ast-record.sbc"
+if ! cmp -s "$tmp/reference-record.sbc" "$tmp/ast-record.sbc"; then
+    echo "AST record-field bytecode differs from reference" >&2
+    cmp -l "$tmp/reference-record.sbc" "$tmp/ast-record.sbc" | head -12 >&2 || true
+    exit 1
+fi
+record_actual="$("$SURU" exec "$tmp/ast-record.sbc")"
+record_expected="41"
+if [ "$record_actual" != "$record_expected" ]; then
+    echo "AST record-field C VM execution mismatch: '$record_actual'" >&2
+    exit 1
+fi
+suru_vm_record_actual="$(timeout -k 1s 10s "$SURU" run \
+    "$DIR/natural_vm_driver.suru" "$tmp/ast-record.sbc" 2>&1)"
+if [ "$suru_vm_record_actual" != "$record_expected" ]; then
+    echo "AST record-field SURU VM execution mismatch: '$suru_vm_record_actual'" >&2
+    exit 1
+fi
+echo "natural AST bytecode: record-field assignment matched reference bytecode and passed both VMs"
 echo "AST bytecode regression: array-across fixture"
 across_source="$DIR/natural_ast_each_across.suru"
 echo "natural AST bytecode: compiling each-across fixture"
