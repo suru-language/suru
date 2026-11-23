@@ -37,7 +37,7 @@ if ! cmp -s "$tmp/reference-choose.sbc" "$tmp/ast-choose.sbc"; then
     exit 1
 fi
 choice_actual="$("$SURU" exec "$tmp/ast-choose.sbc")"
-choice_expected="up"
+choice_expected="$(printf 'up\ndown')"
 if [ "$choice_actual" != "$choice_expected" ]; then
     echo "AST choice-match C VM execution mismatch: '$choice_actual'" >&2
     exit 1
