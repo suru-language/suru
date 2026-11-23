@@ -4,7 +4,7 @@ record Counter
 end record
 
 routine main() -> Unit
-    count counter: Counter = none
+    value counter: Counter = none
     set counter.count to 41
     show(counter.count)
 end routine
