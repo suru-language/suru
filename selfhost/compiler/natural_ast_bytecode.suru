@@ -425,24 +425,39 @@ func nab_collect_ast(source: str) -> [str] {
                 controls[array_len(controls) - 1] =
                     "choose|" + current[1] + "|" + current[2] + "|" + current[3] + "||1";
             } else {
-                if pattern_kind == "call" {
-                    return nab_fail("choice payload patterns are not yet lowered in the AST bytecode path");
-                }
-                if pattern_kind != "atom" {
+                mut variant: str = "";
+                mut pattern_children: [int] = [];
+                if pattern_kind == "atom" {
+                    variant = pattern_name;
+                } else if pattern_kind == "call" {
+                    pattern_children = nbc_ast_children(nodes, roots[0]);
+                    if array_len(pattern_children) == 0 or
+                       nbc_ast_kind(nodes, pattern_children[0]) != "atom" {
+                        return nab_fail("choice payload pattern must use a named variant");
+                    }
+                    variant = nbc_ast_value(nodes, pattern_children[0]);
+                } else {
                     return nab_fail("case pattern must name a choice variant or '_'");
                 }
-                let variant_choice: str = nbc_variant_choice(instructions, pattern_name);
+
+                let variant_choice: str = nbc_variant_choice(instructions, variant);
                 if variant_choice == "" or variant_choice != current[2] {
-                    return nab_fail("case variant '" + pattern_name +
+                    return nab_fail("case variant '" + variant +
                                     "' does not belong to choice '" + current[2] + "'");
                 }
-                if nbc_variant_nargs(instructions, current[2], pattern_name) != 0 {
-                    return nab_fail("case variant '" + pattern_name +
+                let payload_count: int = nbc_variant_nargs(instructions, current[2], variant);
+                if pattern_kind == "atom" and payload_count != 0 {
+                    return nab_fail("case variant '" + variant +
                                     "' requires a payload pattern");
                 }
-                let variant_tag: int = nbc_variant_tag(instructions, current[2], pattern_name);
+                if pattern_kind == "call" and array_len(pattern_children) - 1 != payload_count {
+                    return nab_fail("case variant '" + variant + "' expects " +
+                                    to_str(payload_count) + " payload bindings");
+                }
+
+                let variant_tag: int = nbc_variant_tag(instructions, current[2], variant);
                 if variant_tag < 0 {
-                    return nab_fail("missing tag for choice variant '" + pattern_name + "'");
+                    return nab_fail("missing tag for choice variant '" + variant + "'");
                 }
                 let next_case: str = "ast-choose-next-" + to_str(labels);
                 labels += 1;
@@ -451,10 +466,43 @@ func nab_collect_ast(source: str) -> [str] {
                     return nab_fail("missing choose selector slot");
                 }
                 instructions = nbc_emit(instructions, "BC_LD_LOCAL", to_str(selector_slot));
+                if payload_count > 0 {
+                    instructions = nbc_const(instructions, "int", "BC_CONST_INT", "0");
+                    instructions = nbc_emit(instructions, "BC_IDX_LD", "");
+                }
                 instructions = nbc_const(instructions, "int", "BC_CONST_INT",
                                           to_str(variant_tag));
                 instructions = nbc_emit(instructions, "BC_EQ_I", "");
                 instructions = nbc_emit(instructions, "BC_JZ", "@" + next_case);
+
+                mut payload_index: int = 0;
+                while payload_index < payload_count {
+                    let binding_node: int = pattern_children[payload_index + 1];
+                    if nbc_ast_kind(nodes, binding_node) != "atom" {
+                        return nab_fail("choice payload binding must be a local name or '_'");
+                    }
+                    let binding_name: str = nbc_ast_value(nodes, binding_node);
+                    if binding_name != "_" {
+                        if binding_name == "" or nbc_slot(instructions, binding_name) >= 0 {
+                            return nab_fail("invalid or duplicate choice payload binding '" +
+                                            binding_name + "'");
+                        }
+                        let binding_type: str = nbc_variant_argtype(
+                            instructions, current[2], variant, payload_index);
+                        instructions = nbc_bind(instructions, binding_name);
+                        instructions = nbc_note_type(instructions, binding_name, binding_type);
+                        names = array_concat(names, [binding_name]);
+                        types = array_concat(types, [binding_type]);
+                        instructions = nbc_emit(instructions, "BC_LD_LOCAL",
+                                                to_str(selector_slot));
+                        instructions = nbc_const(instructions, "int", "BC_CONST_INT",
+                                                  to_str(payload_index + 1));
+                        instructions = nbc_emit(instructions, "BC_IDX_LD", "");
+                        instructions = nbc_emit(instructions, "BC_ST_LOCAL",
+                                                to_str(nbc_slot(instructions, binding_name)));
+                    }
+                    payload_index += 1;
+                }
                 controls[array_len(controls) - 1] =
                     "choose|" + current[1] + "|" + current[2] + "|" +
                     current[3] + "|" + next_case + "|0";
