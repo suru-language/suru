@@ -1,0 +1,14 @@
+choice LinkState
+    Up
+    Down
+end choice
+
+routine main() -> Unit
+    value current: LinkState = Down
+    choose current
+        case Up
+            show("wrong")
+        case _
+            show("down")
+    end choose
+end routine
