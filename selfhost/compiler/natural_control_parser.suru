@@ -188,7 +188,7 @@ func nac_skip_to_end(source: str, position: int, end_kind: str) -> int {
 
 func nac_skip_declaration(source: str, first: NToken) -> [str] {
     let kind: str = first.text;
-    if kind != "routine" and kind != "record" and kind != "choice" and kind != "contract" {
+    if kind != "routine" and kind != "record" and kind != "choice" and kind != "contract" and kind != "attempt" {
         return nac_fail(first.start, "not a declaration");
     }
     let end_pos = nac_skip_to_end(source, first.next, kind);
