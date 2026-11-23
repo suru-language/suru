@@ -16,7 +16,7 @@ tests=0
 run_case() {
     local name="$1"
     local src="$2"
-    local required="\${3:-optional}"
+    local required="${3:-optional}"
     printf '%b\n' "$src" > "$tmp/$name.suru"
     if ! "$SURU" --syntax=natural compile "$tmp/$name.suru" \
             "$tmp/$name.sbc" 2>"$tmp/$name-compile.err"; then
