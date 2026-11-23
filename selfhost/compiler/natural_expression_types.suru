@@ -91,6 +91,14 @@ func net_infer(nodes: [str], id: int, names: [str], types: [str],
         if net_is_real(value) { return net_ok("Real"); }
         let found: str = net_lookup(names, types, value);
         if found != "" { return net_ok(found); }
+        let variant_signature: str = net_lookup(field_names, field_types,
+                                                "@variant:" + value);
+        if variant_signature != "" {
+            let variant_parts: [str] = str_split(variant_signature, "|");
+            if array_len(variant_parts) >= 1 and variant_parts[0] != "" {
+                return net_ok(variant_parts[0]);
+            }
+        }
         return net_error("unknown name '" + value + "'");
     }
 
@@ -270,6 +278,34 @@ func net_infer(nodes: [str], id: int, names: [str], types: [str],
                                                   args[parameter_index]);
                 if common != parameters[parameter_index] {
                     return net_error("argument " + to_str(parameter_index + 1) +
+                        " to '" + name + "' has type " + args[parameter_index] +
+                        ", expected " + parameters[parameter_index]);
+                }
+                parameter_index += 1;
+            }
+            return net_ok(signature[0]);
+        }
+        let variant_signature: str = net_lookup(field_names, field_types,
+                                                "@variant:" + name);
+        if variant_signature != "" {
+            let signature: [str] = str_split(variant_signature, "|");
+            if array_len(signature) != 3 {
+                return net_error("invalid choice variant metadata for '" + name + "'");
+            }
+            let parameter_count: int = int_from_str(signature[1]);
+            if array_len(args) != parameter_count {
+                return net_error("choice variant '" + name + "' expects " +
+                    to_str(parameter_count) + " payload values, got " +
+                    to_str(array_len(args)));
+            }
+            mut parameters: [str] = [];
+            if signature[2] != "" { parameters = str_split(signature[2], ","); }
+            mut parameter_index: int = 0;
+            while parameter_index < array_len(parameters) {
+                let common: str = net_common_type(parameters[parameter_index],
+                                                  args[parameter_index]);
+                if common != parameters[parameter_index] {
+                    return net_error("payload " + to_str(parameter_index + 1) +
                         " to '" + name + "' has type " + args[parameter_index] +
                         ", expected " + parameters[parameter_index]);
                 }
