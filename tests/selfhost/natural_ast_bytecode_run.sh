@@ -57,6 +57,7 @@ if [ "$calls_suru_actual" != "$calls_expected" ]; then
     echo "AST nested routine-call SURU VM mismatch: '$calls_suru_actual'" >&2
     exit 1
 fi
+echo "AST nested forward-call fixture: both VMs passed"
 
 bad_type_source="$DIR/natural_ast_bad_call_type.suru"
 if "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
@@ -64,7 +65,11 @@ if "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
     echo "AST bytecode accepted an invalid user-routine argument type" >&2
     exit 1
 fi
-grep -q "argument 1 to 'identity' has type Text, expected Whole" "$tmp/bad-call-type.log"
+if ! grep -q "argument 1 to 'identity' has type Text, expected Whole" "$tmp/bad-call-type.log"; then
+    echo "Unexpected wrong-argument-type diagnostic:" >&2
+    cat "$tmp/bad-call-type.log" >&2
+    exit 1
+fi
 
 bad_arity_source="$DIR/natural_ast_bad_call_arity.suru"
 if "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
@@ -72,7 +77,11 @@ if "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
     echo "AST bytecode accepted an invalid user-routine argument count" >&2
     exit 1
 fi
-grep -q "routine 'identity' expects 1 arguments, got 0" "$tmp/bad-call-arity.log"
+if ! grep -q "routine 'identity' expects 1 arguments, got 0" "$tmp/bad-call-arity.log"; then
+    echo "Unexpected wrong-argument-count diagnostic:" >&2
+    cat "$tmp/bad-call-arity.log" >&2
+    exit 1
+fi
 echo "natural AST bytecode: nested forward calls, return-type inference, and invalid call rejection passed"
 echo "AST bytecode regression: range-loop fixture"
 range_source="$ROOT/tests/natural/routine_ast_each_range.suru"
