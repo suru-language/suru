@@ -25,6 +25,46 @@ if [ "$actual" != "$expected" ]; then
     echo "AST bytecode execution mismatch: '$actual'" >&2
     exit 1
 fi
+
+echo "AST bytecode regression: nested forward routine-call fixture"
+call_source="$DIR/natural_ast_call_types.suru"
+"$SURU" --syntax=natural compile "$call_source" "$tmp/reference-calls.sbc"
+"$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+    "$call_source" "$tmp/ast-calls.sbc"
+if ! cmp -s "$tmp/reference-calls.sbc" "$tmp/ast-calls.sbc"; then
+    echo "AST routine-call bytecode differs from reference" >&2
+    cmp -l "$tmp/reference-calls.sbc" "$tmp/ast-calls.sbc" | head -12 >&2 || true
+    exit 1
+fi
+calls_actual="$("$SURU" exec "$tmp/ast-calls.sbc")"
+calls_expected="6"
+if [ "$calls_actual" != "$calls_expected" ]; then
+    echo "AST nested routine-call C VM mismatch: '$calls_actual'" >&2
+    exit 1
+fi
+calls_suru_actual="$(timeout -k 1s 10s "$SURU" run \
+    "$DIR/natural_vm_driver.suru" "$tmp/ast-calls.sbc" 2>&1)"
+if [ "$calls_suru_actual" != "$calls_expected" ]; then
+    echo "AST nested routine-call SURU VM mismatch: '$calls_suru_actual'" >&2
+    exit 1
+fi
+
+bad_type_source="$DIR/natural_ast_bad_call_type.suru"
+if "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+       "$bad_type_source" "$tmp/bad-call-type.sbc" >"$tmp/bad-call-type.log" 2>&1; then
+    echo "AST bytecode accepted an invalid user-routine argument type" >&2
+    exit 1
+fi
+grep -q "argument 1 to 'identity' has type Text, expected Whole" "$tmp/bad-call-type.log"
+
+bad_arity_source="$DIR/natural_ast_bad_call_arity.suru"
+if "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
+       "$bad_arity_source" "$tmp/bad-call-arity.sbc" >"$tmp/bad-call-arity.log" 2>&1; then
+    echo "AST bytecode accepted an invalid user-routine argument count" >&2
+    exit 1
+fi
+grep -q "routine 'identity' expects 1 arguments, got 0" "$tmp/bad-call-arity.log"
+echo "natural AST bytecode: nested forward calls, return-type inference, and invalid call rejection passed"
 echo "AST bytecode regression: range-loop fixture"
 range_source="$ROOT/tests/natural/routine_ast_each_range.suru"
 "$SURU" run "$DIR/natural_ast_bytecode_driver.suru" \
